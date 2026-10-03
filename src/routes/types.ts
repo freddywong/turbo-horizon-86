@@ -21,8 +21,6 @@ export interface RouteDef {
   fog: { color: number; near: number; far: number };
   ambient: { color: number; intensity: number };
   sun: { color: number; intensity: number; dir: [number, number, number] };
-  carColor: number;
-  carStripe: number;
   startTime: number;
   extendTime: number;
   trafficColors: number[];

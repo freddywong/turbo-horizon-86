@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { SignAtlas } from './atlas';
-import { PlayerCar } from './car';
+import { CarMats, PlayerCar } from './cars/build';
+import { ROSTER } from './cars/roster';
+import { CarSpec } from './cars/spec';
 import { Particles } from './particles';
 import { makeMaterials, PropRenderer } from './props';
 import { RoadMesh } from './road';
@@ -32,6 +34,8 @@ export class World {
   traffic: TrafficCar[] = [];
   particles: Particles;
   private rng = new Rng(7);
+  private mats: CarMats;
+  private plate: [number, number, number, number];
 
   constructor(public route: RouteDef, atlas: SignAtlas) {
     this.data = route.build(atlas);
@@ -49,11 +53,23 @@ export class World {
     this.road = new RoadMesh(this.data.profiles);
     this.scene.add(this.road.mesh);
     this.props = new PropRenderer(this.data.props, mats, this.scene);
-    const plate = atlas.add({ bg: route.id === 'tokyo' ? 0xf0f0e8 : 0xffe040, fg: 0x102060, text: 'TH-86', border: 0x102060 }, 1, 1);
-    this.car = new PlayerCar(route.carColor, route.carStripe, mats, plate);
+    this.mats = mats;
+    this.plate = atlas.add({ bg: route.id === 'tokyo' ? 0xf0f0e8 : 0xffe040, fg: 0x102060, text: 'TH-86', border: 0x102060 }, 1, 1);
+    this.car = new PlayerCar(ROSTER[0], ROSTER[0].paints[0], mats, this.plate);
     this.scene.add(this.car.root);
     this.particles = new Particles(this.scene);
   }
+
+  /** Swap the player's car model. */
+  setPlayerCar(spec: CarSpec, paint: number) {
+    if (this.car.spec === spec && this.carPaint === paint) return;
+    this.scene.remove(this.car.root);
+    this.car.dispose();
+    this.car = new PlayerCar(spec, paint, this.mats, this.plate);
+    this.carPaint = paint;
+    this.scene.add(this.car.root);
+  }
+  private carPaint = -1;
 
   // ------------------------------ traffic ---------------------------------
   laneX(l: number) {

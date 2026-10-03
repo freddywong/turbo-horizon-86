@@ -428,33 +428,7 @@ export function floorLights(rng: Rng): PropDef {
 
 // ----------------------------- traffic ------------------------------------
 
-export function sedan(): PropDef {
-  const g = new GeoBuilder();
-  const l = new GeoBuilder();
-  g.box(0, 0.62, 0, 1.9, 0.7, 4.2, [0xffffff, 0xf4f4f4]);
-  g.poly([[-0.8, 0.97, -0.9], [0.8, 0.97, -0.9], [0.68, 1.5, -0.3], [-0.68, 1.5, -0.3]], 0x223344);
-  g.poly([[-0.68, 1.5, -0.3], [0.68, 1.5, -0.3], [0.68, 1.5, 0.9], [-0.68, 1.5, 0.9]], 0xffffff);
-  g.poly([[-0.68, 1.5, 0.9], [0.68, 1.5, 0.9], [0.8, 0.97, 1.4], [-0.8, 0.97, 1.4]], 0x223344);
-  g.poly([[-0.8, 0.97, -0.9], [-0.68, 1.5, -0.3], [-0.68, 1.5, 0.9], [-0.8, 0.97, 1.4]], 0x2a3a4a);
-  g.poly([[0.8, 0.97, -0.9], [0.68, 1.5, -0.3], [0.68, 1.5, 0.9], [0.8, 0.97, 1.4]], 0x2a3a4a);
-  for (const [x, z] of [[-0.85, -1.35], [0.85, -1.35], [-0.85, 1.35], [0.85, 1.35]]) g.box(x, 0.32, z, 0.3, 0.64, 0.7, 0x151515);
-  g.box(0, 0.42, 2.12, 1.4, 0.2, 0.06, 0x202020);
-  l.box(-0.68, 0.75, 2.11, 0.45, 0.22, 0.04, 0xff2a20);
-  l.box(0.68, 0.75, 2.11, 0.45, 0.22, 0.04, 0xff2a20);
-  return { parts: parts(g, l), radius: 0, max: 24 };
-}
 
-export function van(): PropDef {
-  const g = new GeoBuilder();
-  const l = new GeoBuilder();
-  g.box(0, 1.25, 0, 2.0, 1.9, 4.6, [0xffffff, 0xf2f2f2]);
-  g.box(0, 1.65, 0, 2.04, 0.5, 3.6, 0x223344);
-  g.box(0, 0.9, 0, 2.04, 0.2, 4.64, 0x3a3a3a);
-  for (const [x, z] of [[-0.9, -1.5], [0.9, -1.5], [-0.9, 1.5], [0.9, 1.5]]) g.box(x, 0.32, z, 0.3, 0.64, 0.7, 0x151515);
-  l.box(-0.8, 0.95, 2.31, 0.3, 0.5, 0.04, 0xff2a20);
-  l.box(0.8, 0.95, 2.31, 0.3, 0.5, 0.04, 0xff2a20);
-  return { parts: parts(g, l), radius: 0, max: 16 };
-}
 
 export function truck(stripe: number): PropDef {
   const g = new GeoBuilder();
@@ -469,20 +443,6 @@ export function truck(stripe: number): PropDef {
   return { parts: parts(g, l), radius: 0, max: 10, len: 6.5 };
 }
 
-/** Low wedge coupe. */
-export function coupe(): PropDef {
-  const g = new GeoBuilder();
-  const l = new GeoBuilder();
-  g.box(0, 0.5, 0, 1.9, 0.5, 4.2, [0xffffff, 0xf0f0f0]);
-  g.poly([[-0.8, 0.75, -0.6], [0.8, 0.75, -0.6], [0.66, 1.15, 0.1], [-0.66, 1.15, 0.1]], 0x1a2a3a);
-  g.poly([[-0.66, 1.15, 0.1], [0.66, 1.15, 0.1], [0.66, 1.15, 0.7], [-0.66, 1.15, 0.7]], 0xffffff);
-  g.poly([[-0.66, 1.15, 0.7], [0.66, 1.15, 0.7], [0.85, 0.78, 1.5], [-0.85, 0.78, 1.5]], 0x1a2a3a);
-  for (const sg of [-1, 1]) g.poly([[sg * 0.8, 0.75, -0.6], [sg * 0.66, 1.15, 0.1], [sg * 0.66, 1.15, 0.7], [sg * 0.85, 0.78, 1.5]], 0x24344a);
-  g.box(0, 0.86, 2.0, 1.8, 0.05, 0.3, 0x1a1a1a);
-  for (const [x, z] of [[-0.85, -1.3], [0.85, -1.3], [-0.85, 1.3], [0.85, 1.3]]) g.box(x, 0.3, z, 0.3, 0.6, 0.66, 0x151515);
-  l.box(0, 0.62, 2.11, 1.7, 0.14, 0.04, 0xff2a20);
-  return { parts: parts(g, l), radius: 0, max: 16 };
-}
 
 /** City bus / coach. */
 export function bus(stripe: number): PropDef {
@@ -499,11 +459,3 @@ export function bus(stripe: number): PropDef {
   return { parts: parts(g, l), radius: 0, max: 8, len: 7.5 };
 }
 
-/** Tokyo-style taxi with a roof lamp. */
-export function taxi(): PropDef {
-  const d = sedan();
-  const l = new GeoBuilder();
-  l.box(0, 1.62, 0.3, 0.5, 0.22, 0.3, 0xffe080);
-  d.parts.push({ geo: l.build(), mat: 'glow' });
-  return d;
-}

@@ -1,5 +1,6 @@
 import { SignAtlas } from '../atlas';
 import { Backdrop, clouds, disc, horizonBand, mountainRing, skyDome, skylineRing } from '../backdrop';
+import { TRAFFIC, trafficProp } from '../cars/traffic';
 import * as P from '../props';
 import { makeProfile, RoadStyle } from '../road';
 import { Rng } from '../rng';
@@ -25,8 +26,6 @@ export const miami: RouteDef = {
   fog: { color: FOG, near: 160, far: 1150 },
   ambient: { color: 0xffffff, intensity: 1.9 },
   sun: { color: 0xfff2dc, intensity: 2.4, dir: [-0.5, 1, 0.8] },
-  carColor: 0xe8202a,
-  carStripe: 0xffffff,
   startTime: 60,
   extendTime: 40,
   trafficColors: [0xff5a5a, 0x5ab0ff, 0xffe05a, 0xffffff, 0x60e0a0, 0xff9ad0, 0xffa040],
@@ -101,7 +100,9 @@ export const miami: RouteDef = {
     const gStart = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0xe02a2a, text: 'START', stripes: 0x1a1a1a }, 4, 1)));
     const gCheck = reg.add(P.gate(atlas.add({ bg: 0xffe040, fg: 0x1a1a1a, text: 'CHECKPOINT' }, 4, 1), 0xf0f0f0, 0x1a5ae0));
     const gGoal = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0x000000, text: 'GOAL', stripes: -1 }, 4, 1), 0xf0f0f0, 0x1a1a1a));
-    const trafficTypes = [reg.add(P.sedan()), reg.add(P.coupe()), reg.add(P.van()), reg.add(P.truck(0x2a8aff)), reg.add(P.coupe()), reg.add(P.bus(0xff5a8a))];
+    const T = TRAFFIC;
+    const trafficTypes = [T.golf, T.volvo240, T.ae86, T.cherokee, T.caprice, T.w124, T.f150].map((s) => reg.add(trafficProp(s)))
+      .concat([reg.add(P.truck(0x2a8aff)), reg.add(P.bus(0xff5a8a))]);
     const chevR = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'R' }, 2, 1)));
     const chevL = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'L' }, 2, 1)));
     const hedge = reg.add(P.hedge());

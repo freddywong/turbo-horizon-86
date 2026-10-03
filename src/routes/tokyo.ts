@@ -1,6 +1,7 @@
 import { SignAtlas, SignSpec } from '../atlas';
 import { Backdrop, clouds, disc, horizonBand, skyDome, skylineRing, stars, volcano } from '../backdrop';
 import { GeoBuilder } from '../geom';
+import { TRAFFIC, trafficProp } from '../cars/traffic';
 import * as P from '../props';
 import { makeProfile, RoadStyle, SideStep } from '../road';
 import { Rng } from '../rng';
@@ -123,8 +124,6 @@ export const tokyo: RouteDef = {
   fog: { color: FOG, near: 140, far: 1150 },
   ambient: { color: 0xc4c4ff, intensity: 1.8 },
   sun: { color: 0xffc0d8, intensity: 1.6, dir: [-0.4, 1, 0.9] },
-  carColor: 0xffd020,
-  carStripe: 0x1a1a1a,
   startTime: 60,
   extendTime: 40,
   trafficColors: [0xffffff, 0xe03030, 0x40a0ff, 0x30d0a0, 0xffa030, 0xd060ff, 0x9a9aa8],
@@ -191,8 +190,10 @@ export const tokyo: RouteDef = {
     const gStart = reg.add(P.gate(atlas.add({ bg: 0x10101c, fg: 0x40f0ff, text: 'START', border: 0x40f0ff }, 4, 1), 0x9a9aa8, 0xff3a8a, 0x40f0ff));
     const gCheck = reg.add(P.gate(atlas.add({ bg: 0xffe040, fg: 0x1a1a1a, text: 'CHECKPOINT' }, 4, 1), 0x9a9aa8, 0x1a5ae0, 0xffe040));
     const gGoal = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0x000000, text: 'GOAL', stripes: -1 }, 4, 1), 0x9a9aa8, 0x1a1a1a, 0xff3a8a));
-    const trafficTypes = [reg.add(P.sedan()), reg.add(P.taxi()), reg.add(P.van()), reg.add(P.truck(0xe02a2a)), reg.add(P.truck(0x1a8a3a)),
-      reg.add(P.coupe()), reg.add(P.bus(0x2a8a5a)), reg.add(P.taxi())];
+    const T = TRAFFIC;
+    const trafficTypes = [T.cedric, T.every, T.civic, T.ae86, T.crown].map((s) => reg.add(trafficProp(s)))
+      .concat([reg.add(trafficProp(T.crown, { taxi: true })), reg.add(trafficProp(T.crown, { taxi: true })),
+        reg.add(P.truck(0xe02a2a)), reg.add(P.truck(0x1a8a3a)), reg.add(P.bus(0x2a8a5a))]);
     const chevR = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'R' }, 2, 1), 0.3));
     const chevL = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'L' }, 2, 1), 0.3));
     const bridge = reg.add(P.overpass(0x2a8aa0));

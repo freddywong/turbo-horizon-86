@@ -7,6 +7,7 @@ import { Hud } from './hud';
 import { Input } from './input';
 import { miami } from './routes/miami';
 import { tokyo } from './routes/tokyo';
+import { TouchControls } from './touch';
 import { World } from './world';
 
 /** Internal framebuffer: roughly the resolution of a mid-80s arcade board, 16:9. */
@@ -32,14 +33,21 @@ async function boot() {
   const audio = new Audio();
   const hud = new Hud(document.getElementById('hud') as HTMLCanvasElement);
   const game = new Game(worlds, camera, input, audio, hud);
-  input.onFirstInput = () => {
+  input.onFirstInput(() => {
     audio.init();
     audio.music('title');
-  };
+  });
+  const touch = new TouchControls(input, stage, () => (game.touch = true));
+  // mouse clicks work as menu taps too
+  window.addEventListener('mousedown', (e) => {
+    if (touch.enabled) return;
+    const r = stage.getBoundingClientRect();
+    input.tap(((e.clientX - r.left) / r.width) * 852, ((e.clientY - r.top) / r.height) * 480);
+  });
   (window as unknown as { game: Game }).game = game;
 
   const fit = () => {
-    const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+    const s = Math.min(window.innerWidth / W, window.innerHeight / H) || 1;
     const scale = s >= 3 ? Math.floor(s) : s;
     stage.style.width = `${Math.floor(W * scale)}px`;
     stage.style.height = `${Math.floor(H * scale)}px`;
@@ -51,6 +59,8 @@ async function boot() {
   const frame = (now: number) => {
     const dt = Math.min(1 / 30, (now - last) / 1000);
     last = now;
+    const driving = (game.state === 'race' || game.state === 'countdown') && !game.paused;
+    if (touch.update(driving) && driving) game.paused = true;
     game.update(dt);
     game.draw();
     input.endFrame();

@@ -3,11 +3,13 @@ import { Audio } from './audio';
 import { CYAN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
 import { Input } from './input';
 import { ROAD_HALF, SEG } from './track';
+import { ROSTER } from './cars/roster';
+import { CarSpec } from './cars/spec';
 import { World } from './world';
 
-type State = 'attract' | 'select' | 'countdown' | 'race' | 'goal' | 'over';
+type State = 'attract' | 'select' | 'carselect' | 'countdown' | 'race' | 'goal' | 'over';
 
-const VMAX = 82; // ~295 km/h
+const VMAX = 82; // reference top speed (~295 km/h) for camera / gearing
 const KMH = 3.6;
 const GEARS = [0, 18, 34, 50, 66, 84];
 const STEER_RATE = 25;
@@ -18,6 +20,21 @@ const loadHi = (): number => {
     return parseInt(localStorage.getItem('th86-hi') ?? '0', 10) || 0;
   } catch {
     return 0;
+  }
+};
+const loadCar = (): [number, number] => {
+  try {
+    const v = JSON.parse(localStorage.getItem('th86-car') ?? '[0,0]');
+    return [Math.min(ROSTER.length - 1, v[0] | 0), v[1] | 0];
+  } catch {
+    return [0, 0];
+  }
+};
+const saveCar = (c: number, p: number) => {
+  try {
+    localStorage.setItem('th86-car', JSON.stringify([c, p]));
+  } catch {
+    /* storage unavailable */
   }
 };
 const saveHi = (v: number) => {
@@ -64,6 +81,19 @@ export class Game {
   attractRoute = 0;
   clock = 0;
   private lastBeep = -1;
+  carIdx = loadCar()[0];
+  paintIdx = loadCar()[1];
+  touch = false; // set by the touch controls; changes prompts
+
+  get spec(): CarSpec {
+    return ROSTER[this.carIdx];
+  }
+  get vmax(): number {
+    return this.spec.stats.vmax / KMH;
+  }
+  private applyCar(spec = this.spec, paint = spec.paints[this.paintIdx % spec.paints.length]) {
+    this.world.setPlayerCar(spec, paint);
+  }
 
   constructor(private worlds: World[], private camera: THREE.PerspectiveCamera, private input: Input,
     private audio: Audio, private hud: Hud) {
@@ -75,6 +105,7 @@ export class Game {
     if (this.world === this.worlds[i] && this.routeIdx === i) return;
     this.routeIdx = i;
     this.world = this.worlds[i];
+    if (this.state !== 'attract') this.applyCar();
   }
 
   private resetPlayer(demo: boolean) {
@@ -118,9 +149,15 @@ export class Game {
     if (inp.hit('KeyM')) this.audio.toggleMute();
 
     if (this.paused) {
-      if (inp.hit('Escape')) this.paused = false;
-      else if (inp.hit('KeyR')) this.startRace();
-      else if (inp.hit('KeyQ')) { this.paused = false; this.toSelect(); }
+      let act = inp.hit('Escape') ? 'resume' : inp.hit('KeyR') ? 'restart' : inp.hit('KeyQ') ? 'quit' : '';
+      for (const tp of inp.taps) {
+        if (tp.y > 222 && tp.y < 254) act = 'resume';
+        else if (tp.y >= 254 && tp.y < 280) act = 'restart';
+        else if (tp.y >= 280 && tp.y < 310) act = 'quit';
+      }
+      if (act === 'resume') this.paused = false;
+      else if (act === 'restart') this.startRace();
+      else if (act === 'quit') { this.paused = false; this.toSelect(); }
       this.audio.engine(false, 0, 0);
       this.audio.skid(0);
       return;
@@ -134,10 +171,12 @@ export class Game {
           this.demoClock = 0;
           this.attractRoute = 1 - this.attractRoute;
           this.setWorld(this.attractRoute);
+          const s = ROSTER[Math.floor(Math.random() * ROSTER.length)];
+          this.world.setPlayerCar(s, s.paints[0]);
           this.resetPlayer(true);
         }
         this.drive(dt, this.autopilot(), true);
-        if (inp.confirm) {
+        if (inp.confirm || inp.taps.length) {
           this.audio.coin();
           this.toSelect();
         }
@@ -145,13 +184,60 @@ export class Game {
       }
       case 'select': {
         this.drive(dt, this.autopilot(), true);
-        if (inp.hit('ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS')) {
+        let pick = -1, go = inp.confirm || this.t > 20;
+        if (inp.hit('ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS')) pick = 1 - this.routeIdx;
+        for (const tp of inp.taps) {
+          if (tp.y > 140 && tp.y < 280) {
+            const i = tp.x < HUD_W / 2 ? 0 : 1;
+            if (i === this.routeIdx) go = true;
+            else pick = i;
+          } else if (tp.y > 280) go = true;
+        }
+        if (pick >= 0) {
           this.audio.blip();
-          this.setWorld(1 - this.routeIdx);
+          this.setWorld(pick);
           this.resetPlayer(true);
         }
         if (inp.hit('Escape')) { this.go('attract'); this.audio.music('title'); }
-        else if (inp.confirm || this.t > 20) { this.audio.coin(); this.startRace(); }
+        else if (go) { this.audio.coin(); this.toCarSelect(); }
+        break;
+      }
+      case 'carselect': {
+        // parked on the start straight, camera circles the car
+        this.speed = 0;
+        let dc = 0, dp = 0, go = inp.confirm || this.t > 25;
+        if (inp.hit('ArrowLeft', 'KeyA')) dc = -1;
+        if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
+        if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
+        for (const tp of inp.taps) {
+          if (tp.y > 380 && tp.x > HUD_W / 2 - 150 && tp.x < HUD_W / 2 + 150) go = true;
+          else if (tp.x < 160) dc = -1;
+          else if (tp.x > HUD_W - 160) dc = 1;
+          else dp = 1;
+        }
+        if (dc) {
+          this.carIdx = (this.carIdx + dc + ROSTER.length) % ROSTER.length;
+          this.paintIdx = 0;
+          this.audio.blip();
+        }
+        if (dp) {
+          this.paintIdx = (this.paintIdx + 1) % this.spec.paints.length;
+          this.audio.blip();
+        }
+        if (dc || dp) this.applyCar();
+        if (inp.hit('Escape')) this.toSelect();
+        else if (go) {
+          saveCar(this.carIdx, this.paintIdx);
+          this.audio.coin();
+          this.startRace();
+        }
+        this.updateWorld(dt, { steer: 0, yaw: 0, spin: 0, bounce: 0 });
+        const a = this.t * 0.45 + 0.6;
+        const cam = this.camera;
+        cam.fov = 40;
+        cam.updateProjectionMatrix();
+        cam.position.set(this.px + Math.sin(a) * 7, 2.0, Math.cos(a) * 7);
+        cam.lookAt(this.px, 0.35, 0);
         break;
       }
       case 'countdown': {
@@ -211,13 +297,13 @@ export class Game {
           if (Math.floor(this.t * 12) % 2 === 0) this.audio.blip();
           if (this.bonusLeft <= 0) this.saveScore();
         }
-        if (this.t > 3 && this.bonusLeft <= 0 && (inp.confirm || this.t > 14)) this.toSelect();
+        if (this.t > 3 && this.bonusLeft <= 0 && (inp.confirm || inp.taps.length || this.t > 14)) this.toSelect();
         if (inp.hit('KeyR')) this.startRace();
         break;
       }
       case 'over': {
         this.drive(dt, { accel: false, brake: this.t > 1, steer: 0, drift: false }, false);
-        if (this.t > 2.5 && (inp.confirm || this.t > 12)) this.toSelect();
+        if (this.t > 2.5 && (inp.confirm || inp.taps.length || this.t > 12)) this.toSelect();
         if (inp.hit('KeyR')) this.startRace();
         break;
       }
@@ -233,8 +319,16 @@ export class Game {
 
   private toSelect() {
     this.go('select');
+    this.applyCar();
     this.resetPlayer(true);
     this.audio.music('title');
+  }
+
+  private toCarSelect() {
+    this.go('carselect');
+    this.applyCar();
+    this.resetPlayer(false);
+    this.px = 0;
   }
 
   /** Simple demo driver: hold a lane, dodge traffic, counter the curve push. */
@@ -280,7 +374,8 @@ export class Game {
       if (this.crashT <= 0) this.crashYaw = 0;
     } else {
       const v = this.speed;
-      if (c.accel) this.speed += 30 * (1 - Math.pow(v / VMAX, 1.8)) * dt + 2 * dt;
+      const st = this.spec.stats;
+      if (c.accel) this.speed += 30 * st.accel * (1 - Math.pow(v / this.vmax, 1.8)) * dt + 2 * dt;
       else if (c.brake) this.speed -= 58 * dt;
       else this.speed -= (3 + v * 0.035) * dt;
 
@@ -288,8 +383,8 @@ export class Game {
       const target = c.steer;
       const rate = target === 0 ? 9 : 7;
       this.steer += Math.sign(target - this.steer) * Math.min(Math.abs(target - this.steer), rate * dt);
-      let lat = this.steer * STEER_RATE * Math.min(1, v / 22);
-      let cf = seg.curve * v * v * CF;
+      let lat = this.steer * STEER_RATE * st.grip * Math.min(1, v / 22);
+      let cf = (seg.curve * v * v * CF) / st.grip;
       this.drifting = c.drift && v > 30 && Math.abs(c.steer) > 0;
       if (this.drifting) {
         lat *= 1.45;
@@ -335,7 +430,7 @@ export class Game {
         }
       }
     }
-    this.speed = Math.max(0, Math.min(VMAX, this.speed));
+    this.speed = Math.max(0, Math.min(this.vmax, this.speed));
     this.pos += this.speed * dt;
     this.wheelSpin -= this.speed * dt / 0.37;
     if ((this.state === 'attract' || this.state === 'select') && this.pos > track.goalDist - 200) this.resetPlayer(true);
@@ -346,8 +441,9 @@ export class Game {
 
     // engine audio: automatic gearbox
     let g = 1;
-    while (g < GEARS.length - 1 && this.speed > GEARS[g]) g++;
-    const rpm = 0.25 + 0.75 * Math.min(1, (this.speed - GEARS[g - 1]) / (GEARS[g] - GEARS[g - 1]));
+    const gs = this.vmax / VMAX;
+    while (g < GEARS.length - 1 && this.speed > GEARS[g] * gs) g++;
+    const rpm = 0.25 + 0.75 * Math.min(1, (this.speed - GEARS[g - 1] * gs) / ((GEARS[g] - GEARS[g - 1]) * gs));
     const audible = this.state !== 'attract' && this.state !== 'select';
     this.audio.engine(audible, rpm, c.accel ? 1 : 0);
     this.audio.skid(audible ? skid * Math.min(1, this.speed / 20) : 0);
@@ -425,7 +521,7 @@ export class Game {
         h.logo('HORIZON', HUD_W / 2, 150, 56, 0x80f8ff, 0x2a90ff, 0x1a2a90);
         h.text("'86", HUD_W / 2 + 230, 210, 24, PINK, 'left');
         h.text('ARCADE  ROAD  RACING', HUD_W / 2, 236, 16, WHITE, 'center');
-        if (blink) h.text('PRESS ENTER', HUD_W / 2, 320, 24, YELLOW, 'center');
+        if (blink) h.text(this.touch ? 'TAP TO START' : 'PRESS ENTER', HUD_W / 2, 320, 24, YELLOW, 'center');
         h.text(`HI-SCORE ${String(this.hi).padStart(8, '0')}`, HUD_W / 2, 20, 16, CYAN, 'center');
         h.text('FREE PLAY', HUD_W - 20, HUD_H - 30, 16, WHITE, 'right');
         h.text('©1986 HORIZON SOFT', 20, HUD_H - 30, 16, WHITE, 'left');
@@ -443,8 +539,34 @@ export class Game {
           h.text(w.route.lines[0], x + bw / 2, y + 30, 24, col, 'center');
           h.text(w.route.lines[1], x + bw / 2, y + 66, 24, col, 'center');
         });
-        h.text('<  >  CHOOSE    ENTER  START', HUD_W / 2, 296, 16, WHITE, 'center');
+        h.text(this.touch ? 'TAP A ROUTE, TAP AGAIN TO GO' : '<  >  CHOOSE    ENTER  NEXT', HUD_W / 2, 296, 16, WHITE, 'center');
         h.text(`${Math.max(0, Math.ceil(20 - this.t))}`, HUD_W / 2, 92, 32, ORANGE, 'center');
+        break;
+      }
+      case 'carselect': {
+        const s = this.spec;
+        h.text('SELECT  YOUR  CAR', HUD_W / 2, 20, 24, YELLOW, 'center');
+        h.text(`${Math.max(0, Math.ceil(25 - this.t))}`, HUD_W - 30, 20, 24, ORANGE, 'right');
+        h.text(s.make, HUD_W / 2, 64, 16, CYAN, 'center');
+        h.text(s.name, HUD_W / 2, 88, 32, WHITE, 'center');
+        h.text(`${s.year}  ${s.group}`, HUD_W / 2, 130, 16, PINK, 'center');
+        // big arrows
+        h.text('<', 40, 210, 48, blink ? YELLOW : WHITE, 'center');
+        h.text('>', HUD_W - 40, 210, 48, blink ? YELLOW : WHITE, 'center');
+        // stat bars
+        const bars: [string, number][] = [
+          ['SPEED', (s.stats.vmax - 260) / 90], ['ACCEL', (s.stats.accel - 0.85) / 0.3], ['GRIP', (s.stats.grip - 0.82) / 0.38],
+        ];
+        bars.forEach(([label, v], i) => {
+          const y = 330 + i * 22;
+          h.text(label, 40, y, 16, YELLOW);
+          for (let k = 0; k < 12; k++) h.rect(150 + k * 14, y, 11, 16, k < Math.round(Math.max(0.1, Math.min(1, v)) * 12) ? (i === 0 ? RED : i === 1 ? ORANGE : 0x40e040) : 0x202040);
+        });
+        h.text(`${s.stats.vmax} KM/H`, 340, 330, 16, WHITE);
+        h.text(`CAR ${this.carIdx + 1}/${ROSTER.length}`, HUD_W - 30, 330, 16, WHITE, 'right');
+        h.text(this.touch ? 'TAP CAR: COLOUR' : '^ v  COLOUR', HUD_W - 30, 356, 16, CYAN, 'right');
+        h.box(HUD_W / 2 - 150, 410, 300, 50, 0x1a5ab8, blink ? YELLOW : WHITE);
+        h.text(this.touch ? 'TAP TO RACE' : 'ENTER  RACE', HUD_W / 2, 427, 16, WHITE, 'center');
         break;
       }
       default: {
@@ -458,14 +580,14 @@ export class Game {
           h.text('GOAL!', HUD_W / 2, 140, 64, YELLOW, 'center');
           h.text('CONGRATULATIONS', HUD_W / 2, 230, 24, CYAN, 'center');
           h.text(`TIME BONUS  ${Math.ceil(this.bonusLeft * 10000)}`, HUD_W / 2, 280, 16, WHITE, 'center');
-          if (this.t > 3 && this.bonusLeft <= 0 && blink) h.text('PRESS ENTER', HUD_W / 2, 330, 24, YELLOW, 'center');
+          if (this.t > 3 && this.bonusLeft <= 0 && blink) h.text(this.touch ? 'TAP TO CONTINUE' : 'PRESS ENTER', HUD_W / 2, 330, 24, YELLOW, 'center');
         }
         if (this.state === 'over') {
           if (this.t < 2.5) h.text('TIME UP', HUD_W / 2, 180, 48, RED, 'center');
           else {
             h.text('GAME OVER', HUD_W / 2, 170, 48, RED, 'center');
             h.text(`SCORE ${this.score}`, HUD_W / 2, 250, 24, WHITE, 'center');
-            if (blink) h.text('PRESS ENTER', HUD_W / 2, 310, 24, YELLOW, 'center');
+            if (blink) h.text(this.touch ? 'TAP TO CONTINUE' : 'PRESS ENTER', HUD_W / 2, 310, 24, YELLOW, 'center');
           }
         }
         if (this.clock < this.msgUntil && (this.msg === 'GO!' || blink)) {
@@ -475,9 +597,9 @@ export class Game {
         if (this.paused) {
           h.box(HUD_W / 2 - 220, 150, 440, 170, 0x101030, WHITE);
           h.text('PAUSE', HUD_W / 2, 180, 32, YELLOW, 'center');
-          h.text('ESC  RESUME', HUD_W / 2, 236, 16, WHITE, 'center');
-          h.text('R  RESTART', HUD_W / 2, 262, 16, WHITE, 'center');
-          h.text('Q  QUIT', HUD_W / 2, 288, 16, WHITE, 'center');
+          h.text(this.touch ? 'RESUME' : 'ESC  RESUME', HUD_W / 2, 230, 16, WHITE, 'center');
+          h.text(this.touch ? 'RESTART' : 'R  RESTART', HUD_W / 2, 260, 16, WHITE, 'center');
+          h.text(this.touch ? 'QUIT' : 'Q  QUIT', HUD_W / 2, 290, 16, WHITE, 'center');
         }
       }
     }
@@ -498,13 +620,17 @@ export class Game {
 
     // speed + tach
     const kmh = Math.round(this.speed * KMH);
-    h.text('SPEED', 20, HUD_H - 92, 16, YELLOW);
-    h.text(String(kmh).padStart(3, ' '), 20, HUD_H - 66, 32, WHITE);
-    h.text('KM/H', 130, HUD_H - 50, 16, CYAN);
-    h.tach(220, HUD_H - 24, this.speed / VMAX);
+    // on phones the thumbs cover the bottom corners, so the gauges move up
+    const t = this.touch;
+    const sy = t ? 70 : HUD_H - 92;
+    h.text('SPEED', 20, sy, 16, YELLOW);
+    h.text(String(kmh).padStart(3, ' '), 20, sy + 26, 32, WHITE);
+    h.text('KM/H', 130, sy + 42, 16, CYAN);
+    if (t) h.tach(20, sy + 100, this.speed / this.vmax);
+    else h.tach(220, HUD_H - 24, this.speed / this.vmax);
 
     // course progress bar
-    const x0 = HUD_W - 250, x1 = HUD_W - 24, y = HUD_H - 34;
+    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 24, y = t ? 118 : HUD_H - 34;
     h.text('COURSE', x0, y - 26, 16, YELLOW);
     h.rect(x0, y, x1 - x0, 8, 0x202040);
     const goal = this.world.track.goalDist;
