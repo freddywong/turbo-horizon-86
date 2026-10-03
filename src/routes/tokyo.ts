@@ -1,5 +1,5 @@
 import { SignAtlas, SignSpec } from '../atlas';
-import { Backdrop, disc, horizonBand, skyDome, skylineRing, stars, volcano } from '../backdrop';
+import { Backdrop, clouds, disc, horizonBand, skyDome, skylineRing, stars, volcano } from '../backdrop';
 import { GeoBuilder } from '../geom';
 import * as P from '../props';
 import { makeProfile, RoadStyle, SideStep } from '../road';
@@ -191,7 +191,12 @@ export const tokyo: RouteDef = {
     const gStart = reg.add(P.gate(atlas.add({ bg: 0x10101c, fg: 0x40f0ff, text: 'START', border: 0x40f0ff }, 4, 1), 0x9a9aa8, 0xff3a8a, 0x40f0ff));
     const gCheck = reg.add(P.gate(atlas.add({ bg: 0xffe040, fg: 0x1a1a1a, text: 'CHECKPOINT' }, 4, 1), 0x9a9aa8, 0x1a5ae0, 0xffe040));
     const gGoal = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0x000000, text: 'GOAL', stripes: -1 }, 4, 1), 0x9a9aa8, 0x1a1a1a, 0xff3a8a));
-    const trafficTypes = [reg.add(P.sedan()), reg.add(P.sedan()), reg.add(P.van()), reg.add(P.truck(0xe02a2a)), reg.add(P.truck(0x1a8a3a))];
+    const trafficTypes = [reg.add(P.sedan()), reg.add(P.taxi()), reg.add(P.van()), reg.add(P.truck(0xe02a2a)), reg.add(P.truck(0x1a8a3a)),
+      reg.add(P.coupe()), reg.add(P.bus(0x2a8a5a)), reg.add(P.taxi())];
+    const chevR = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'R' }, 2, 1), 0.3));
+    const chevL = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'L' }, 2, 1), 0.3));
+    const bridge = reg.add(P.overpass(0x2a8aa0));
+    const lightsBelow = [0, 1, 2].map(() => reg.add(P.floorLights(rng)));
 
     const segs = track.segs;
     const city = (i: number, density: number, near: number) => {
@@ -218,6 +223,13 @@ export const tokyo: RouteDef = {
         continue;
       }
       const z = s.zone;
+      if (Math.abs(s.curve) > 0.0016 && i % 4 === 0) {
+        pr.push(s.curve > 0 ? { t: chevR, x: -(R + 1.95), r: 0.1 } : { t: chevL, x: R + 1.95, r: -0.1 });
+      }
+      if (z !== 'bay' && i % 3 === 0) {
+        pr.push({ t: rng.pick(lightsBelow), x: rng.sign() * (R + rng.range(40, 330)), y: 0, abs: true, r: rng.range(0, 6) });
+      }
+      if (z !== 'bay' && i % 130 === 90 && !segs[i + 2]?.tunnel && !segs[i - 2]?.tunnel) pr.push({ t: bridge, x: 0, y: -0.0 });
       if (i % 7 === 0) pr.push({ t: lamp, x: R + 2.6, y: 1.3, r: 0 });
       if (i % 7 === 3) pr.push({ t: lamp, x: -(R + 2.6), y: 1.3, r: Math.PI });
       if (z === 'bay') {
@@ -237,11 +249,13 @@ export const tokyo: RouteDef = {
 
     const bd = new Backdrop();
     bd.addLayer(skyDome([
-      [0.8, 0xff9a5a], [1.8, 0xf27a72], [3.0, 0xd25a86], [4.5, 0xa0448c], [6.5, 0x6e3082], [9, 0x4a2472],
-      [13, 0x321c62], [19, 0x221852], [28, 0x161244], [90, 0x0a0a2c],
+      [0, 0xffa860], [1.2, 0xf27a72], [2.6, 0xd25a86], [4.2, 0xa0448c], [6.2, 0x6e3082], [9, 0x4a2472],
+      [13, 0x321c62], [19, 0x221852], [30, 0x141040], [90, 0x06061e],
     ], FOG), 0);
+    // night clouds lit from below by the city glow
+    bd.addLayer(clouds(rng, 2380, 9, [0x5a3a80, 0x3c2862, 0xc05a88], -Math.PI, Math.PI, [5, 14]), 0.7);
     bd.addLayer(stars(rng, 260), 0.3);
-    bd.addLayer(disc(2500, -0.45, 16, 70, [[1, 0xfff4d0], [0.8, 0xffffe8]], 14), 1);
+    bd.addLayer(disc(2500, -0.45, 16, 70, [[1.6, 0x5a4a8a], [1.3, 0x8a7aaa], [1, 0xfff4d0], [0.8, 0xffffe8]], 16), 1);
     bd.addLayer(volcano(2300, 0.55, 190, 520, 0x3a2a6a, 0xd8d0f0), 1);
     bd.addLayer(skylineRing(rng, 2100, [0x1a1838, 0x201a40, 0x14163a], WIN, 170, () => 1, 0.75, 0.22), 1);
     bd.addLayer(horizonBand(1950, FOG), 0);

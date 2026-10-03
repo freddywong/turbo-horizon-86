@@ -5,7 +5,7 @@ import { Rng } from './rng';
 
 export type MatKind = 'lit' | 'glow' | 'sign';
 export interface PropPart { geo: THREE.BufferGeometry; mat: MatKind; tint?: boolean }
-export interface PropDef { parts: PropPart[]; radius: number; max: number }
+export interface PropDef { parts: PropPart[]; radius: number; max: number; len?: number }
 export type UV = [number, number, number, number];
 
 export interface Materials { lit: THREE.Material; glow: THREE.Material; sign: THREE.Material }
@@ -327,6 +327,105 @@ export function hillPortal(H = 9): PropDef {
   return { parts: parts(g), radius: 0, max: 6 };
 }
 
+/** Yellow/black curve-warning chevron board on two short posts. */
+export function chevron(uv: UV, mount = 0): PropDef {
+  const g = new GeoBuilder();
+  const s = new GeoBuilder();
+  const y0 = 1.0 + mount;
+  if (!mount) for (const x of [-1.5, 1.5]) g.box(x, 0.6, -0.1, 0.16, 1.2, 0.16, 0xe8e8e8);
+  g.box(0, y0 + 0.75, -0.08, 4.3, 1.7, 0.12, 0x1a1a1a);
+  s.quad([-2, y0 + 0.1, 0], [2, y0 + 0.1, 0], [2, y0 + 1.4, 0], [-2, y0 + 1.4, 0], 0xffffff, uv);
+  return { parts: [{ geo: g.build(), mat: 'lit' }, { geo: s.build(), mat: 'sign' }], radius: 1.8, max: 60 };
+}
+
+/** Clipped hedge with flowers, one segment long (rows read as continuous). */
+export function hedge(): PropDef {
+  const g = new GeoBuilder();
+  g.box(0, 0.65, -SEG / 2, 1.5, 1.3, SEG, [0x3a9a3a, 0x52b84a]);
+  const cols = [0xff5a8a, 0xffe040, 0xffffff, 0xff8a30];
+  for (let i = 0; i < 6; i++) g.box((i % 2 ? 0.35 : -0.35), 1.34, -0.5 - i * 0.95, 0.3, 0.12, 0.3, cols[i % cols.length]);
+  return { parts: parts(g), radius: 0, max: 360 };
+}
+
+/** Flag pole with a pennant; pennant colour comes from the instance tint. */
+export function flag(): PropDef {
+  const g = new GeoBuilder();
+  const f = new GeoBuilder();
+  g.prism(0, 0, 0, 8, 0.1, 0.08, 6, 0xf0f0f0, 0xffe040);
+  f.tri([0, 7.8, 0], [0, 6.2, 0], [-2.6, 7.0, 0.3], 0xffffff);
+  f.tri([0, 7.0, 0.01], [0, 6.6, 0.01], [-1.6, 6.85, 0.31], 0xd0d0d0);
+  return { parts: [{ geo: g.build(), mat: 'lit', tint: false }, { geo: f.build(), mat: 'lit', tint: true }], radius: 0.4, max: 80 };
+}
+
+/** Tall cypress / pine made of stacked cones. */
+export function pine(): PropDef {
+  const g = new GeoBuilder();
+  g.prism(0, 0, 0, 1.6, 0.3, 0.25, 5, 0x6a4626);
+  g.prism(0, 0, 1.2, 5.2, 2.4, 0, 7, [0x2a7a3a, 0x1e6430]);
+  g.prism(0, 0, 3.6, 7.6, 1.9, 0, 7, [0x34903f, 0x267034]);
+  g.prism(0, 0, 5.8, 9.6, 1.3, 0, 7, [0x3ea448, 0x2c7a38]);
+  return { parts: parts(g), radius: 1.0, max: 200 };
+}
+
+/** Three surfboards stuck upright in the sand. */
+export function surfboards(): PropDef {
+  const g = new GeoBuilder();
+  const cols: [number, number][] = [[0xff4a6a, 0xffffff], [0x2aa0ff, 0xffe040], [0xffe040, 0xff6a20]];
+  cols.forEach(([c, st], i) => {
+    const x = (i - 1) * 0.8;
+    const pts: V3[] = [];
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      pts.push([x + Math.cos(a) * 0.32, 1.25 + Math.sin(a) * 1.25, i * 0.12]);
+    }
+    g.poly(pts, c);
+    g.quad([x - 0.06, 0.1, i * 0.12 + 0.01], [x + 0.06, 0.1, i * 0.12 + 0.01], [x + 0.06, 2.4, i * 0.12 + 0.01], [x - 0.06, 2.4, i * 0.12 + 0.01], st);
+  });
+  return { parts: parts(g), radius: 0, max: 40 };
+}
+
+/** Little sailing boat for the sea (absolute height 0). */
+export function sailboat(): PropDef {
+  const g = new GeoBuilder();
+  g.poly([[-1.4, 0, -4], [1.4, 0, -4], [1.1, 0.9, -4.4], [-1.1, 0.9, -4.4]], 0xffffff);
+  g.box(0, 0.6, 0, 2.8, 1.2, 8, [0xffffff, 0xe8e8e8, 0xf0f0f0, 0x2a5aa8]);
+  g.box(0, 0.35, 0, 2.84, 0.25, 8.04, 0x2a5aa8);
+  g.box(0, 6, 0.6, 0.15, 10, 0.15, 0xd0d0d0);
+  g.tri([0, 10.5, 0.6], [0, 1.6, 0.6], [0, 1.6, 4.0], 0xffffff);
+  g.tri([0, 9.0, 0.5], [0, 1.6, 0.5], [0, 1.6, -3.0], 0xff6a8a);
+  return { parts: parts(g), radius: 0, max: 40 };
+}
+
+/** Concrete road bridge crossing over the expressway, lit underneath. */
+export function overpass(fascia: number): PropDef {
+  const g = new GeoBuilder();
+  const l = new GeoBuilder();
+  const X = ROAD_HALF + 60, y = 12.5;
+  g.box(0, y, 0, X * 2, 2.4, 11, [0x8a8a98, 0xa8a8b4, 0x6e6e7c, 0x6e6e7c]);
+  g.box(0, y - 0.3, 5.55, X * 2, 1.2, 0.2, fascia);
+  g.box(0, y + 1.7, 5.3, X * 2, 1.0, 0.3, 0xc8c8d0);
+  g.box(0, y + 1.7, -5.3, X * 2, 1.0, 0.3, 0xc8c8d0);
+  for (const x of [-(ROAD_HALF + 5), ROAD_HALF + 5, -(ROAD_HALF + 36), ROAD_HALF + 36]) g.box(x, y / 2 - 20, 0, 2.6, y + 40, 4, [0x7a7a88, 0x8a8a96]);
+  for (let x = -ROAD_HALF; x <= ROAD_HALF; x += 5.5) l.box(x, y - 1.25, 0, 1.6, 0.1, 0.8, 0xfff0c0);
+  for (let x = -X + 4; x < X; x += 9) l.box(x, y + 2.35, 5.3, 0.5, 0.3, 0.4, 0xffc060);
+  return { parts: parts(g, l), radius: 0, max: 6 };
+}
+
+/** A scatter of street lights / windows on the city floor far below the expressway. */
+export function floorLights(rng: Rng): PropDef {
+  const l = new GeoBuilder();
+  const cols = [0xffd070, 0xffffff, 0xffb040, 0x80e0ff, 0xff5a8a];
+  for (let i = 0; i < 26; i++) {
+    const x = rng.range(-45, 45), z = rng.range(-30, 30);
+    const c = rng.pick(cols);
+    if (rng.chance(0.4)) {
+      // a row of lamps along a street
+      for (let k = 0; k < 5; k++) l.box(x + k * 3, 0.4, z, 0.7, 0.7, 0.7, c);
+    } else l.box(x, 0.4, z, 0.9, 0.9, 0.9, c);
+  }
+  return { parts: [{ geo: l.build(), mat: 'glow' }], radius: 0, max: 200 };
+}
+
 // ----------------------------- traffic ------------------------------------
 
 export function sedan(): PropDef {
@@ -367,5 +466,44 @@ export function truck(stripe: number): PropDef {
   for (const [x, z] of [[-1.0, -3.6], [1.0, -3.6], [-1.0, 2.6], [1.0, 2.6], [-1.0, 3.8], [1.0, 3.8]]) g.box(x, 0.45, z, 0.4, 0.9, 0.9, 0x151515);
   l.box(-1.0, 0.95, 4.72, 0.35, 0.3, 0.04, 0xff2a20);
   l.box(1.0, 0.95, 4.72, 0.35, 0.3, 0.04, 0xff2a20);
-  return { parts: parts(g, l), radius: 0, max: 10 };
+  return { parts: parts(g, l), radius: 0, max: 10, len: 6.5 };
+}
+
+/** Low wedge coupe. */
+export function coupe(): PropDef {
+  const g = new GeoBuilder();
+  const l = new GeoBuilder();
+  g.box(0, 0.5, 0, 1.9, 0.5, 4.2, [0xffffff, 0xf0f0f0]);
+  g.poly([[-0.8, 0.75, -0.6], [0.8, 0.75, -0.6], [0.66, 1.15, 0.1], [-0.66, 1.15, 0.1]], 0x1a2a3a);
+  g.poly([[-0.66, 1.15, 0.1], [0.66, 1.15, 0.1], [0.66, 1.15, 0.7], [-0.66, 1.15, 0.7]], 0xffffff);
+  g.poly([[-0.66, 1.15, 0.7], [0.66, 1.15, 0.7], [0.85, 0.78, 1.5], [-0.85, 0.78, 1.5]], 0x1a2a3a);
+  for (const sg of [-1, 1]) g.poly([[sg * 0.8, 0.75, -0.6], [sg * 0.66, 1.15, 0.1], [sg * 0.66, 1.15, 0.7], [sg * 0.85, 0.78, 1.5]], 0x24344a);
+  g.box(0, 0.86, 2.0, 1.8, 0.05, 0.3, 0x1a1a1a);
+  for (const [x, z] of [[-0.85, -1.3], [0.85, -1.3], [-0.85, 1.3], [0.85, 1.3]]) g.box(x, 0.3, z, 0.3, 0.6, 0.66, 0x151515);
+  l.box(0, 0.62, 2.11, 1.7, 0.14, 0.04, 0xff2a20);
+  return { parts: parts(g, l), radius: 0, max: 16 };
+}
+
+/** City bus / coach. */
+export function bus(stripe: number): PropDef {
+  const g = new GeoBuilder();
+  const l = new GeoBuilder();
+  g.box(0, 1.9, 0, 2.5, 3.0, 10, [0xffffff, 0xf4f4f4, 0xe8e8e8, 0xe8e8e8]);
+  g.box(0, 2.4, 0, 2.54, 1.0, 9.0, 0x223344);
+  g.box(0, 1.2, 0, 2.54, 0.4, 10.04, stripe);
+  g.box(0, 2.6, 5.02, 1.8, 0.8, 0.05, 0x223344);
+  for (const [x, z] of [[-1.05, -3.4], [1.05, -3.4], [-1.05, 3.4], [1.05, 3.4]]) g.box(x, 0.45, z, 0.4, 0.9, 1.0, 0x151515);
+  l.box(-1.0, 1.0, 5.02, 0.3, 0.35, 0.04, 0xff2a20);
+  l.box(1.0, 1.0, 5.02, 0.3, 0.35, 0.04, 0xff2a20);
+  l.box(0, 3.25, 5.02, 1.6, 0.25, 0.04, 0xffb040);
+  return { parts: parts(g, l), radius: 0, max: 8, len: 7.5 };
+}
+
+/** Tokyo-style taxi with a roof lamp. */
+export function taxi(): PropDef {
+  const d = sedan();
+  const l = new GeoBuilder();
+  l.box(0, 1.62, 0.3, 0.5, 0.22, 0.3, 0xffe080);
+  d.parts.push({ geo: l.build(), mat: 'glow' });
+  return d;
 }

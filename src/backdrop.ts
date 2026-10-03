@@ -26,9 +26,23 @@ export class Backdrop {
 const basic = (opts: THREE.MeshBasicMaterialParameters = {}) =>
   new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide, ...opts });
 
-/** Hard-stepped gradient: [elevation upper bound in degrees, colour] bottom to top. */
-export function skyDome(bands: [number, number][], below: number): THREE.Mesh {
-  const H = 1024;
+/** 15-bit colour (5 bits per channel), like a late-80s arcade palette. */
+const q15 = (c: number) => {
+  const q = (v: number) => Math.round(Math.round((v / 255) * 31) * (255 / 31));
+  return (q((c >> 16) & 255) << 16) | (q((c >> 8) & 255) << 8) | q(c & 255);
+};
+const lerpHex = (a: number, b: number, t: number) => {
+  const ch = (s: number) => Math.round(((a >> s) & 255) + (((b >> s) & 255) - ((a >> s) & 255)) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+};
+
+/**
+ * Raster-style sky: key colours at given elevations, blended and then
+ * quantised into fine hard steps (per-line palette changes on the real boards).
+ * stops: [elevation in degrees, colour] from the horizon upward.
+ */
+export function skyDome(stops: [number, number][], below: number, step = 0.45): THREE.Mesh {
+  const H = 2048;
   const cv = document.createElement('canvas');
   cv.width = 2;
   cv.height = H;
@@ -36,12 +50,18 @@ export function skyDome(bands: [number, number][], below: number): THREE.Mesh {
   const hex = (h: number) => '#' + h.toString(16).padStart(6, '0');
   g.fillStyle = hex(below);
   g.fillRect(0, 0, 2, H);
-  let lo = 0;
-  for (const [hi, c] of bands) {
-    const y0 = (H * (90 - hi)) / 180, y1 = (H * (90 - lo)) / 180;
-    g.fillStyle = hex(c);
+  const colorAt = (e: number) => {
+    if (e <= stops[0][0]) return stops[0][1];
+    for (let i = 1; i < stops.length; i++) {
+      if (e <= stops[i][0]) return lerpHex(stops[i - 1][1], stops[i][1], (e - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]));
+    }
+    return stops[stops.length - 1][1];
+  };
+  for (let e = 0; e < 90; e += step * (e < 20 ? 1 : 3)) {
+    const hi = Math.min(90, e + step * (e < 20 ? 1 : 3));
+    const y0 = (H * (90 - hi)) / 180, y1 = (H * (90 - e)) / 180;
+    g.fillStyle = hex(q15(colorAt(e)));
     g.fillRect(0, Math.floor(y0), 2, Math.ceil(y1 - y0) + 1);
-    lo = hi;
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.magFilter = THREE.NearestFilter;
@@ -60,14 +80,14 @@ const ring = (R: number, a: number, u: number, y: number): V3 =>
 
 /** Jagged polygon mountain range wrapped round the horizon. mask(a) scales height per azimuth. */
 export function mountainRing(rng: Rng, R: number, color: number, maxH: number, mask: (a: number) => number,
-  cap?: number, peaks = 40): THREE.Mesh {
+  cap?: number, peaks = 40, wr: [number, number] = [6, 18]): THREE.Mesh {
   const g = new GeoBuilder();
   const N = 240;
   const h = new Float32Array(N + 1);
   for (let p = 0; p < peaks; p++) {
     const c = rng.next() * N;
     const height = rng.range(0.3, 1) * maxH;
-    const width = rng.range(6, 18);
+    const width = rng.range(wr[0], wr[1]);
     for (let i = 0; i <= N; i++) {
       let d = Math.abs(i - c);
       d = Math.min(d, N - d);
@@ -114,28 +134,35 @@ export function disc(R: number, a: number, elev: number, radius: number, colors:
 }
 
 /** Puffy flat clouds made of overlapping polygons, lighter on top. */
-export function clouds(rng: Rng, R: number, count: number, top: number, bottom: number, aMin = -Math.PI, aMax = Math.PI): THREE.Mesh {
+export function clouds(rng: Rng, R: number, count: number, tones: [number, number, number],
+  aMin = -Math.PI, aMax = Math.PI, elev: [number, number] = [4, 13]): THREE.Mesh {
   const g = new GeoBuilder();
+  const [hi, mid, shade] = tones;
+  const ellipse = (rr: number, a: number, cx: number, cy: number, rx: number, ry: number, c: number, from = 0, to = Math.PI * 2) => {
+    const pts: V3[] = [];
+    const n = 12;
+    for (let i = 0; i <= n; i++) {
+      const t = from + ((to - from) * i) / n;
+      pts.push(ring(rr, a, cx + Math.cos(t) * rx, cy + Math.sin(t) * ry));
+    }
+    g.poly(pts, c);
+  };
   for (let c = 0; c < count; c++) {
     const a = rng.range(aMin, aMax);
-    const elev = rng.range(4, 13);
-    const cy = Math.tan((elev * Math.PI) / 180) * R;
-    const w = rng.range(120, 300);
-    const puffs = rng.int(3, 6);
+    const e = rng.range(elev[0], elev[1]);
+    const cy = Math.tan((e * Math.PI) / 180) * R;
+    const w = rng.range(140, 340);
+    const puffs = rng.int(4, 8);
+    const base = R - c * 6;
+    // flat shaded underside spanning the cloud
+    ellipse(base, a, 0, cy, w * 0.9, 16, shade, Math.PI, Math.PI * 2);
     for (let p = 0; p < puffs; p++) {
-      const px = rng.range(-w, w) * 0.7;
-      const py = rng.range(0, 30);
-      const rx = rng.range(50, 110), ry = rx * rng.range(0.35, 0.55);
-      const sides = 10;
-      const rr = R - c * 3 - p * 0.5;
-      const lower: V3[] = [], upper: V3[] = [];
-      for (let i = 0; i <= sides / 2; i++) {
-        const t = (i / sides) * Math.PI * 2;
-        upper.push(ring(rr, a, px + Math.cos(t) * rx, cy + py + Math.sin(t) * ry));
-        lower.push(ring(rr, a, px + Math.cos(t + Math.PI) * rx, cy + py + Math.sin(t + Math.PI) * ry));
-      }
-      g.poly(upper, top);
-      g.poly(lower, bottom);
+      const px = rng.range(-w, w) * 0.65;
+      const py = rng.range(0, 34) * (1 - Math.abs(px) / w);
+      const rx = rng.range(45, 100), ry = rx * rng.range(0.5, 0.7);
+      const rr = base - 1 - p * 0.3;
+      ellipse(rr, a, px, cy + py, rx, ry, mid, 0, Math.PI);
+      ellipse(rr - 0.1, a, px - rx * 0.15, cy + py + ry * 0.2, rx * 0.7, ry * 0.65, hi, 0.2, Math.PI);
     }
   }
   return new THREE.Mesh(g.build(), basic());

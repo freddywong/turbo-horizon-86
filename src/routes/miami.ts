@@ -13,7 +13,9 @@ const HILLGRASS: [number, number] = [0x4cb43c, 0x42a436];
 const WALK: [number, number] = [0xe0d4c4, 0xd4c8b8];
 const FOG = 0xbfe6e2;
 
-const style: RoadStyle = { road: [0xa6a6ae, 0x94949c], line: 0xffffff, rumble: [0xff2a2a, 0xffffff] };
+const style: RoadStyle = { road: [0xa6a6ae, 0x96969e], line: 0xffffff, edge: 0xffffff, rumble: [0xff2a2a, 0xffffff] };
+const FOAM: [number, number] = [0xffffff, 0xe0f8ff];
+const SHALLOW: [number, number] = [0x52dcd8, 0x46d2d2];
 
 export const miami: RouteDef = {
   id: 'miami',
@@ -37,7 +39,7 @@ export const miami: RouteDef = {
     // ---- road cross-sections --------------------------------------------
     const profiles = [
       // 0 beach: town on the left, sand sloping into the sea on the right
-      makeProfile(style, [{ w: 4, c: WALK }, { w: 600, c: GRASS }], [{ w: 6, c: SAND }, { w: 30, abs: 0.4, c: SAND }, { w: 600, abs: 0, c: SEA }]),
+      makeProfile(style, [{ w: 4, c: WALK }, { w: 600, c: GRASS }], [{ w: 6, c: SAND }, { w: 28, abs: 0.4, c: SAND }, { w: 3, abs: 0.12, c: FOAM }, { w: 16, abs: 0, c: SHALLOW }, { w: 600, abs: 0, c: SEA }]),
       // 1 city boulevard
       makeProfile(style, [{ w: 6, c: WALK }, { w: 600, c: [0x70d258, 0x66c650] }], [{ w: 6, c: WALK }, { w: 600, c: [0x70d258, 0x66c650] }]),
       // 2 causeway: low white wall, then the bay on both sides
@@ -99,7 +101,19 @@ export const miami: RouteDef = {
     const gStart = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0xe02a2a, text: 'START', stripes: 0x1a1a1a }, 4, 1)));
     const gCheck = reg.add(P.gate(atlas.add({ bg: 0xffe040, fg: 0x1a1a1a, text: 'CHECKPOINT' }, 4, 1), 0xf0f0f0, 0x1a5ae0));
     const gGoal = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0x000000, text: 'GOAL', stripes: -1 }, 4, 1), 0xf0f0f0, 0x1a1a1a));
-    const trafficTypes = [reg.add(P.sedan()), reg.add(P.sedan()), reg.add(P.van()), reg.add(P.truck(0x2a8aff))];
+    const trafficTypes = [reg.add(P.sedan()), reg.add(P.coupe()), reg.add(P.van()), reg.add(P.truck(0x2a8aff)), reg.add(P.coupe()), reg.add(P.bus(0xff5a8a))];
+    const chevR = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'R' }, 2, 1)));
+    const chevL = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'L' }, 2, 1)));
+    const hedge = reg.add(P.hedge());
+    const flag = reg.add(P.flag());
+    const pine = reg.add(P.pine());
+    const surf = reg.add(P.surfboards());
+    const boat = reg.add(P.sailboat());
+    const arches = [
+      { bg: 0xff5a8a, fg: 0xffffff, text: 'WELCOME TO MIAMI', border: 0xffffff },
+      { bg: 0x1a6ae0, fg: 0xffe040, text: 'SUNSET POINT', border: 0xffffff },
+    ].map((s, i) => reg.add(P.gate(atlas.add(s, 4, 1), 0xffffff, i ? 0xff8a20 : 0x20c0b0, 0xffffff)));
+    const FLAGS = [0xff3a5a, 0xffe040, 0x2a90ff, 0x40e0a0, 0xffffff, 0xff8a20];
 
     // ---- scenery placement (sparse on purpose) -----------------------------
     const segs = track.segs;
@@ -111,7 +125,15 @@ export const miami: RouteDef = {
         continue;
       }
       const z = s.zone;
+      // curve warnings on the outside of every real bend
+      if (Math.abs(s.curve) > 0.0016 && i % 5 === 0 && z !== 'causeway') {
+        pr.push(s.curve > 0 ? { t: chevR, x: -(R + 5.5), r: 0.15 } : { t: chevL, x: R + 5.5, r: -0.15 });
+      }
+      if ((z === 'beach' || z === 'beach2' || z === 'causeway') && i % 23 === 0 && rng.chance(0.6)) {
+        pr.push({ t: boat, x: (z === 'causeway' ? rng.sign() : 1) * rng.range(70, 280), y: 0, abs: true, s: rng.range(0.9, 1.4), r: rng.range(-0.6, 0.6) });
+      }
       if (z === 'beach' || z === 'beach2') {
+        if (i % 19 === 4 && rng.chance(0.5)) pr.push({ t: surf, x: R + rng.range(10, 18), r: rng.range(-0.5, 0.5) });
         if (i % 7 === 0 && rng.chance(0.85)) pr.push({ t: palm, x: R + rng.range(4.5, 7), s: rng.range(0.9, 1.3), r: rng.range(0, 6) });
         if (i % 7 === 3 && rng.chance(0.5)) pr.push({ t: palm, x: -(R + rng.range(5, 9)), s: rng.range(0.9, 1.3), r: rng.range(0, 6) });
         if (i % 9 === 0 && rng.chance(z === 'beach2' ? 0.75 : 0.45)) {
@@ -124,6 +146,8 @@ export const miami: RouteDef = {
         if (i % 37 === 0 && rng.chance(0.5)) pr.push({ t: rock, x: R + rng.range(24, 32), s: rng.range(0.6, 1.2), r: rng.range(0, 6) });
         if (i % 120 === 60) pr.push({ t: rng.pick(roadSigns), x: R + 3, r: -0.2 });
       } else if (z === 'city') {
+        if (i % 30 > 3) pr.push({ t: hedge, x: R + 9.5 }, { t: hedge, x: -(R + 9.5) });
+        if (i % 16 === 12) pr.push({ t: flag, x: R + 4.5, tint: rng.pick(FLAGS) }, { t: flag, x: -(R + 4.5), r: Math.PI, tint: rng.pick(FLAGS) });
         if (i % 14 === 0 && rng.chance(0.75)) pr.push({ t: rng.pick(shopSigns), x: -(R + rng.range(15, 18)), tint: rng.pick(PASTELS), r: 0.5 });
         if (i % 14 === 7 && rng.chance(0.75)) pr.push({ t: rng.pick(shopSigns), x: R + rng.range(15, 18), tint: rng.pick(PASTELS), r: -0.5 });
         if (i % 8 === 0) pr.push({ t: light, x: R + 3, r: 0 }, { t: light, x: -(R + 3), r: Math.PI });
@@ -144,6 +168,7 @@ export const miami: RouteDef = {
           pr.push({ t: rail, x: R + 2.4 });
           pr.push({ t: rail, x: -(R + 2.4) });
         }
+        if (i % 4 === 2 && rng.chance(0.5)) pr.push({ t: pine, x: rng.sign() * (R + rng.range(8, 50)), s: rng.range(0.8, 1.5), r: rng.range(0, 6) });
         if (i % 5 === 0 && rng.chance(0.6)) pr.push({ t: tree, x: rng.sign() * (R + rng.range(8, 40)), s: rng.range(0.8, 1.4), r: rng.range(0, 6) });
         if (i % 11 === 0 && rng.chance(0.5)) pr.push({ t: bush, x: rng.sign() * (R + rng.range(5, 12)), s: rng.range(0.7, 1.2), r: rng.range(0, 6) });
         if (i % 23 === 0 && rng.chance(0.6)) pr.push({ t: rock, x: rng.sign() * (R + rng.range(9, 30)), s: rng.range(0.8, 1.8), r: rng.range(0, 6) });
@@ -152,21 +177,25 @@ export const miami: RouteDef = {
     }
     for (let si = 1; si < track.stageStarts.length; si++) segs[track.stageStarts[si] + 4].props.push({ t: gCheck, x: 0 });
     segs[8].props.push({ t: gStart, x: 0 });
+    segs[track.stageStarts[1] + 160].props.push({ t: arches[0], x: 0 });
+    segs[track.stageStarts[4] + 200].props.push({ t: arches[1], x: 0 });
     segs[track.goalSeg].props.push({ t: gGoal, x: 0 });
 
     // ---- the horizon --------------------------------------------------------
     const bd = new Backdrop();
     bd.addLayer(skyDome([
-      [1.0, 0xffe6a8], [2.2, 0xffc888], [3.6, 0xffa880], [5.2, 0xff9a9a], [7.0, 0xf8a8c8], [9.0, 0xd0c4ec],
-      [11.5, 0xa0d8f4], [15, 0x70caf4], [20, 0x48b4f2], [27, 0x2c98ea], [36, 0x1c80e2], [90, 0x1468d4],
+      [0, 0xfff0b8], [1.4, 0xffd090], [3, 0xffa884], [4.6, 0xff96a0], [6.5, 0xf6a8cc], [8.5, 0xd2c6ee],
+      [11, 0xa2daf6], [15, 0x6ecaf6], [20, 0x46b2f2], [28, 0x2a96ea], [40, 0x1a7ee0], [90, 0x0e5ec8],
     ], FOG), 0);
     const ahead = (a: number) => {
       const d = Math.atan2(Math.sin(a), Math.cos(a));
       return d;
     };
     // big low sun over the sea, slightly right of the opening straight
-    bd.addLayer(disc(2500, 0.25, 2.6, 300, [[1, 0xff9a3c], [0.8, 0xffc848], [0.55, 0xfff08a]], 18), 1);
-    bd.addLayer(clouds(rng, 2350, 12, 0xffffff, 0xffc0d0), 0.8);
+    bd.addLayer(disc(2500, 0.25, 2.6, 300, [[1.45, 0xffc4a4], [1.22, 0xffa884], [1, 0xff8a3a], [0.84, 0xffaa44], [0.68, 0xffcc58], [0.5, 0xffe880], [0.3, 0xfff8c8]], 24), 1);
+    // long low strato bands across the sun, then puffy cumulus higher up
+    bd.addLayer(clouds(rng, 2320, 7, [0xffe0c0, 0xffb8a0, 0xe888a8], -0.5, 1.2, [1.2, 3.2]), 0.9);
+    bd.addLayer(clouds(rng, 2350, 14, [0xffffff, 0xffe8f0, 0xf4a8c8]), 0.8);
     // mountains inland (left), low on the sea side so the sunset reads
     bd.addLayer(mountainRing(rng, 2200, 0x7a8ad0, 230, (a) => {
       const d = ahead(a);
@@ -176,11 +205,16 @@ export const miami: RouteDef = {
       const d = ahead(a);
       return d < -0.15 ? 1 : d > 1.9 ? 1 : 0;
     }, undefined, 50), 1);
+    // near wooded ridge: lots of small bumps reads as a tree line
+    bd.addLayer(mountainRing(rng, 1980, 0x2e8a58, 55, (a) => {
+      const d = ahead(a);
+      return d < -0.35 ? 1 : d > 2.1 ? 1 : 0;
+    }, undefined, 260, [1.2, 3.5]), 1);
     // distant downtown across the bay
-    bd.addLayer(skylineRing(rng, 2000, [0xa8b8d8, 0x98a8cc, 0xb8c4e0], [], 150, (a) => {
+    bd.addLayer(skylineRing(rng, 2000, [0xa8b8d8, 0x98a8cc, 0xb8c4e0, 0xd8c8d8], [0x7a98c8, 0xe8f0ff, 0x8aa8d8], 150, (a) => {
       const d = ahead(a);
       return d > 0.7 && d < 1.3 ? 1 : 0;
-    }, 0.9), 1);
+    }, 0.9, 0.35), 1);
     bd.addLayer(horizonBand(1900, FOG), 0);
     return { track, profiles, props: reg.defs, backdrop: bd, trafficTypes, gateType: gGoal };
   },

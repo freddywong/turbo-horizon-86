@@ -47,6 +47,9 @@ export class Game {
   bounce = 0;
   shakeKick = 0;
   drifting = false;
+  gear = 1;
+  flameT = 0;
+  wasAccel = false;
 
   // run
   timeLeft = 0;
@@ -83,6 +86,7 @@ export class Game {
     this.crashT = 0;
     this.stage = 0;
     this.world.resetTraffic(this.pos);
+    this.world.particles.clear();
   }
 
   private go(s: State) {
@@ -262,6 +266,8 @@ export class Game {
     const route = w.route;
     const seg = track.seg(Math.floor(this.pos / SEG));
     let skid = 0;
+    let offroad = false;
+    let scrape = 0;
 
     if (this.crashT > 0) {
       this.crashT -= dt;
@@ -303,12 +309,13 @@ export class Game {
       if (Math.abs(this.px) > lim) {
         this.px = Math.sign(this.px) * lim;
         if (walls && v > 15) {
+          scrape = Math.sign(this.px);
           this.speed -= v * 0.9 * dt;
           this.shakeKick = 0.25;
           if (Math.random() < dt * 12) this.audio.scrape();
         }
       }
-      const offroad = Math.abs(this.px) > ROAD_HALF + 1.0;
+      offroad = Math.abs(this.px) > ROAD_HALF + 1.0;
       if (offroad) {
         if (this.speed > 32) this.speed -= 40 * dt;
         this.bounce = Math.random() * 0.08 * Math.min(1, v / 30);
@@ -345,8 +352,39 @@ export class Game {
     this.audio.engine(audible, rpm, c.accel ? 1 : 0);
     this.audio.skid(audible ? skid * Math.min(1, this.speed / 20) : 0);
 
+    // backfire on up-shifts and when lifting off at speed
+    if (g > this.gear && c.accel && this.speed > 20) {
+      this.flameT = 0.12;
+      if (audible) this.audio.pop();
+    }
+    if (this.wasAccel && !c.accel && this.speed > 55 && this.crashT <= 0) {
+      this.flameT = 0.2;
+      if (audible) this.audio.pop();
+    }
+    this.gear = g;
+    this.wasAccel = c.accel;
+    this.flameT = Math.max(0, this.flameT - dt);
+
+    // tyre smoke, dust and sparks
+    const P = w.particles;
+    const n = Math.random() < dt * 45 ? 1 : 0;
+    if (n && skid > 0 && this.speed > 12) {
+      const col = route.id === 'tokyo' ? 0xb8b8d0 : 0xffffff;
+      for (const sx of [-0.9, 0.9]) P.spawn(this.pos - 1.4, this.px + sx, 0.35, this.speed * 0.6, sx, 0.8, 0.8, 0.45, 2.6, col);
+    }
+    if (n && offroad && this.speed > 15) {
+      const sand = seg.zone.startsWith('beach') && this.px > 0;
+      const col = sand ? 0xf2dca0 : seg.zone === 'hills' ? 0xc8b07a : 0xd8c898;
+      for (const sx of [-0.9, 0.9]) P.spawn(this.pos - 1.5, this.px + sx, 0.3, this.speed * 0.5, sx * 2, 1.8, 0.6, 0.4, 2.2, col);
+    }
+    if (scrape && Math.random() < dt * 60) {
+      for (let i = 0; i < 2; i++) P.spawn(this.pos + Math.random() * 2 - 1, this.px + scrape * 0.9, 0.5, this.speed * 0.8, -scrape * (2 + Math.random() * 3), 3 + Math.random() * 3, 0.35, 0.13, -1, Math.random() < 0.5 ? 0xffe040 : 0xff8a20);
+    }
+    P.update(dt);
+
     this.updateWorld(dt, {
       steer: this.steer, yaw: this.driftYaw + this.crashYaw, spin: this.wheelSpin, bounce: this.bounce,
+      brake: (c.brake && this.speed > 1) || this.crashT > 0, flame: this.flameT,
     });
   }
 
@@ -356,9 +394,13 @@ export class Game {
     this.speed *= 0.35;
     this.shakeKick = 0.6;
     this.audio.crash(big);
+    for (let i = 0; i < 14; i++) {
+      this.world.particles.spawn(this.pos + Math.random() * 3 - 1.5, this.px + Math.random() * 3 - 1.5, 0.4 + Math.random(),
+        this.speed * 0.5, Math.random() * 4 - 2, 1 + Math.random() * 2, 1.1, 0.7, 2.5, i % 3 ? 0xd8d8d8 : 0x8a8a8a);
+    }
   }
 
-  private updateWorld(dt: number, pose: { steer: number; yaw: number; spin: number; bounce: number }) {
+  private updateWorld(dt: number, pose: { steer: number; yaw: number; spin: number; bounce: number; brake?: boolean; flame?: number }) {
     const f = this.speed / VMAX;
     const cam = this.camera;
     const fov = 54 + 14 * f * f;

@@ -12,6 +12,7 @@ export interface SignSpec {
   jp?: boolean; // use a CJK font for the main text
   vertical?: boolean; // stack characters vertically (Japanese tate signs)
   stripes?: number; // decorative stripe colour (checkered banners use -1)
+  arrows?: 'L' | 'R'; // bold curve-warning chevrons instead of text
 }
 
 const hex = (h: number) => '#' + h.toString(16).padStart(6, '0');
@@ -82,6 +83,27 @@ export class SignAtlas {
       g.strokeRect(cx + 1.5, cy + 1.5, w - 3, h - 3);
     }
     g.fillStyle = hex(spec.fg);
+    if (spec.arrows) {
+      const n = 3, cw = w / n, t = cw * 0.38;
+      for (let i = 0; i < n; i++) {
+        const x0 = cx + i * cw + cw * 0.12, x1 = x0 + cw * 0.62;
+        const [a, b] = spec.arrows === 'R' ? [x0, x1] : [x1, x0];
+        const d = spec.arrows === 'R' ? 1 : -1;
+        g.beginPath();
+        g.moveTo(a, cy + 3);
+        g.lineTo(a + d * t, cy + 3);
+        g.lineTo(b, cy + h / 2);
+        g.lineTo(a + d * t, cy + h - 3);
+        g.lineTo(a, cy + h - 3);
+        g.lineTo(b - d * t, cy + h / 2);
+        g.closePath();
+        g.fill();
+      }
+      g.restore();
+      this.texture.needsUpdate = true;
+      const W = this.canvas.width, H = this.canvas.height;
+      return [cx / W, 1 - (cy + h) / H, (cx + w) / W, 1 - cy / H];
+    }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const font = spec.jp ? JP_FONT : PIXEL_FONT;

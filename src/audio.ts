@@ -228,6 +228,11 @@ export class Audio {
     if (!this.ctx) return;
     this.burst(0.18, 0.25, 3000, 0, 'highpass');
   }
+  pop() {
+    if (!this.ctx) return;
+    this.burst(0.09, 0.5, 900);
+    this.tone(70, 0.08, 'square', 0.25, 0, 40);
+  }
   countBeep(go: boolean) {
     if (!this.ctx) return;
     if (go) this.tone(880, 0.7, 'square', 0.22);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SignAtlas } from './atlas';
 import { PlayerCar } from './car';
+import { Particles } from './particles';
 import { makeMaterials, PropRenderer } from './props';
 import { RoadMesh } from './road';
 import { Rng } from './rng';
@@ -29,6 +30,7 @@ export class World {
   props: PropRenderer;
   car: PlayerCar;
   traffic: TrafficCar[] = [];
+  particles: Particles;
   private rng = new Rng(7);
 
   constructor(public route: RouteDef, atlas: SignAtlas) {
@@ -47,8 +49,10 @@ export class World {
     this.road = new RoadMesh(this.data.profiles);
     this.scene.add(this.road.mesh);
     this.props = new PropRenderer(this.data.props, mats, this.scene);
-    this.car = new PlayerCar(route.carColor, route.carStripe, mats);
+    const plate = atlas.add({ bg: route.id === 'tokyo' ? 0xf0f0e8 : 0xffe040, fg: 0x102060, text: 'TH-86', border: 0x102060 }, 1, 1);
+    this.car = new PlayerCar(route.carColor, route.carStripe, mats, plate);
     this.scene.add(this.car.root);
+    this.particles = new Particles(this.scene);
   }
 
   // ------------------------------ traffic ---------------------------------
@@ -91,7 +95,7 @@ export class World {
   /** Returns the traffic car overlapping the player, if any. */
   hitTraffic(pos: number, px: number): TrafficCar | null {
     for (const c of this.traffic) {
-      const len = c.t === this.data.trafficTypes[this.data.trafficTypes.length - 1] ? 6.5 : 4.4;
+      const len = this.data.props[c.t].len ?? 4.4;
       if (Math.abs(c.d - pos) < len && Math.abs(c.x - px) < 2.0) return c;
     }
     return null;
@@ -114,7 +118,7 @@ export class World {
 
   // ------------------------------ frame -----------------------------------
   update(pos: number, px: number, camera: THREE.PerspectiveCamera, shake: number,
-    pose: { steer: number; yaw: number; spin: number; bounce: number }) {
+    pose: { steer: number; yaw: number; spin: number; bounce: number; brake?: boolean; flame?: number }) {
     const v = this.view;
     v.update(pos);
     this.road.update(v);
@@ -144,7 +148,7 @@ export class World {
     v.sample(pos - 2, px, tmp);
     const yB = tmp.y;
     this.car.root.position.set(px, 0, 0);
-    this.car.pose(pose.steer, pose.yaw, pose.spin, pose.bounce, Math.atan2(yF - yB, 4));
+    this.car.pose(pose.steer, pose.yaw, pose.spin, pose.bounce, Math.atan2(yF - yB, 4), pose.brake, pose.flame);
 
     // camera: low, behind, always looking straight down the player's heading
     v.sample(pos - 8.8, px * 0.9, tmp);
@@ -154,5 +158,6 @@ export class World {
     camera.position.set(px * 0.9 + (Math.random() - 0.5) * shake, camY + (Math.random() - 0.5) * shake, 8.8);
     camera.lookAt(px * 0.82, lookY, -30);
     this.data.backdrop.update(camera.position, v.heading);
+    this.particles.render(v, camera);
   }
 }
