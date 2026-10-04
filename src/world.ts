@@ -55,7 +55,7 @@ export class World {
     this.props = new PropRenderer(this.data.props, mats, this.scene);
     this.mats = mats;
     this.plate = atlas.add({ bg: route.id === 'tokyo' ? 0xf0f0e8 : 0xffe040, fg: 0x102060, text: 'TH-86', border: 0x102060 }, 1, 1);
-    this.car = new PlayerCar(ROSTER[0], ROSTER[0].paints[0], mats, this.plate);
+    this.car = new PlayerCar(ROSTER[0], ROSTER[0].paints[0], mats, this.plate, this.route.shadow);
     this.scene.add(this.car.root);
     this.particles = new Particles(this.scene);
   }
@@ -65,7 +65,7 @@ export class World {
     if (this.car.spec === spec && this.carPaint === paint) return;
     this.scene.remove(this.car.root);
     this.car.dispose();
-    this.car = new PlayerCar(spec, paint, this.mats, this.plate);
+    this.car = new PlayerCar(spec, paint, this.mats, this.plate, this.route.shadow);
     this.carPaint = paint;
     this.scene.add(this.car.root);
   }

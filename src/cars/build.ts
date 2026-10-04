@@ -246,7 +246,7 @@ export class PlayerCar {
   private flames: THREE.Mesh;
   private geos: THREE.BufferGeometry[] = [];
 
-  constructor(public spec: CarSpec, paint: number, mats: CarMats, plateUv: [number, number, number, number]) {
+  constructor(public spec: CarSpec, paint: number, mats: CarMats, plateUv: [number, number, number, number], shadow = 0x3c3c46) {
     const cg = buildBody(spec, paint);
     const s = new GeoBuilder();
     const { y, z } = cg.plate;
@@ -273,7 +273,7 @@ export class PlayerCar {
     this.flames.position.set(0, 0, cg.tailZ + 0.05);
     this.flames.visible = false;
 
-    // sprite-style shadow
+    // sprite-style shadow: kept inside the car's footprint so it only peeks out under the sills
     const st = spec.stations;
     const len = st[st.length - 1].z - st[0].z;
     const wid = Math.max(...st.map((x) => x.w));
@@ -281,10 +281,10 @@ export class PlayerCar {
     const pts: V3[] = [];
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      pts.push([Math.cos(a) * (wid + 0.3), 0.03, (st[0].z + len / 2) + Math.sin(a) * (len / 2 + 0.4)]);
+      pts.push([Math.cos(a) * wid * 0.92, 0.02, (st[0].z + len / 2) + Math.sin(a) * (len / 2 - 0.05)]);
     }
-    sh.poly(pts, 0x101014);
-    add(sh.build(), new THREE.MeshBasicMaterial({ color: 0x0c0c10, side: THREE.DoubleSide }), this.root);
+    sh.poly(pts, 0xffffff);
+    add(sh.build(), new THREE.MeshBasicMaterial({ color: shadow, side: THREE.DoubleSide }), this.root);
 
     const w = spec.wheels;
     const hw = w.hw ?? 0.18;

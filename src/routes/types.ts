@@ -23,6 +23,8 @@ export interface RouteDef {
   sun: { color: number; intensity: number; dir: [number, number, number] };
   startTime: number;
   extendTime: number;
+  /** colour of the car's flat shadow on this route's road */
+  shadow: number;
   trafficColors: number[];
   trafficCount: number;
   /** solid walls at the road edge (elevated expressway) instead of run-off */

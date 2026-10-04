@@ -28,6 +28,7 @@ export const miami: RouteDef = {
   sun: { color: 0xfff2dc, intensity: 2.4, dir: [-0.5, 1, 0.8] },
   startTime: 60,
   extendTime: 40,
+  shadow: 0x5c5c66,
   trafficColors: [0xff5a5a, 0x5ab0ff, 0xffe05a, 0xffffff, 0x60e0a0, 0xff9ad0, 0xffa040],
   trafficCount: 16,
   walls: false,

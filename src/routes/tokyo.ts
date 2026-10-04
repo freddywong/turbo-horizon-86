@@ -126,6 +126,7 @@ export const tokyo: RouteDef = {
   sun: { color: 0xffc0d8, intensity: 1.6, dir: [-0.4, 1, 0.9] },
   startTime: 60,
   extendTime: 40,
+  shadow: 0x22222c,
   trafficColors: [0xffffff, 0xe03030, 0x40a0ff, 0x30d0a0, 0xffa030, 0xd060ff, 0x9a9aa8],
   trafficCount: 18,
   walls: true,
