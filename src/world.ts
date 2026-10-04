@@ -4,6 +4,7 @@ import { CarMats, PlayerCar } from './cars/build';
 import { ROSTER } from './cars/roster';
 import { CarSpec } from './cars/spec';
 import { Particles } from './particles';
+import type { Rival } from './rivals';
 import { makeMaterials, PropRenderer } from './props';
 import { RoadMesh } from './road';
 import { Rng } from './rng';
@@ -33,6 +34,8 @@ export class World {
   car: PlayerCar;
   traffic: TrafficCar[] = [];
   particles: Particles;
+  rivals: Rival[] = [];
+  private rivalCars: PlayerCar[] = [];
   private rng = new Rng(7);
   private mats: CarMats;
   private plate: [number, number, number, number];
@@ -71,6 +74,20 @@ export class World {
   }
   private carPaint = -1;
 
+  /** Builds the rival drivers' car models (empty list clears them). */
+  setRivals(rivals: Rival[]) {
+    for (const c of this.rivalCars) {
+      this.scene.remove(c.root);
+      c.dispose();
+    }
+    this.rivals = rivals;
+    this.rivalCars = rivals.map((r) => {
+      const car = new PlayerCar(r.spec, r.paint, this.mats, this.plate, this.route.shadow);
+      this.scene.add(car.root);
+      return car;
+    });
+  }
+
   // ------------------------------ traffic ---------------------------------
   laneX(l: number) {
     return -LANES * LANE_W / 2 + LANE_W * (l + 0.5);
@@ -84,9 +101,9 @@ export class World {
     };
   }
 
-  resetTraffic(pos: number) {
+  resetTraffic(pos: number, count = this.route.trafficCount, from = 160) {
     this.traffic = [];
-    for (let i = 0; i < this.route.trafficCount; i++) this.traffic.push(this.spawnCar(pos + 160 + i * 75 + this.rng.range(0, 40)));
+    for (let i = 0; i < count; i++) this.traffic.push(this.spawnCar(pos + from + i * 75 + this.rng.range(0, 40)));
   }
 
   updateTraffic(dt: number, playerPos: number, onPass: () => void) {
@@ -165,6 +182,22 @@ export class World {
     const yB = tmp.y;
     this.car.root.position.set(px, 0, 0);
     this.car.pose(pose.steer, pose.yaw, pose.spin, pose.bounce, Math.atan2(yF - yB, 4), pose.brake, pose.flame);
+
+    // rival drivers
+    this.rivals.forEach((r, i) => {
+      const car = this.rivalCars[i];
+      if (!v.sample(r.d + 2, r.x, tmp)) {
+        car.root.visible = false;
+        return;
+      }
+      const f = tmp.y;
+      v.sample(r.d - 2, r.x, tmp);
+      const b = tmp.y;
+      v.sample(r.d, r.x, tmp);
+      car.root.visible = true;
+      car.root.position.set(tmp.x, tmp.y, tmp.z);
+      car.pose(r.steer, -tmp.h - r.steer * 0.08, r.spin, 0, Math.atan2(f - b, 4), r.braking, 0);
+    });
 
     // camera: low, behind, always looking straight down the player's heading
     v.sample(pos - 8.8, px * 0.9, tmp);

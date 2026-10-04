@@ -36,6 +36,18 @@ AUTO GAS (on by default) keeps the throttle down for you. Tap through the
 menus; the pause button sits at the top right. The game tries to go
 fullscreen and lock to landscape where the browser allows it.
 
+## Modes
+
+Choose the mode on the route-select screen (↑ / ↓, or tap a mode box):
+
+* **ARCADE**: the classic: beat the clock, with checkpoints adding time.
+* **VS RIVALS**: an 8-car race. You start at the back of the grid behind seven computer
+  drivers (ACE, AOKI, REYES, VOLK, LOLA, BLADE, KENJI), each in a different car from the
+  roster, with their own pace, cornering and aggression. They take the inside line,
+  overtake round traffic and bump wheels with you. Your live position shows on the HUD;
+  the finish shows a results table with everyone's times. The timer still runs, so if it
+  hits zero you're classified DNF.
+
 ## Music
 
 Six original synth tracks plus a title theme, all generated live in the browser:
@@ -86,6 +98,7 @@ overtaking, and the time bonus at the goal.
   drawn with one `InstancedMesh` per prop part.
 * `src/cars/`: a spec-driven car builder. Each car is a list of body cross-sections
   plus its tail lights, wings, intakes and exhausts.
+* `src/rivals.ts`: the computer drivers, their AI and the race classification.
 * `src/touch.ts`: the multi-touch on-screen controls.
 * `src/backdrop.ts`: stepped-gradient sky dome, sun/moon discs, cut-out clouds,
   mountains and skylines that scroll with the road's heading.
