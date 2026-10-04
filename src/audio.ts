@@ -6,7 +6,10 @@
 type Chord = [string, number[]];
 const MAJ7 = [0, 4, 7, 11], MIN7 = [0, 3, 7, 10], MAJ = [0, 4, 7], MIN = [0, 3, 7], DOM7 = [0, 4, 7, 10];
 
+type LeadVoice = OscillatorType | 'saw2' | 'fm';
+
 interface Song {
+  name: string;
   bpm: number;
   chords: Chord[]; // one per bar
   lead: string[]; // 16 tokens per bar: note, '.' hold, '-' rest
@@ -14,12 +17,17 @@ interface Song {
   kick: number[];
   snare: number[];
   hat: number[];
-  leadWave: OscillatorType;
+  leadWave: LeadVoice;
+  pad?: boolean; // sustained detuned-saw chord pad
+  arp?: { pattern: number[]; wave: OscillatorType; oct: number }; // 16th-note chord arpeggio (indices into chord tones)
+  gated?: boolean; // big gated-reverb style snare
+  stabs?: boolean; // off-beat chord stabs (default on)
 }
 
 const SONGS: Record<string, Song> = {
   // "Coastline Rush" - bright major-key cruise
   miami: {
+    name: 'COASTLINE RUSH',
     bpm: 138,
     chords: [
       ['D', MAJ7], ['G', MAJ7], ['E', MIN7], ['A', MAJ], ['D', MAJ7], ['B', MIN7], ['G', MAJ7], ['A', MAJ],
@@ -43,6 +51,7 @@ const SONGS: Record<string, Song> = {
   },
   // "Neon Expressway" - minor key, Japanese royal-road progression
   tokyo: {
+    name: 'NEON EXPRESSWAY',
     bpm: 144,
     chords: [
       ['F', MAJ7], ['G', MAJ], ['E', MIN7], ['A', MIN], ['F', MAJ7], ['G', MAJ], ['E', DOM7], ['A', MIN],
@@ -66,6 +75,7 @@ const SONGS: Record<string, Song> = {
   },
   // short attract / select loop
   title: {
+    name: 'TITLE',
     bpm: 128,
     chords: [['C', MAJ7], ['A', MIN7], ['F', MAJ7], ['G', MAJ]],
     lead: [
@@ -78,7 +88,91 @@ const SONGS: Record<string, Song> = {
     hat: [2, 6, 10, 14],
     leadWave: 'square',
   },
+  // "Palm Drive" - laid-back synthwave cruise with a rolling arpeggio
+  palm: {
+    name: 'PALM DRIVE',
+    bpm: 116,
+    chords: [['A', MAJ7], ['F#', MIN7], ['D', MAJ7], ['E', MAJ], ['A', MAJ7], ['C#', MIN7], ['D', MAJ7], ['E', MAJ]],
+    lead: [
+      'E5 . . . C#5 . . . E5 . F#5 . G#5 . . .', 'A5 . . . . . . . F#5 . E5 . C#5 . . .',
+      'D5 . . . F#5 . . . A5 . . . C#6 . B5 .', 'B5 . . . . . . . G#5 . . . E5 . . .',
+      'E5 . . . C#5 . . . E5 . F#5 . A5 . . .', 'G#5 . . . E5 . . . C#5 . E5 . G#5 . . .',
+      'F#5 . . . A5 . . . D6 . . . C#6 . A5 .', 'B5 . . . . . . . - - G#5 . A5 . B5 .',
+    ],
+    bass: [0, null, 0, null, 0, null, 12, null, 0, null, 0, null, 0, null, 12, 7],
+    kick: [0, 8, 10],
+    snare: [4, 12],
+    hat: [2, 6, 10, 14],
+    leadWave: 'saw2',
+    pad: true,
+    arp: { pattern: [0, 1, 2, 3, 4, 3, 2, 1], wave: 'square', oct: 5 },
+    gated: true,
+    stabs: false,
+  },
+  // "Night Signal" - minor-key drive with an FM bell lead
+  signal: {
+    name: 'NIGHT SIGNAL',
+    bpm: 128,
+    chords: [['D', MIN], ['A#', MAJ], ['C', MAJ], ['A', MIN], ['D', MIN7], ['A#', MAJ7], ['G', MIN7], ['A', MAJ]],
+    lead: [
+      'A5 . . D6 . . F6 . E6 . D6 . C6 . A5 .', 'A#5 . . . . . F5 . . . A#5 . D6 . . .',
+      'C6 . . E6 . . G6 . F6 . E6 . C6 . . .', 'E6 . . . . . . . - - A5 . C6 . E6 .',
+      'F6 . . E6 . . D6 . A5 . . . D6 . F6 .', 'G6 . . F6 . . D6 . A#5 . . . F5 . . .',
+      'G5 . . A#5 . . D6 . G6 . . . F6 . D6 .', 'C#6 . . . . . E6 . . . A5 . . . - -',
+    ],
+    bass: [0, 0, 12, 0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 12, 0, 12],
+    kick: [0, 4, 8, 12],
+    snare: [4, 12],
+    hat: [2, 6, 10, 14],
+    leadWave: 'fm',
+    pad: true,
+    gated: true,
+    stabs: false,
+  },
+  // "Turbo Rival" - fast galloping chase theme
+  rival: {
+    name: 'TURBO RIVAL',
+    bpm: 152,
+    chords: [['E', MIN], ['C', MAJ], ['D', MAJ], ['B', MAJ], ['E', MIN], ['C', MAJ], ['A', MIN], ['B', DOM7]],
+    lead: [
+      'B5 . . . G5 . E5 . B5 . . . C6 . B5 .', 'G5 . . . E5 . C5 . E5 . G5 . C6 . . .',
+      'A5 . . . F#5 . D5 . F#5 . A5 . D6 . C6 .', 'B5 . . . . . . . D#6 . . . F#6 . . .',
+      'E6 . . . D6 . B5 . G5 . . . B5 . E6 .', 'G6 . . . E6 . C6 . E6 . . . G6 . E6 .',
+      'C6 . . . A5 . E5 . A5 . C6 . E6 . . .', 'D#6 . . . . . F#6 . . . B5 . . . - -',
+    ],
+    bass: [0, null, 0, 12, 0, null, 0, 12, 0, null, 0, 12, 0, 7, 12, 7],
+    kick: [0, 4, 8, 12],
+    snare: [4, 12],
+    hat: [0, 2, 4, 6, 8, 10, 12, 14],
+    leadWave: 'saw2',
+    arp: { pattern: [0, 2, 4, 2], wave: 'square', oct: 5 },
+  },
+  // "After Sunset" - slow city-pop ballad
+  sunset: {
+    name: 'AFTER SUNSET',
+    bpm: 98,
+    chords: [['F', MAJ7], ['E', MIN7], ['D', MIN7], ['C', MAJ7], ['A#', MAJ7], ['A', MIN7], ['G', MIN7], ['C', MAJ]],
+    lead: [
+      'A5 . . . C6 . . . E6 . . . D6 . C6 .', 'B5 . . . G5 . . . E5 . . . . . . .',
+      'F5 . . . A5 . . . C6 . . . E6 . D6 .', 'E6 . . . . . . . G5 . . . . . . .',
+      'D6 . . . F6 . . . A6 . . . G6 . F6 .', 'E6 . . . C6 . . . A5 . . . G5 . A5 .',
+      'A#5 . . . A5 . . . G5 . . . F5 . G5 .', 'E5 . . . . . . . . . . . - - - -',
+    ],
+    bass: [0, null, null, 0, null, null, 12, null, 0, null, null, 7, null, null, 12, null],
+    kick: [0, 10],
+    snare: [4, 12],
+    hat: [0, 2, 4, 6, 8, 10, 12, 14],
+    leadWave: 'fm',
+    pad: true,
+    arp: { pattern: [0, 2, 1, 3, 2, 4, 3, 1], wave: 'triangle', oct: 5 },
+    gated: true,
+    stabs: false,
+  },
 };
+
+/** Songs the in-game radio can play, in order. */
+export const TRACKS: { id: string; name: string }[] = ['miami', 'tokyo', 'palm', 'signal', 'rival', 'sunset']
+  .map((id) => ({ id, name: SONGS[id].name }));
 
 const NOTE: Record<string, number> = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
 const midi = (name: string): number => {
@@ -261,7 +355,7 @@ export class Audio {
   }
 
   // ------------------------------- music ----------------------------------
-  music(id: 'miami' | 'tokyo' | 'title' | null) {
+  music(id: string | null) {
     if (!this.ctx) return;
     const s = id ? SONGS[id] : null;
     if (s === this.song) return;
@@ -299,7 +393,15 @@ export class Audio {
     const b = s.bass[i];
     if (b !== null && b !== undefined) this.voice(hz(36 + root + b), dt * 0.9, 'sawtooth', 0.32, t, 700);
     // chord stabs on the off-beats
-    if (i % 4 === 2) for (const n of quality) this.voice(hz(60 + root + n), dt * 1.2, 'square', 0.045, t, 2600);
+    if (s.stabs !== false && i % 4 === 2) for (const n of quality) this.voice(hz(60 + root + n), dt * 1.2, 'square', 0.045, t, 2600);
+    // pad: one long chord per bar
+    if (s.pad && i === 0) for (const n of quality) this.padNote(hz(48 + root + n), dt * 16, t);
+    // arpeggio over the chord tones, climbing into the next octave
+    if (s.arp) {
+      const k = s.arp.pattern[i % s.arp.pattern.length];
+      const n = quality[k % quality.length] + 12 * Math.floor(k / quality.length);
+      this.voice(hz((s.arp.oct + 1) * 12 + root + n), dt * 0.7, s.arp.wave, 0.045, t, 3200, false, true);
+    }
     // lead
     const toks = s.lead[bar].split(/\s+/);
     const tok = toks[i];
@@ -321,14 +423,76 @@ export class Audio {
       o.start(t);
       o.stop(t + 0.2);
     }
-    if (s.snare.includes(i)) this.burst(0.14, 0.45, 1800, 0, 'bandpass', this.musicBus, t);
+    if (s.snare.includes(i)) {
+      if (s.gated) {
+        // gated-reverb snare: a loud burst that cuts off dead
+        this.burst(0.26, 0.55, 1500, 0, 'bandpass', this.musicBus, t);
+        this.burst(0.2, 0.3, 5000, 0, 'highpass', this.musicBus, t);
+      } else this.burst(0.14, 0.45, 1800, 0, 'bandpass', this.musicBus, t);
+    }
     if (s.hat.includes(i)) this.burst(0.04, 0.18, 7000, 0, 'highpass', this.musicBus, t);
   }
 
-  private voice(f: number, dur: number, type: OscillatorType, vol: number, t: number, cutoff: number, echo = false) {
+  /** Slow-attack detuned saw pair for pads. */
+  private padNote(f: number, dur: number, t: number) {
     const ctx = this.ctx!;
+    const fl = ctx.createBiquadFilter();
+    fl.type = 'lowpass';
+    fl.frequency.value = 1400;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.028, t + Math.min(0.35, dur * 0.3));
+    g.gain.setValueAtTime(0.028, t + dur * 0.85);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    fl.connect(g).connect(this.musicBus);
+    for (const det of [-9, 9]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f, t);
+      o.detune.value = det;
+      o.connect(fl);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    }
+  }
+
+  private voice(f: number, dur: number, type: LeadVoice, vol: number, t: number, cutoff: number, echo = false, sendDelay = false) {
+    const ctx = this.ctx!;
+    if (type === 'fm') {
+      // two-operator FM bell/e-piano: modulator at 2x, index decays
+      const car = ctx.createOscillator();
+      const mod = ctx.createOscillator();
+      const mg = ctx.createGain();
+      car.frequency.setValueAtTime(f, t);
+      mod.frequency.setValueAtTime(f * 2, t);
+      mg.gain.setValueAtTime(f * 3, t);
+      mg.gain.exponentialRampToValueAtTime(f * 0.3, t + Math.max(0.05, dur));
+      mod.connect(mg).connect(car.frequency);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol * 1.3, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(vol * 0.4, t + Math.max(0.05, dur * 0.8));
+      g.gain.linearRampToValueAtTime(0, t + dur + 0.05);
+      car.connect(g).connect(this.musicBus);
+      if (echo) g.connect(this.delay);
+      for (const o of [car, mod]) {
+        o.start(t);
+        o.stop(t + dur + 0.08);
+      }
+      return;
+    }
     const o = ctx.createOscillator();
-    o.type = type;
+    const extra: OscillatorNode[] = [];
+    if (type === 'saw2') vol *= 0.6; // two oscillators summed
+    if (type === 'saw2') {
+      o.type = 'sawtooth';
+      o.detune.value = -8;
+      const o2 = ctx.createOscillator();
+      o2.type = 'sawtooth';
+      o2.detune.value = 8;
+      o2.frequency.setValueAtTime(f, t);
+      extra.push(o2);
+    } else o.type = type;
     o.frequency.setValueAtTime(f, t);
     if (echo) {
       // gentle delayed vibrato
@@ -338,6 +502,7 @@ export class Audio {
       lg.gain.setValueAtTime(0, t);
       lg.gain.linearRampToValueAtTime(f * 0.012, t + Math.min(dur, 0.4));
       lfo.connect(lg).connect(o.frequency);
+      for (const x of extra) lg.connect(x.frequency);
       lfo.start(t);
       lfo.stop(t + dur + 0.05);
     }
@@ -350,8 +515,11 @@ export class Audio {
     g.gain.setValueAtTime(vol, t + Math.max(0.01, dur - 0.03));
     g.gain.linearRampToValueAtTime(0, t + dur);
     o.connect(fl).connect(g).connect(this.musicBus);
-    if (echo) g.connect(this.delay);
-    o.start(t);
-    o.stop(t + dur + 0.02);
+    if (echo || sendDelay) g.connect(this.delay);
+    for (const x of [o, ...extra]) {
+      if (x !== o) x.connect(fl);
+      x.start(t);
+      x.stop(t + dur + 0.02);
+    }
   }
 }

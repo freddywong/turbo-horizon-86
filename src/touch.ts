@@ -35,6 +35,7 @@ export class TouchControls {
     mk('brake', 'BRAKE', 'ArrowDown');
     mk('drift', 'DRIFT', 'Space');
     mk('pause', 'II', 'Escape');
+    mk('radio', 'MUSIC', 'KeyN');
     this.autoBtn = mk('auto', 'AUTO\nGAS', '');
     this.rotate = document.createElement('div');
     this.rotate.id = 'rotate';
@@ -110,7 +111,7 @@ export class TouchControls {
     e.preventDefault();
     const code = this.codeAt(e.clientX, e.clientY);
     // only steering/pedal buttons follow a sliding thumb; pause stays a tap
-    if (code !== 'Escape') this.pointers.set(e.pointerId, code);
+    if (code !== 'Escape' && code !== 'KeyN') this.pointers.set(e.pointerId, code);
     this.sync();
   }
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Audio } from './audio';
+import { Audio, TRACKS } from './audio';
 import { CYAN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
 import { Input } from './input';
 import { ROAD_HALF, SEG } from './track';
@@ -33,6 +33,21 @@ const loadCar = (): [number, number] => {
 const saveCar = (c: number, p: number) => {
   try {
     localStorage.setItem('th86-car', JSON.stringify([c, p]));
+  } catch {
+    /* storage unavailable */
+  }
+};
+const loadMusic = (): number => {
+  try {
+    const v = parseInt(localStorage.getItem('th86-music') ?? '-1', 10);
+    return v >= -1 && v < TRACKS.length ? v : -1;
+  } catch {
+    return -1;
+  }
+};
+const saveMusic = (v: number) => {
+  try {
+    localStorage.setItem('th86-music', String(v));
   } catch {
     /* storage unavailable */
   }
@@ -81,6 +96,9 @@ export class Game {
   attractRoute = 0;
   clock = 0;
   private lastBeep = -1;
+  /** -1 = the route's own theme, otherwise an index into TRACKS. */
+  musicIdx = loadMusic();
+  private musicToast = 0;
   carIdx = loadCar()[0];
   paintIdx = loadCar()[1];
   touch = false; // set by the touch controls; changes prompts
@@ -125,6 +143,20 @@ export class Game {
     this.t = 0;
   }
 
+  private trackId(): string {
+    return this.musicIdx < 0 ? this.world.route.id : TRACKS[this.musicIdx].id;
+  }
+  musicLabel(): string {
+    return this.musicIdx < 0 ? `ROUTE THEME` : TRACKS[this.musicIdx].name;
+  }
+  /** Next radio station; plays it straight away. */
+  private nextTrack() {
+    this.musicIdx = this.musicIdx + 1 >= TRACKS.length ? -1 : this.musicIdx + 1;
+    saveMusic(this.musicIdx);
+    this.audio.music(this.trackId());
+    this.musicToast = this.clock + 2.5;
+  }
+
   private flash(a: string, b = '', dur = 2) {
     this.msg = a;
     this.msg2 = b;
@@ -139,7 +171,7 @@ export class Game {
     this.lastBeep = -1;
     this.msg = '';
     this.go('countdown');
-    this.audio.music(this.world.route.id);
+    this.audio.music(this.trackId());
   }
 
   // ------------------------------------------------------------------ update
@@ -147,6 +179,7 @@ export class Game {
     const inp = this.input;
     this.clock += dt;
     if (inp.hit('KeyM')) this.audio.toggleMute();
+    if (!this.paused && inp.hit('KeyN') && ['carselect', 'countdown', 'race'].includes(this.state)) this.nextTrack();
 
     if (this.paused) {
       let act = inp.hit('Escape') ? 'resume' : inp.hit('KeyR') ? 'restart' : inp.hit('KeyQ') ? 'quit' : '';
@@ -210,7 +243,8 @@ export class Game {
         if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
         if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
         for (const tp of inp.taps) {
-          if (tp.y > 380 && tp.x > HUD_W / 2 - 150 && tp.x < HUD_W / 2 + 150) go = true;
+          if (tp.y > 370 && tp.y < 405 && tp.x > HUD_W / 2) this.nextTrack();
+          else if (tp.y > 405 && tp.x > HUD_W / 2 - 150 && tp.x < HUD_W / 2 + 150) go = true;
           else if (tp.x < 160) dc = -1;
           else if (tp.x > HUD_W - 160) dc = 1;
           else dp = 1;
@@ -326,6 +360,7 @@ export class Game {
 
   private toCarSelect() {
     this.go('carselect');
+    this.audio.music(this.trackId()); // preview the race music
     this.applyCar();
     this.resetPlayer(false);
     this.px = 0;
@@ -565,6 +600,7 @@ export class Game {
         h.text(`${s.stats.vmax} KM/H`, 340, 330, 16, WHITE);
         h.text(`CAR ${this.carIdx + 1}/${ROSTER.length}`, HUD_W - 30, 330, 16, WHITE, 'right');
         h.text(this.touch ? 'TAP CAR: COLOUR' : '^ v  COLOUR', HUD_W - 30, 356, 16, CYAN, 'right');
+        h.text(`${this.touch ? 'TAP' : 'N'}  MUSIC: ${this.musicLabel()}`, HUD_W - 30, 382, 16, PINK, 'right');
         h.box(HUD_W / 2 - 150, 410, 300, 50, 0x1a5ab8, blink ? YELLOW : WHITE);
         h.text(this.touch ? 'TAP TO RACE' : 'ENTER  RACE', HUD_W / 2, 427, 16, WHITE, 'center');
         break;
@@ -589,6 +625,10 @@ export class Game {
             h.text(`SCORE ${this.score}`, HUD_W / 2, 250, 24, WHITE, 'center');
             if (blink) h.text(this.touch ? 'TAP TO CONTINUE' : 'PRESS ENTER', HUD_W / 2, 310, 24, YELLOW, 'center');
           }
+        }
+        if (this.clock < this.musicToast && this.state !== 'goal' && this.state !== 'over') {
+          h.box(HUD_W / 2 - 200, 150 - 4, 400, 34, 0x101030, PINK, 3);
+          h.text(`MUSIC  ${this.musicLabel()}`, HUD_W / 2, 156, 16, WHITE, 'center');
         }
         if (this.clock < this.msgUntil && (this.msg === 'GO!' || blink)) {
           h.text(this.msg, HUD_W / 2, 150, this.msg === 'GO!' ? 64 : 32, this.msg === 'GO!' ? YELLOW : CYAN, 'center');

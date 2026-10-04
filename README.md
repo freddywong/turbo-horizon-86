@@ -25,6 +25,7 @@ npm run build    # type-check + production build into dist/
 | Enter | Insert coin / confirm |
 | R | Restart the current route |
 | Esc | Pause (Q in the pause menu quits to route select) |
+| N | Next music track (car select and while racing) |
 | M | Mute |
 
 ### Phones and tablets
@@ -34,6 +35,22 @@ Play in landscape. The first touch switches to on-screen arcade buttons:
 AUTO GAS (on by default) keeps the throttle down for you. Tap through the
 menus; the pause button sits at the top right. The game tries to go
 fullscreen and lock to landscape where the browser allows it.
+
+## Music
+
+Six original synth tracks plus a title theme, all generated live in the browser:
+
+| Track | Feel |
+| --- | --- |
+| COASTLINE RUSH | Miami's theme: bright major-key cruise |
+| NEON EXPRESSWAY | Tokyo's theme: minor key, Japanese-pop chord progression |
+| PALM DRIVE | Laid-back synthwave with a rolling arpeggio and pads |
+| NIGHT SIGNAL | Minor-key drive with an FM bell lead |
+| TURBO RIVAL | Fast, galloping chase theme |
+| AFTER SUNSET | Slow city-pop ballad |
+
+Pick one on the car-select screen (it previews as you cycle), or press N (the MUSIC button on
+touch screens) to change stations mid-race. ROUTE THEME plays each route's own track.
 
 ## Cars
 
@@ -72,5 +89,6 @@ overtaking, and the time bonus at the goal.
 * `src/touch.ts`: the multi-touch on-screen controls.
 * `src/backdrop.ts`: stepped-gradient sky dome, sun/moon discs, cut-out clouds,
   mountains and skylines that scroll with the road's heading.
-* `src/audio.ts`: engine, tyre squeal, crashes, jingles, and three original
-  chiptune-style tunes.
+* `src/audio.ts`: engine, tyre squeal, crashes, jingles, and an original synth
+  soundtrack played live by a step sequencer (detuned saw and FM bell leads, pads,
+  arpeggios, gated snares).
