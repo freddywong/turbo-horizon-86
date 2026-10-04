@@ -1,6 +1,8 @@
 import { SignAtlas, SignSpec } from '../atlas';
-import { Backdrop, clouds, disc, horizonBand, skyDome, skylineRing, stars, volcano } from '../backdrop';
+import { aircraft, Backdrop, clouds, disc, horizonBand, skyDome, skylineRing, stars, volcano } from '../backdrop';
 import { GeoBuilder } from '../geom';
+import { GFX } from '../gfx';
+import { FACADE, tileOffset } from '../textures';
 import { TRAFFIC, trafficProp } from '../cars/traffic';
 import * as P from '../props';
 import { makeProfile, RoadStyle, SideStep } from '../road';
@@ -25,6 +27,25 @@ function tower(rng: Rng, w: number, d: number, h: number): P.PropDef {
   const g = new GeoBuilder();
   const l = new GeoBuilder();
   const body = rng.pick([0x1c2244, 0x221c40, 0x182a40, 0x262640]);
+  if (GFX.modern) {
+    // textured window walls (self-lit), set-back crown, rooftop plant and a warning lamp
+    const f = new GeoBuilder();
+    const tile = tileOffset(h < 30 ? FACADE.APARTMENT : rng.pick([FACADE.OFFICE_WARM, FACADE.OFFICE_COOL, FACADE.OFFICE_DARK, FACADE.OFFICE_WARM]));
+    const rep = h < 30 ? [12, 12] : [16, 16];
+    f.facadeBox(0, h / 2, 0, w, h, d, tile, rep[0], rep[1], [0xffffff, 0xb8bcd8], 0x2a2e48, rng.range(0, 1));
+    if (h > 45 && rng.chance(0.6)) {
+      const cw = w * 0.65, cd = d * 0.65, ch = rng.range(6, 14);
+      f.facadeBox(0, h + ch / 2, 0, cw, ch, cd, tile, rep[0], rep[1], [0xdcdcf0, 0xa0a4c4], 0x2a2e48, rng.range(0, 1));
+      if (rng.chance(0.5)) l.box(0, h + ch + 0.3, 0, cw + 0.2, 0.5, cd + 0.2, rng.pick([0x40f0ff, 0xff3a8a, 0xffffff]));
+      h += ch;
+    }
+    for (let i = 0; i < 3; i++) g.box(rng.range(-w / 4, w / 4), h + 0.8, rng.range(-d / 4, d / 4), 2.6, 1.6, 2, [0x3a3e58, 0x4a4e68]);
+    if (h > 40) {
+      g.box(w / 5, h + 6, 0, 0.35, 12, 0.35, 0x6a6e88);
+      l.box(w / 5, h + 12.3, 0, 1, 1, 1, 0xff2020);
+    }
+    return { parts: [{ geo: f.build(), mat: 'facadeLit' }, { geo: g.build(), mat: 'lit' }, { geo: l.build(), mat: 'glow' }], radius: 0, max: 60 };
+  }
   g.box(0, h / 2, 0, w, h, d, [body, 0x2a2e52]);
   if (rng.chance(0.5)) g.box(0, h + 2, 0, w * 0.6, 4, d * 0.6, body);
   const style = rng.int(0, 2);
@@ -159,10 +180,18 @@ export const tokyo: RouteDef = {
 
     const reg = new PropReg();
     const towers: { t: number; h: number; w: number }[] = [];
-    for (let i = 0; i < 8; i++) {
-      const w = rng.range(18, 34), d = rng.range(18, 30), h = rng.range(40, 130);
-      towers.push({ t: reg.add(tower(rng, w, d, h)), h, w: Math.max(w, d) });
-    }
+    // '92: build real low / mid / high blocks (textured windows mustn't be squashed by scaling)
+    const bands: [number, number, number][] = GFX.modern ? [[5, 12, 26], [5, 32, 64], [5, 70, 140]] : [[8, 40, 130]];
+    const towerBands: { t: number; h: number; w: number }[][] = bands.map(([n, h0, h1]) => {
+      const list: { t: number; h: number; w: number }[] = [];
+      for (let i = 0; i < n; i++) {
+        const w = rng.range(18, 34), d = rng.range(18, 30), h = rng.range(h0, h1);
+        const tw = { t: reg.add(tower(rng, w, d, h)), h, w: Math.max(w, d) };
+        list.push(tw);
+        towers.push(tw);
+      }
+      return list;
+    });
     const lamp = reg.add(P.streetLight(10, 0xffc060, 0x8a8a98, 4, true));
     const neonCols = [0xff3a8a, 0x40f0ff, 0xffe040, 0xff5030, 0x80ff60, 0xc060ff];
     const tateWords = ['ホテル', 'カラオケ', 'ラーメン', '喫茶店', '電気街', '寿司', 'ゲーム', '居酒屋'];
@@ -195,6 +224,9 @@ export const tokyo: RouteDef = {
     const trafficTypes = [T.cedric, T.every, T.civic, T.ae86, T.crown].map((s) => reg.add(trafficProp(s, { night: true })))
       .concat([reg.add(trafficProp(T.crown, { taxi: true, night: true })), reg.add(trafficProp(T.crown, { taxi: true, night: true })),
         reg.add(P.truck(0xe02a2a)), reg.add(P.truck(0x1a8a3a)), reg.add(P.bus(0x2a8a5a))]);
+    const reflector = reg.add(P.barrierLamp(0xffb030));
+    const phone = reg.add(P.phoneBox(atlas.add({ bg: 0xff8a20, fg: 0x1a1a1a, text: '非常電話', jp: true }, 1, 1)));
+    const fans = reg.add(P.tunnelFans(8.2));
     const chevR = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'R' }, 2, 1), 0.3));
     const chevL = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'L' }, 2, 1), 0.3));
     const bridge = reg.add(P.overpass(0x2a8aa0));
@@ -205,12 +237,12 @@ export const tokyo: RouteDef = {
       const pr = segs[i].props;
       for (const side of [-1, 1]) {
         if (!rng.chance(density)) continue;
-        const tw = rng.pick(towers);
-        const s = rng.range(0.85, 1.25);
         const off = rng.range(0, 240);
-        const x = side * (R + near + tw.w * s * 0.5 + off);
         // keep the blocks beside the expressway low so the road rides above the city
-        const sy = off < 70 ? rng.range(0.25, 0.45) : off < 140 ? rng.range(0.5, 0.9) : rng.range(0.8, 1.5);
+        const tw = GFX.modern ? rng.pick(towerBands[off < 70 ? 0 : off < 140 ? 1 : 2]) : rng.pick(towers);
+        const s = GFX.modern ? rng.range(0.9, 1.15) : rng.range(0.85, 1.25);
+        const x = side * (R + near + tw.w * s * 0.5 + off);
+        const sy = GFX.modern ? rng.range(0.92, 1.1) : off < 70 ? rng.range(0.25, 0.45) : off < 140 ? rng.range(0.5, 0.9) : rng.range(0.8, 1.5);
         pr.push({ t: tw.t, x, y: 0, abs: true, s, sy, r: rng.range(-0.2, 0.2), tint: rng.pick([0xffffff, 0xd8d0ff, 0xc8e0ff]) });
         if (off < 140 && rng.chance(0.4)) {
           pr.push({ t: rng.pick(roof), x: x - side * tw.w * s * 0.2, y: tw.h * s * sy, abs: true, r: side * -0.4 });
@@ -222,9 +254,14 @@ export const tokyo: RouteDef = {
       const pr = s.props;
       if (s.tunnel) {
         if (!segs[i - 1].tunnel) pr.push({ t: portal, x: 0 });
+        if (GFX.modern && i % 22 === 0) pr.push({ t: fans, x: 0 });
         continue;
       }
       const z = s.zone;
+      if (GFX.modern) {
+        if (i % 2 === 0) pr.push({ t: reflector, x: R + 1.65, y: 1.3 }, { t: reflector, x: -(R + 1.65), y: 1.3 });
+        if (i % 140 === 70) pr.push({ t: phone, x: R + 0.9, r: -Math.PI / 2 });
+      }
       if (Math.abs(s.curve) > 0.0016 && i % 4 === 0) {
         pr.push(s.curve > 0 ? { t: chevR, x: -(R + 1.95), r: 0.1 } : { t: chevL, x: R + 1.95, r: -0.1 });
       }
@@ -260,6 +297,7 @@ export const tokyo: RouteDef = {
     bd.addLayer(disc(2500, -0.45, 16, 70, [[1.6, 0x5a4a8a], [1.3, 0x8a7aaa], [1, 0xfff4d0], [0.8, 0xffffe8]], 16), 1);
     bd.addLayer(volcano(2300, 0.55, 190, 520, 0x3a2a6a, 0xd8d0f0), 1);
     bd.addLayer(skylineRing(rng, 2100, [0x1a1838, 0x201a40, 0x14163a], WIN, 170, () => 1, 0.75, 0.22), 1);
+    if (GFX.modern) bd.addLayer(aircraft(rng, 2300, 6), 0.4);
     bd.addLayer(horizonBand(1950, FOG), 0);
     return { track, profiles, props: reg.defs, backdrop: bd, trafficTypes, gateType: gGoal };
   },

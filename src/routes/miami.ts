@@ -1,6 +1,7 @@
 import { SignAtlas } from '../atlas';
-import { Backdrop, clouds, disc, discCentre, horizonBand, mountainRing, skyDome, skylineRing } from '../backdrop';
+import { Backdrop, clouds, disc, discCentre, lighthouse, seaGlitter, ships, horizonBand, mountainRing, skyDome, skylineRing } from '../backdrop';
 import { TRAFFIC, trafficProp } from '../cars/traffic';
+import { GFX } from '../gfx';
 import * as P from '../props';
 import { makeProfile, RoadStyle } from '../road';
 import { Rng } from '../rng';
@@ -115,6 +116,13 @@ export const miami: RouteDef = {
       { bg: 0xff5a8a, fg: 0xffffff, text: 'WELCOME TO MIAMI', border: 0xffffff },
       { bg: 0x1a6ae0, fg: 0xffe040, text: 'SUNSET POINT', border: 0xffffff },
     ].map((s, i) => reg.add(P.gate(atlas.add(s, 4, 1), 0xffffff, i ? 0xff8a20 : 0x20c0b0, 0xffffff)));
+    // '92 roadside detail
+    const delR = reg.add(P.delineator(true)), delW = reg.add(P.delineator(false));
+    const kms = Array.from({ length: 16 }, (_, k) => reg.add(P.kmPost(atlas.add({ bg: 0x1a7a3a, fg: 0xffffff, text: String(k + 1), border: 0xffffff }, 1, 1))));
+    const people = [reg.add(P.person(0)), reg.add(P.person(1))];
+    const gulls = reg.add(P.seagulls(rng));
+    const hut = reg.add(P.beachHut());
+    const SHIRTS = [0xff4a6a, 0x2a90ff, 0xffe040, 0xffffff, 0x40d0a0, 0xff9a30, 0xc060ff];
     const FLAGS = [0xff3a5a, 0xffe040, 0x2a90ff, 0x40e0a0, 0xffffff, 0xff8a20];
 
     // ---- scenery placement (sparse on purpose) -----------------------------
@@ -127,6 +135,18 @@ export const miami: RouteDef = {
         continue;
       }
       const z = s.zone;
+      if (GFX.modern) {
+        const beach = z === 'beach' || z === 'beach2';
+        if (i % 3 === 0 && (z === 'hills' || beach)) pr.push({ t: delR, x: R + 2.1 }, { t: delW, x: -(R + 2.1) });
+        if (i % 167 === 100) pr.push({ t: kms[Math.min(kms.length - 1, Math.floor((i * 6) / 1000))], x: R + 3.4, r: -0.3 });
+        if (beach) {
+          if (i % 5 === 0 && rng.chance(0.55)) pr.push({ t: people[1], x: R + rng.range(9, 26), r: rng.range(0, 6), tint: rng.pick(SHIRTS) });
+          if (i % 4 === 1 && rng.chance(0.35)) pr.push({ t: people[0], x: -(R + rng.range(1.5, 3.5)), r: rng.range(0, 6), tint: rng.pick(SHIRTS) });
+          if (i % 40 === 10) pr.push({ t: gulls, x: R + rng.range(15, 60), y: rng.range(16, 28), r: rng.range(0, 6) });
+          if (z === 'beach2' && i % 26 === 13 && rng.chance(0.7)) pr.push({ t: hut, x: R + rng.range(18, 22), r: -0.3 + rng.range(-0.2, 0.2), tint: rng.pick(SHIRTS) });
+        }
+        if (z === 'city' && i % 5 === 2 && rng.chance(0.45)) pr.push({ t: people[0], x: rng.sign() * (R + rng.range(2.5, 5.5)), r: rng.range(0, 6), tint: rng.pick(SHIRTS) });
+      }
       // curve warnings on the outside of every real bend
       if (Math.abs(s.curve) > 0.0016 && i % 5 === 0 && z !== 'causeway') {
         pr.push(s.curve > 0 ? { t: chevR, x: -(R + 5.5), r: 0.15 } : { t: chevL, x: R + 5.5, r: -0.15 });
@@ -219,6 +239,12 @@ export const miami: RouteDef = {
       const d = ahead(a);
       return d > 0.7 && d < 1.3 ? 1 : 0;
     }, 0.9, 0.35), 1);
+    if (GFX.modern) {
+      // horizon detail: ships, a lighthouse on the point, glitter under the sun
+      bd.addLayer(ships(rng, 1880, 0.35, 1.5, 5), 1);
+      bd.addLayer(lighthouse(1860, 1.55), 1);
+      bd.addLayer(seaGlitter(rng, 1880, 0.25, 140), 1);
+    }
     bd.addLayer(horizonBand(1900, FOG), 0);
     return { track, profiles, props: reg.defs, backdrop: bd, trafficTypes, gateType: gGoal };
   },

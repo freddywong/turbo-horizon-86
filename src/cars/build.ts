@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GeoBuilder, V3 } from '../geom';
+import { GFX } from '../gfx';
 import { CarSpec, Light, Station } from './spec';
 
 const GLASS = 0x18283c, GLASS_SIDE = 0x22364c, DARK = 0x141416, BLACK = 0x0a0a0c, CHROME = 0xc8ccd4;
@@ -108,10 +109,16 @@ export function buildBody(spec: CarSpec, paint: number, traffic = false): CarGeo
       gb.poly(pts, c);
     } else gb.quad([x - li.w / 2, li.y - li.h / 2, z], [x + li.w / 2, li.y - li.h / 2, z], [x + li.w / 2, li.y + li.h / 2, z], [x - li.w / 2, li.y + li.h / 2, z], c);
   };
+  const detail = GFX.modern && !traffic;
   for (const li of spec.lights) {
     for (const x of li.mirror === false || li.x === 0 ? [li.x] : [li.x, -li.x]) {
       lamp(l, li, x, zR + 0.012, li.c);
       if (li.brake && !traffic) lamp(b, li, x, zR + 0.016, 0xff3a2a);
+      if (detail) {
+        // lamp housing rim and a brighter reflector core
+        lamp(g, { ...li, w: li.w + 0.05, h: li.h + 0.05 }, x, zR + 0.008, 0x1a1a1e);
+        lamp(l, { ...li, w: li.w * 0.5, h: li.h * 0.45 }, x, zR + 0.014, new THREE.Color(li.c).lerp(new THREE.Color(0xffffff), 0.45).getHex());
+      }
     }
   }
   if (spec.slats) {
@@ -130,6 +137,14 @@ export function buildBody(spec: CarSpec, paint: number, traffic = false): CarGeo
     }
     // plate recess
     g.quad([-0.3, spec.plateY - 0.1, zR + 0.004], [0.3, spec.plateY - 0.1, zR + 0.004], [0.3, spec.plateY + 0.1, zR + 0.004], [-0.3, spec.plateY + 0.1, zR + 0.004], DARK);
+    if (detail) {
+      // chrome plate frame, reversing lamps, diffuser fins
+      const py = spec.plateY, z = zR + 0.006;
+      g.quad([-0.31, py - 0.105, z], [0.31, py - 0.105, z], [0.31, py - 0.085, z], [-0.31, py - 0.085, z], CHROME);
+      g.quad([-0.31, py + 0.085, z], [0.31, py + 0.085, z], [0.31, py + 0.105, z], [-0.31, py + 0.105, z], CHROME);
+      for (const s of [-1, 1]) l.quad([s * 0.36, py - 0.04, zR + 0.012], [s * 0.48, py - 0.04, zR + 0.012], [s * 0.48, py + 0.04, zR + 0.012], [s * 0.36, py + 0.04, zR + 0.012], 0xf0f0e8);
+      for (let k = -2; k <= 2; k++) g.box(k * 0.2, last.yb - 0.03, zR - 0.12, 0.03, 0.1, 0.26, DARK);
+    }
   } else {
     g.quad([-0.26, spec.plateY - 0.08, zR + 0.008], [0.26, spec.plateY - 0.08, zR + 0.008], [0.26, spec.plateY + 0.08, zR + 0.008], [-0.26, spec.plateY + 0.08, zR + 0.008], 0xe8e8d8);
   }
@@ -158,6 +173,44 @@ export function buildBody(spec: CarSpec, paint: number, traffic = false): CarGeo
     // mirrors at the base of the windscreen
     const ws = st.find((s) => s.seg === 'ws');
     if (ws) for (const s of [-1, 1]) g.box(s * (ws.w + 0.06), ws.belt + 0.12, ws.z + 0.25, 0.18, 0.12, 0.12, [paint, paint, shade, BLACK]);
+    if (detail && ws) {
+      const rw = st.find((s) => s.seg === 'rw') ?? st.find((s) => s.seg === 'lv');
+      for (const s of [-1, 1]) {
+        // mirror stalk
+        g.box(s * (ws.w + 0.02), ws.belt + 0.08, ws.z + 0.25, 0.08, 0.04, 0.05, BLACK);
+        // door shut lines and handle
+        const zd0 = ws.z + 0.05, zd1 = rw ? rw.z + 0.05 : ws.z + 1.1;
+        for (const zz of [zd0, zd1]) {
+          const w = at(st, zz, 'w') + 0.007, yb = at(st, zz, 'yb') + 0.1, yt = at(st, zz, 'belt') - 0.02;
+          g.quad([s * w, yb, zz], [s * w, yb, zz + 0.02], [s * w, yt, zz + 0.02], [s * w, yt, zz], DARK);
+        }
+        const wh = at(st, zd1 - 0.25, 'w') + 0.012, yh = at(st, zd1 - 0.25, 'belt') - 0.1;
+        g.quad([s * wh, yh, zd1 - 0.38], [s * wh, yh, zd1 - 0.18], [s * wh, yh + 0.04, zd1 - 0.18], [s * wh, yh + 0.04, zd1 - 0.38], CHROME);
+      }
+      // rubber window seals: dark strips along the screen and rear-window edges
+      for (const seg of ['ws', 'rw'] as const) {
+        const i = st.findIndex((s) => s.seg === seg);
+        if (i < 0 || i + 1 >= st.length) continue;
+        const a = st[i], c = st[i + 1];
+        for (const s of [-1, 1]) {
+          g.quad([s * a.wt, a.top + 0.004, a.z], [s * c.wt, c.top + 0.004, c.z], [s * (c.wt - 0.04), c.top + 0.006, c.z], [s * (a.wt - 0.04), a.top + 0.006, a.z], BLACK);
+        }
+      }
+    }
+  }
+
+  if (traffic && GFX.modern) {
+    // period traffic detail: chunky bumpers, door mirrors, rear wiper, roof rails on estates/4x4s
+    const f0 = st[0], ws = st.find((s) => s.seg === 'ws'), rw = st.find((s) => s.seg === 'rw');
+    g.box(0, last.yb + 0.05, zR + 0.08, last.w * 2 + 0.06, 0.16, 0.16, [0x3a3a3e, 0x4a4a4e]);
+    g.box(0, f0.yb + 0.05, f0.z - 0.08, f0.w * 2 + 0.06, 0.16, 0.16, [0x3a3a3e, 0x4a4a4e]);
+    if (ws) for (const s of [-1, 1]) g.box(s * (ws.w + 0.08), ws.belt + 0.1, ws.z + 0.2, 0.14, 0.12, 0.1, 0x1a1a1a);
+    if (rw) g.quad([-0.05, rw.top + 0.15, rw.z + 0.3], [0.45, rw.top + 0.35, rw.z + 0.3], [0.45, rw.top + 0.37, rw.z + 0.3], [-0.05, rw.top + 0.17, rw.z + 0.3], 0x111111);
+    if (spec.id === 'volvo240' || spec.id === 'cherokee') {
+      const rf = st.find((s) => s.seg === 'rf')!;
+      const rfEnd = st[st.indexOf(rf) + 1];
+      for (const s of [-1, 1]) g.box(s * (rf.wt - 0.08), rf.top + 0.06, (rf.z + rfEnd.z) / 2, 0.06, 0.08, rfEnd.z - rf.z, 0x2a2a2a);
+    }
   }
 
   // ---- top details ------------------------------------------------------------

@@ -624,7 +624,8 @@ export class Game {
     const cam = this.camera;
     const fov = 54 + 14 * Math.min(1.3, f) * Math.min(1.3, f) + (this.turboT > 0 ? 6 : 0);
     if (Math.abs(cam.fov - fov) > 0.01) {
-      cam.fov += (fov - cam.fov) * Math.min(1, dt * 5);
+      // ease small changes (turbo), snap big ones (coming back from the car-select camera)
+      cam.fov = Math.abs(fov - cam.fov) > 8 ? fov : cam.fov + (fov - cam.fov) * Math.min(1, dt * 5);
       cam.updateProjectionMatrix();
     }
     this.shakeKick = Math.max(0, this.shakeKick - dt * 1.5);

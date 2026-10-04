@@ -10,7 +10,10 @@ export class GeoBuilder {
   private pos: number[] = [];
   private col: number[] = [];
   private uvs: number[] = [];
+  private tiles: number[] = [];
   private hasUv = false;
+  private hasTile = false;
+  private curTile: [number, number, number] = [12, 0, 0]; // untextured faces sample the plain-white layer
   private m: THREE.Matrix4 | null = null;
   private tmp = new THREE.Vector3();
   private c = new THREE.Color();
@@ -32,6 +35,7 @@ export class GeoBuilder {
     this.col.push(this.c.r, this.c.g, this.c.b);
     if (uv) this.hasUv = true;
     this.uvs.push(uv ? uv[0] : 0, uv ? uv[1] : 0);
+    this.tiles.push(this.curTile[0], this.curTile[1], this.curTile[2]);
   }
 
   tri(a: V3, b: V3, c: V3, color: number, uv?: [[number, number], [number, number], [number, number]]): this {
@@ -58,6 +62,33 @@ export class GeoBuilder {
   quadC(a: V3, b: V3, c: V3, d: V3, cols: [number, number, number, number]): this {
     this.push(a, cols[0]); this.push(b, cols[1]); this.push(c, cols[2]);
     this.push(a, cols[0]); this.push(c, cols[2]); this.push(d, cols[3]);
+    return this;
+  }
+
+  /**
+   * Quad textured with a repeating atlas tile (see textures.atlasPatch):
+   * uv are in repeat units, tile is the atlas corner offset.
+   */
+  quadT(a: V3, b: V3, c: V3, d: V3, color: number, uv: [number, number, number, number], tile: [number, number]): this {
+    this.hasTile = true;
+    this.curTile = [tile[0], tile[1], 0];
+    this.quad(a, b, c, d, color, uv);
+    this.curTile = [12, 0, 0];
+    return this;
+  }
+
+  /** Box whose four sides carry a repeating façade tile; repW/repH = world size of one repeat. */
+  facadeBox(cx: number, cy: number, cz: number, w: number, h: number, d: number, tile: [number, number],
+    repW: number, repH: number, color: number | [number, number], roof: number, u0 = 0): this {
+    const [front, side] = Array.isArray(color) ? color : [color, color];
+    const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2, z0 = cz - d / 2, z1 = cz + d / 2;
+    const vh = h / repH;
+    const fw = w / repW, sw = d / repW;
+    this.quadT([x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1], front, [u0, 0, u0 + fw, vh], tile);
+    this.quadT([x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], front, [u0 + 0.5, 0, u0 + 0.5 + fw, vh], tile);
+    this.quadT([x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1], side, [u0 + 0.25, 0, u0 + 0.25 + sw, vh], tile);
+    this.quadT([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], side, [u0 + 0.75, 0, u0 + 0.75 + sw, vh], tile);
+    this.quad([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], roof);
     return this;
   }
 
@@ -129,6 +160,7 @@ export class GeoBuilder {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
     if (this.hasUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
+    if (this.hasTile) g.setAttribute('tile', new THREE.Float32BufferAttribute(this.tiles, 3));
     g.computeVertexNormals();
     g.computeBoundingSphere();
     return g;

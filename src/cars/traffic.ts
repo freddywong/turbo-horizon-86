@@ -63,7 +63,7 @@ export function trafficProp(s: CarSpec, opts: { taxi?: boolean; night?: boolean 
   }
   const st = s.stations;
   const parts = [{ geo: cg.lit.build(), mat: 'lit' as const }];
-  const out: PropDef = { parts, radius: 0, max: 16, len: (st[st.length - 1].z - st[0].z) / 2 + 2.2 };
+  const out: PropDef = { parts, radius: 0, max: 40, len: (st[st.length - 1].z - st[0].z) / 2 + 2.2 };
   if (!glow.empty) out.parts.push({ geo: glow.build(), mat: 'glow' });
   if (opts.night) out.parts.push({ geo: tailHalos(s, 0.8).build(), mat: 'halo', tint: false });
   return out;

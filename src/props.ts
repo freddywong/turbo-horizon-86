@@ -3,16 +3,31 @@ import { GeoBuilder, V3, at, rotY } from './geom';
 import { ROAD_HALF, SEG } from './track';
 import { Rng } from './rng';
 import { GFX, haloTexture } from './gfx';
+import { atlasPatch, FACADE, facadeAtlas, tileOffset } from './textures';
 
-export type MatKind = 'lit' | 'glow' | 'sign' | 'halo';
+export type MatKind = 'lit' | 'glow' | 'sign' | 'halo' | 'facade' | 'facadeLit';
 export interface PropPart { geo: THREE.BufferGeometry; mat: MatKind; tint?: boolean }
 export interface PropDef { parts: PropPart[]; radius: number; max: number; len?: number }
 export type UV = [number, number, number, number];
 
-export interface Materials { lit: THREE.Material; glow: THREE.Material; sign: THREE.Material; halo: THREE.Material; paint: THREE.Material }
+export interface Materials {
+  lit: THREE.Material; glow: THREE.Material; sign: THREE.Material; halo: THREE.Material; paint: THREE.Material;
+  facade: THREE.Material; facadeLit: THREE.Material;
+}
+
+let facadeTex: THREE.Texture | null = null;
 
 export function makeMaterials(signTex: THREE.Texture): Materials {
+  if (GFX.modern && !facadeTex) facadeTex = facadeAtlas();
+  const facade = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide });
+  const facadeLit = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  if (GFX.modern && facadeTex) {
+    atlasPatch(facade, facadeTex);
+    atlasPatch(facadeLit, facadeTex);
+  }
   return {
+    facade,
+    facadeLit,
     lit: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
     sign: new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }),
@@ -195,9 +210,58 @@ export function lifeguardTower(): PropDef {
 }
 
 /** Tall pastel resort hotel. White base, instance tint gives the pastel colour. */
+/** Rooftop clutter: AC units, a water tank, a mast with a warning lamp. */
+function rooftop(g: GeoBuilder, l: GeoBuilder, y: number, w: number, d: number, rng: Rng, mast = true) {
+  for (let i = 0; i < 3; i++) g.box(rng.range(-w / 3, w / 3), y + 0.6, rng.range(-d / 3, d / 3), 2.2, 1.2, 1.6, [0xc8c8c8, 0xdcdcdc]);
+  if (rng.chance(0.7)) {
+    const tx = rng.range(-w / 4, w / 4), tz = rng.range(-d / 4, d / 4);
+    for (const [dx, dz] of [[-0.9, -0.9], [0.9, -0.9], [0.9, 0.9], [-0.9, 0.9]]) g.box(tx + dx, y + 1, tz + dz, 0.2, 2, 0.2, 0x6a6a70);
+    g.prism(tx, tz, y + 2, y + 4.2, 1.4, 1.4, 8, [0x9a8a70, 0x8a7a62], 0x7a6a52);
+  }
+  if (mast) {
+    g.box(w / 4, y + 4, 0, 0.25, 8, 0.25, 0x9a9aa8);
+    l.box(w / 4, y + 8.2, 0, 0.6, 0.6, 0.6, 0xff2020);
+  }
+}
+
 export function hotel(style: number, rng: Rng): PropDef {
   const g = new GeoBuilder();
   const glass = 0x3a8ab8;
+  if (GFX.modern) {
+    const f = new GeoBuilder();
+    const l = new GeoBuilder();
+    const T = (t: number) => tileOffset(t);
+    if (style === 0) {
+      const w = 16, d = 12, h = 38;
+      f.facadeBox(0, h / 2 + 1.5, 0, w, h - 3, d, T(FACADE.HOTEL), 8, 8, [0xffffff, 0xeeeeee], 0xe8e8e8);
+      // lobby: dark glass ground floor with a canopy
+      g.box(0, 1.5, 0, w - 0.4, 3, d - 0.4, [0x2a4a6a, 0x2a4a6a]);
+      g.box(0, 3.1, d / 2 + 1.2, 7, 0.3, 2.6, [0xffffff, 0xffffff]);
+      for (const x of [-3.2, 3.2]) g.box(x, 1.5, d / 2 + 2.3, 0.2, 3, 0.2, 0xd8d8d8);
+      for (const x of [-w / 2 - 0.2, w / 2 + 0.2]) g.box(x, h / 2, 0, 0.7, h, d + 0.7, [0xffffff, 0xffffff]);
+      g.box(0, h + 1.2, 0, w * 0.5, 2.4, d * 0.6, [0xffffff, 0xf0f0f0]);
+      rooftop(g, l, h, w, d, rng);
+    } else if (style === 1) {
+      const tiers: [number, number, number][] = [[18, 16, 14], [14, 12, 11], [9, 9, 8]];
+      let y = 0;
+      for (const [w, h, d] of tiers) {
+        f.facadeBox(0, y + h / 2, 0, w, h, d, T(FACADE.DECO), 8, 8, [0xffffff, 0xf0f0f0], 0xf0e8d8);
+        g.box(0, y + h - 0.4, 0, w + 0.6, 0.8, d + 0.6, [0xffe08a, 0xffe8a0]);
+        g.box(0, y + h - 1.4, 0, w + 0.3, 0.25, d + 0.3, 0x40c0b0);
+        y += h;
+      }
+      g.prism(0, 0, y, y + 7, 1.2, 0.05, 4, [0xffffff, 0xe0e0e0]);
+      l.box(0, y + 7.2, 0, 0.5, 0.5, 0.5, 0xff2020);
+    } else {
+      const w = 26, d = 9, h = 12;
+      f.facadeBox(0, h / 2, 0, w, h, d, T(FACADE.MOTEL), 12, 12, [0xffffff, 0xf0f0f0], 0xe0dcd4);
+      g.box(0, h + 0.3, 0, w + 1, 0.6, d + 1, [0xff6a8a, 0xff7a96]);
+      g.box(0, 6.1, d / 2 + 0.9, w, 0.25, 1.8, [0xf0f0f0, 0xffffff]);
+      for (let x = -w / 2 + 3; x < w / 2; x += 6) g.box(x, h / 2, d / 2 + 1.7, 0.4, h, 0.4, 0xffffff);
+      rooftop(g, l, h, w, d, rng, false);
+    }
+    return { parts: [...parts(g, l), { geo: f.build(), mat: 'facade' }], radius: 0, max: 40 };
+  }
   if (style === 0) {
     const w = 16, d = 12, h = 38;
     g.box(0, h / 2, 0, w, h, d, [0xffffff, 0xf0f0f0]);
@@ -232,15 +296,21 @@ export function hotel(style: number, rng: Rng): PropDef {
 export function shop(uv: UV): PropDef {
   const g = new GeoBuilder();
   const s = new GeoBuilder();
-  g.box(0, 3.5, 0, 12, 7, 9, [0xffffff, 0xf0f0f0]);
-  g.box(0, 3, 4.6, 8, 2.6, 0.2, 0x3a7aa8);
+  const f = new GeoBuilder();
+  if (GFX.modern) f.facadeBox(0, 3.5, 0, 12, 7, 9, tileOffset(FACADE.SHOP), 12, 7, [0xffffff, 0xf0f0f0], 0xe0dcd4);
+  else {
+    g.box(0, 3.5, 0, 12, 7, 9, [0xffffff, 0xf0f0f0]);
+    g.box(0, 3, 4.6, 8, 2.6, 0.2, 0x3a7aa8);
+  }
   for (let i = 0; i < 6; i++) {
     const x0 = -6 + i * 2, x1 = x0 + 2;
     g.quad([x0, 5.2, 4.5], [x1, 5.2, 4.5], [x1, 4.4, 6.0], [x0, 4.4, 6.0], i % 2 ? 0xffffff : 0xff4a5a);
   }
   s.quad([-5, 7.2, 4.52], [5, 7.2, 4.52], [5, 9.7, 4.52], [-5, 9.7, 4.52], 0xffffff, uv);
   g.box(0, 8.45, 4.4, 10.4, 2.9, 0.2, 0xffffff);
-  return { parts: [{ geo: g.build(), mat: 'lit' }, { geo: s.build(), mat: 'sign' }], radius: 0, max: 40 };
+  const out: PropPart[] = [{ geo: g.build(), mat: 'lit' }, { geo: s.build(), mat: 'sign' }];
+  if (!f.empty) out.push({ geo: f.build(), mat: 'facade' });
+  return { parts: out, radius: 0, max: 40 };
 }
 
 /** Big roadside billboard on two legs. */
@@ -482,3 +552,97 @@ export function bus(stripe: number): PropDef {
   return { parts: parts(g, l), radius: 0, max: 8, len: 7.5 };
 }
 
+
+// ----------------------------- roadside detail ('92) -----------------------------
+
+/** White reflector post with a black band and a red / white reflector. */
+export function delineator(red: boolean): PropDef {
+  const g = new GeoBuilder();
+  const l = new GeoBuilder();
+  g.box(0, 0.55, 0, 0.16, 1.1, 0.16, [0xf4f4f4, 0xffffff]);
+  g.box(0, 0.86, 0, 0.17, 0.12, 0.17, 0x1a1a1a);
+  l.box(0, 0.72, 0.085, 0.1, 0.16, 0.01, red ? 0xff3020 : 0xffffff);
+  return { parts: parts(g, l), radius: 0, max: 400 };
+}
+
+/** Small kilometre marker post with a number plate from the sign atlas. */
+export function kmPost(uv: UV): PropDef {
+  const g = new GeoBuilder();
+  const s = new GeoBuilder();
+  g.box(0, 0.6, 0, 0.12, 1.2, 0.12, 0xdcdcdc);
+  g.box(0, 1.35, -0.04, 0.9, 0.6, 0.06, 0xffffff);
+  s.quad([-0.42, 1.08, 0], [0.42, 1.08, 0], [0.42, 1.62, 0], [-0.42, 1.62, 0], 0xffffff, uv);
+  return { parts: [{ geo: g.build(), mat: 'lit' }, { geo: s.build(), mat: 'sign' }], radius: 0, max: 20 };
+}
+
+/** Low-poly person; the shirt takes the instance tint. variant 1 = swimwear. */
+export function person(variant: number): PropDef {
+  const g = new GeoBuilder();
+  const c = new GeoBuilder();
+  const skin = 0xd8a07a, legs = variant === 1 ? 0xd8a07a : 0x3a4a6a;
+  g.box(-0.12, 0.42, 0, 0.18, 0.84, 0.2, legs);
+  g.box(0.12, 0.42, 0, 0.18, 0.84, 0.2, legs);
+  if (variant === 1) g.box(0, 0.8, 0, 0.44, 0.18, 0.24, 0x2a2a6a);
+  c.box(0, 1.15, 0, 0.46, 0.62, 0.26, [0xffffff, 0xffffff]);
+  g.box(-0.3, 1.1, 0, 0.12, 0.6, 0.14, skin);
+  g.box(0.3, 1.1, 0, 0.12, 0.6, 0.14, skin);
+  g.box(0, 1.6, 0, 0.24, 0.28, 0.24, skin);
+  g.box(0, 1.76, -0.02, 0.26, 0.08, 0.26, variant === 1 ? 0xe8c060 : 0x2a1a10);
+  return { parts: [{ geo: g.build(), mat: 'lit', tint: false }, { geo: c.build(), mat: 'lit', tint: true }], radius: 0, max: 160 };
+}
+
+/** A few seagulls gliding over the beach (flat V shapes). */
+export function seagulls(rng: Rng): PropDef {
+  const g = new GeoBuilder();
+  for (let i = 0; i < 5; i++) {
+    const x = rng.range(-10, 10), y = rng.range(0, 6), z = rng.range(-10, 10), s = rng.range(0.8, 1.3);
+    g.tri([x, y, z], [x - 0.9 * s, y + 0.35 * s, z - 0.2], [x - 0.1, y + 0.05, z + 0.25 * s], 0xffffff);
+    g.tri([x, y, z], [x + 0.9 * s, y + 0.35 * s, z - 0.2], [x + 0.1, y + 0.05, z + 0.25 * s], 0xe8e8f0);
+  }
+  return { parts: parts(g), radius: 0, max: 30 };
+}
+
+/** Striped beach hut; the stripe colour takes the instance tint. */
+export function beachHut(): PropDef {
+  const g = new GeoBuilder();
+  const c = new GeoBuilder();
+  g.box(0, 1.3, 0, 2.4, 2.6, 2.2, [0xffffff, 0xf4f4f4]);
+  for (let i = 0; i < 3; i++) c.box(-0.8 + i * 0.8, 1.3, 0, 0.4, 2.62, 2.22, [0xffffff, 0xffffff]);
+  g.prism(0, 0, 2.6, 3.6, 1.9, 0, 4, [0xffffff, 0xe8e8e8], null, Math.PI / 4);
+  g.box(0, 1.0, 1.12, 0.9, 1.8, 0.04, 0x6a4a2a);
+  return { parts: [{ geo: g.build(), mat: 'lit', tint: false }, { geo: c.build(), mat: 'lit', tint: true }], radius: 1.4, max: 40 };
+}
+
+/** Amber reflector on top of the expressway barrier. */
+export function barrierLamp(color: number): PropDef {
+  const l = new GeoBuilder();
+  l.box(0, 0.05, 0, 0.16, 0.1, 0.4, color);
+  return { parts: [{ geo: l.build(), mat: 'glow' }], radius: 0, max: 500 };
+}
+
+/** Orange emergency phone box against the barrier. */
+export function phoneBox(uv: UV): PropDef {
+  const g = new GeoBuilder();
+  const s = new GeoBuilder();
+  const l = new GeoBuilder();
+  g.box(0, 1.1, 0, 1.0, 2.2, 0.8, [0xff8a20, 0xffa040]);
+  g.box(0, 2.3, 0, 1.1, 0.2, 0.9, 0x3a3a3a);
+  s.quad([-0.4, 1.4, 0.41], [0.4, 1.4, 0.41], [0.4, 1.9, 0.41], [-0.4, 1.9, 0.41], 0xffffff, uv);
+  l.box(0, 2.5, 0, 0.3, 0.2, 0.3, 0xffd040);
+  return { parts: [{ geo: g.build(), mat: 'lit' }, { geo: s.build(), mat: 'sign' }, { geo: l.build(), mat: 'glow' }], radius: 0, max: 20 };
+}
+
+/** Pair of jet fans hung from a tunnel ceiling, with a row of lamps. */
+export function tunnelFans(y: number): PropDef {
+  const g = new GeoBuilder();
+  const l = new GeoBuilder();
+  for (const x of [-4.5, 4.5]) {
+    g.with(new THREE.Matrix4().makeTranslation(x, y - 1.1, 0).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)), () => {
+      g.prism(0, 0, -1.6, 1.6, 0.7, 0.7, 10, [0x8a8a92, 0x7a7a82], 0x2a2a2e);
+      g.prism(0, 0, -1.61, -1.6, 0.7, 0.7, 10, 0x2a2a2e, 0x2a2a2e);
+    });
+    g.box(x, y - 0.3, 0, 0.2, 0.6, 0.2, 0x5a5a62);
+  }
+  for (const x of [-9, 9]) l.box(x, y - 0.2, 0, 0.4, 0.2, 1.4, 0xfff0c0);
+  return { parts: parts(g, l), radius: 0, max: 12 };
+}

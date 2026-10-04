@@ -281,3 +281,69 @@ export function volcano(R: number, a: number, h: number, w: number, body: number
     (v): V3 => [v[0], v[1], v[2]]).reverse(), cap);
   return new THREE.Mesh(g.build(), basic());
 }
+
+// ---------------------------- '92 horizon detail ----------------------------
+
+/** Cargo ships and sailboats sitting on the horizon (flat silhouettes in the distance haze). */
+export function ships(rng: Rng, R: number, aMin: number, aMax: number, n: number): THREE.Mesh {
+  const g = new GeoBuilder();
+  for (let i = 0; i < n; i++) {
+    const a = rng.range(aMin, aMax), s = rng.range(0.8, 1.4), rr = R - i * 4;
+    const p = (u: number, y: number) => ring(rr, a, u * s, y * s - 1.5);
+    if (rng.chance(0.6)) {
+      // freighter: hull, deck cargo, bridge, funnel
+      g.poly([p(-34, 0), p(30, 0), p(36, 7), p(-38, 7)], 0x3a4a6a);
+      g.poly([p(-26, 7), p(14, 7), p(14, 11), p(-26, 11)], rng.pick([0xc85a4a, 0x4a8ac8, 0xd8a040]));
+      g.poly([p(18, 7), p(30, 7), p(30, 17), p(18, 17)], 0xf0f0f0);
+      g.poly([p(22, 17), p(26, 17), p(26, 22), p(22, 22)], 0x2a2a2a);
+    } else {
+      // white yacht
+      g.poly([p(-16, 0), p(16, 0), p(20, 4), p(-18, 4)], 0xf4f4f4);
+      g.poly([p(-8, 4), p(10, 4), p(8, 8), p(-6, 8)], 0xe0e8f0);
+    }
+  }
+  return new THREE.Mesh(g.build(), basic());
+}
+
+/** Striped lighthouse on a rocky point, with a lamp. */
+export function lighthouse(R: number, a: number): THREE.Group {
+  const g = new GeoBuilder();
+  const l = new GeoBuilder();
+  const p = (u: number, y: number) => ring(R, a, u, y);
+  g.poly([p(-90, -40), p(90, -40), p(60, 6), p(20, 14), p(-30, 12), p(-70, 2)], 0x6a7a5a);
+  for (let k = 0; k < 6; k++) {
+    const y0 = 12 + k * 9, y1 = y0 + 9, w0 = 7 - k * 0.6, w1 = 7 - (k + 1) * 0.6;
+    g.poly([p(-w0, y0), p(w0, y0), p(w1, y1), p(-w1, y1)], k % 2 ? 0xd83a3a : 0xffffff);
+  }
+  g.poly([p(-4.5, 66), p(4.5, 66), p(4.5, 72), p(-4.5, 72)], 0x2a2a2a);
+  g.poly([p(-5, 72), p(5, 72), p(0, 78)], 0xd83a3a);
+  l.poly([p(-3.5, 67), p(3.5, 67), p(3.5, 71), p(-3.5, 71)], 0xfff4b0);
+  const grp = new THREE.Group();
+  grp.add(new THREE.Mesh(g.build(), basic()), new THREE.Mesh(l.build(), basic()));
+  return grp;
+}
+
+/** Sun glitter: broken horizontal streaks on the water under the sun, just below the horizon. */
+export function seaGlitter(rng: Rng, R: number, a: number, width: number): THREE.Mesh {
+  const g = new GeoBuilder();
+  for (let i = 0; i < 70; i++) {
+    const y = -rng.range(0.5, 26) ;
+    const spread = width * (0.25 + (-y / 26) * 0.75);
+    const u = rng.range(-spread, spread), len = rng.range(4, 22) * (1 - (-y / 40));
+    const c = rng.pick([0xfff4c0, 0xffe090, 0xffffff, 0xffc890]);
+    g.quad(ring(R, a, u - len, y), ring(R, a, u + len, y), ring(R, a, u + len, y + 0.9), ring(R, a, u - len, y + 0.9), c);
+  }
+  return new THREE.Mesh(g.build(), basic());
+}
+
+/** Blinking-free aircraft warning and jet lights scattered high over the city. */
+export function aircraft(rng: Rng, R: number, n: number): THREE.Mesh {
+  const g = new GeoBuilder();
+  for (let i = 0; i < n; i++) {
+    const a = rng.range(-Math.PI, Math.PI), y = Math.tan((rng.range(8, 22) * Math.PI) / 180) * R;
+    for (const [du, c] of [[-3, 0xff3030], [3, 0x30ff60], [0, 0xffffff]] as [number, number][]) {
+      g.quad(ring(R, a, du - 1.2, y - 1.2), ring(R, a, du + 1.2, y - 1.2), ring(R, a, du + 1.2, y + 1.2), ring(R, a, du - 1.2, y + 1.2), c);
+    }
+  }
+  return new THREE.Mesh(g.build(), basic());
+}

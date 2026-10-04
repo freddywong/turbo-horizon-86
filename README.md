@@ -49,10 +49,18 @@ fires them on straights when they're fighting you for position.
 
 The title screen switches between two looks (G, or tap the GRAPHICS line):
 
-* **1992** (default): early-90s 3D arcade style: 640×360, texture-mapped road and ground
-  with filtering, smooth sky and sun gradients, shaded mountains, glossy car paint,
-  sky-tinted lighting, light halos and glowing tail lights at night, soft tyre smoke and
-  a lens flare from the Miami sun.
+* **1992** (default): early-90s 3D arcade style at 640×360:
+  * hand-painted surface textures: cracked and patched asphalt, worn paint, kerbs, grass tufts,
+    sand ripples and footprints, moving sea, concrete panels, tunnel tiles, lit night streets
+  * textured buildings: hotel balconies, Art-Deco fronts, shop windows full of goods, motels,
+    Tokyo office blocks with lit, blinded and dark windows; rooftop AC units, water tanks, masts
+  * roadside detail: reflector posts, km markers, people on the promenade and beach, beach huts,
+    seagulls, barrier reflectors, emergency phones, tunnel jet fans
+  * detailed cars: framed lamps, reversing lights, plate frames, diffusers, door lines and
+    handles, window seals; traffic with bumpers, mirrors, wipers and roof rails
+  * ships, a lighthouse and sun glitter on the horizon; aircraft lights over Tokyo
+  * smooth sky and sun gradients, glossy car paint, sky-tinted lighting, light halos and
+    glowing tail lights at night, soft tyre smoke, a lens flare from the Miami sun
 * **1986**: the original flat-shaded look: 426×240, hard-stepped 15-bit colour sky,
   untextured ground, sprite-style smoke.
 
