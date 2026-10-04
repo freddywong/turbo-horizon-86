@@ -318,6 +318,14 @@ export class PlayerCar {
 
   private hubs: THREE.Mesh[] = [];
   private detail: THREE.Object3D[] = [];
+  private paintwork: THREE.Mesh[] = []; // dents + scrapes
+  private dentable: THREE.Mesh[] = []; // dents only (glass, lamps, plate)
+  private cracks: THREE.LineSegments | null = null;
+  private crackCount = 0;
+  private glowMesh: THREE.Mesh | null = null;
+  private tailZ = 0;
+  /** true once the model has been dented (a new race needs a fresh one) */
+  damaged = false;
   private near = true;
 
   /** Level of detail: far-off cars drop the cabin and brake hardware. */
@@ -340,19 +348,20 @@ export class PlayerCar {
     let wheelPos: { x: number; z: number; r: number; hw: number }[];
     if (hm) {
       const cg = buildBodyHD(spec, paint);
-      add(cg.skin.build(true), hm.paint, this.body);
-      add(cg.body.build(), hm.paint, this.body);
+      this.paintwork.push(add(cg.skin.build(true), hm.paint, this.body), add(cg.body.build(), hm.paint, this.body));
       this.detail.push(add(cg.cabin.build(), hm.lit, this.body));
-      add(cg.glass.build(), hm.glass, this.body).renderOrder = 1;
-      add(cg.glow.build(), hm.glow, this.body);
+      const gl = add(cg.glass.build(), hm.glass, this.body);
+      gl.renderOrder = 1;
+      this.glowMesh = add(cg.glow.build(), hm.glow, this.body);
+      this.dentable.push(gl, this.glowMesh);
       this.brake = add(cg.brake.empty ? new GeoBuilder().tri([0, 0, 0], [0, 0, 0], [0, 0, 0], 0).build() : cg.brake.build(), hm.glow, this.body);
       plate = cg.plate;
       tailZ = cg.tailZ;
       wheelPos = cg.wheels;
     } else {
       const cg = buildBody(spec, paint);
-      add(cg.lit.build(), mats.paint ?? mats.lit, this.body);
-      if (!cg.glow.empty) add(cg.glow.build(), mats.glow, this.body);
+      this.paintwork.push(add(cg.lit.build(), mats.paint ?? mats.lit, this.body));
+      if (!cg.glow.empty) this.dentable.push((this.glowMesh = add(cg.glow.build(), mats.glow, this.body)));
       this.brake = add(cg.brake.empty ? new GeoBuilder().tri([0, 0, 0], [0, 0, 0], [0, 0, 0], 0).build() : cg.brake.build(), mats.glow, this.body);
       plate = cg.plate;
       tailZ = cg.tailZ;
@@ -362,7 +371,8 @@ export class PlayerCar {
     const s = new GeoBuilder();
     const { y, z } = plate;
     s.quad([-0.27, y - 0.08, z], [0.27, y - 0.08, z], [0.27, y + 0.08, z], [-0.27, y + 0.08, z], 0xffffff, plateUv);
-    add(s.build(), mats.sign, this.body);
+    this.dentable.push(add(s.build(), mats.sign, this.body));
+    this.dentable.push(this.brake);
     if (night && mats.halo) add(tailHalos(spec, 0.45, 0.45).build(), mats.halo, this.body);
 
     const f = new GeoBuilder();
@@ -374,6 +384,7 @@ export class PlayerCar {
     fg.rotateX(Math.PI / 2); // +y -> +z (backwards), -z offsets -> +y heights
     this.flames = add(fg, mats.glow, this.body);
     this.flames.position.set(0, 0, tailZ + (hd ? 0.12 : 0.05));
+    this.tailZ = tailZ;
     this.flames.visible = false;
 
     if (hd) {
@@ -415,6 +426,123 @@ export class PlayerCar {
 
   dispose() {
     for (const g of this.geos) g.dispose();
+    this.cracks?.geometry.dispose();
+  }
+
+  /**
+   * Crash damage: crumples the bodywork round the impact point (pushing panels
+   * in, with a little random crinkle), scuffs the paint to bare metal and soot,
+   * and cracks the glass as it adds up. where: which end/side took the hit.
+   */
+  hit(severity: number, where: 'front' | 'rear' | 'left' | 'right') {
+    this.damaged = true;
+    const st = this.spec.stations;
+    const z0 = st[0].z, z1 = st[st.length - 1].z;
+    const wid = Math.max(...st.map((x) => x.w));
+    const r = Math.random;
+    const c = new THREE.Vector3();
+    const dir = new THREE.Vector3();
+    if (where === 'front' || where === 'rear') {
+      const f = where === 'front';
+      c.set((r() - 0.5) * wid * 1.4, 0.45 + r() * 0.25, f ? z0 + 0.1 : z1 - 0.1);
+      dir.set(0, -0.15, f ? 1 : -1);
+    } else {
+      const sx = where === 'right' ? 1 : -1;
+      c.set(sx * wid, 0.45 + r() * 0.3, z0 + 0.6 + r() * (z1 - z0 - 1.2));
+      dir.set(-sx, -0.1, (r() - 0.5) * 0.3);
+    }
+    dir.normalize();
+    const rad = 0.55 + severity * 0.5, depth = 0.04 + severity * 0.16;
+    const bare = new THREE.Color(0x6a6a70), soot = new THREE.Color(0x1c1a18), tmp = new THREE.Color();
+    const crinkle = (x: number, y: number, z: number) => Math.sin(x * 41.3 + y * 17.1) * Math.cos(z * 29.7 + x * 7.3);
+    const deform = (m: THREE.Mesh, paint: boolean) => {
+      const g = m.geometry;
+      const pos = g.getAttribute('position') as THREE.BufferAttribute;
+      const col = paint ? (g.getAttribute('color') as THREE.BufferAttribute | undefined) : undefined;
+      let touched = false;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const d = Math.hypot(x - c.x, (y - c.y) * 1.3, z - c.z);
+        if (d >= rad) continue;
+        const f = (1 - d / rad) ** 2;
+        const k = depth * f * (0.8 + 0.4 * crinkle(x, y, z));
+        pos.setXYZ(i, x + dir.x * k, y + dir.y * k, z + dir.z * k);
+        touched = true;
+        if (col) {
+          // scraped to bare metal at the centre, sooty smears round it
+          tmp.setRGB(col.getX(i), col.getY(i), col.getZ(i));
+          const t = Math.min(1, f * (0.4 + severity));
+          tmp.lerp(crinkle(z, x, y) > 0.2 ? bare : soot, t * 0.75);
+          col.setXYZ(i, tmp.r, tmp.g, tmp.b);
+        }
+      }
+      if (!touched) return;
+      pos.needsUpdate = true;
+      if (col) col.needsUpdate = true;
+      g.computeVertexNormals();
+    };
+    for (const m of this.paintwork) deform(m, true);
+    for (const m of this.dentable) deform(m, false);
+    if (severity > 0.35 && this.crackCount < 3) this.crack();
+  }
+
+  /** Smashes the tail lamps on one side: lens and brake light go dark. */
+  breakLamp(side: number) {
+    this.damaged = true;
+    for (const m of [this.glowMesh, this.brake]) {
+      if (!m) continue;
+      const pos = m.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const col = m.geometry.getAttribute('color') as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getZ(i) < this.tailZ - 0.05 || pos.getX(i) * side < 0.2) continue;
+        col.setXYZ(i, col.getX(i) * 0.15 + 0.02, col.getY(i) * 0.15 + 0.02, col.getZ(i) * 0.15 + 0.02);
+      }
+      col.needsUpdate = true;
+    }
+  }
+
+  /** Adds a spider-web crack to the rear window (or the windscreen on cars without one). */
+  private crack() {
+    const st = this.spec.stations;
+    let i = st.findIndex((x) => x.seg === 'rw');
+    if (i < 0) i = st.findIndex((x) => x.seg === 'ws');
+    if (i < 0 || i + 1 >= st.length) return;
+    this.crackCount++;
+    const a = st[i], b = st[i + 1];
+    // bilinear map of the glass panel: u across (-1..1), v from station a to b
+    const P = (u: number, v: number): number[] => {
+      const wt = a.wt + (b.wt - a.wt) * v;
+      return [u * wt * 0.95, a.top + (b.top - a.top) * v + 0.03 * (1 - u * u) + 0.025, a.z + (b.z - a.z) * v];
+    };
+    const pts: number[] = this.cracks ? Array.from(this.cracks.geometry.getAttribute('position').array as Float32Array) : [];
+    const cu = (Math.random() - 0.5) * 1.1, cv = 0.25 + Math.random() * 0.5;
+    const rays = 7 + Math.floor(Math.random() * 4);
+    const ring: [number, number][] = [];
+    for (let k = 0; k < rays; k++) {
+      const ang = (k / rays) * Math.PI * 2 + Math.random() * 0.5;
+      const len = 0.35 + Math.random() * 0.45;
+      let u = cu, v = cv;
+      for (let j = 1; j <= 4; j++) {
+        const t = (len * j) / 4;
+        const nu = Math.max(-1, Math.min(1, cu + Math.cos(ang) * t + (Math.random() - 0.5) * 0.08));
+        const nv = Math.max(0, Math.min(1, cv + Math.sin(ang) * t * 0.8 + (Math.random() - 0.5) * 0.06));
+        pts.push(...P(u, v), ...P(nu, nv));
+        if (j === 1) ring.push([nu, nv]);
+        u = nu;
+        v = nv;
+      }
+    }
+    for (let k = 0; k < ring.length; k++) pts.push(...P(...ring[k]), ...P(...ring[(k + 1) % ring.length]));
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    if (this.cracks) {
+      this.cracks.geometry.dispose();
+      this.cracks.geometry = geo;
+    } else {
+      this.cracks = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xe8f0ff, transparent: true, opacity: 0.85 }));
+      this.cracks.renderOrder = 2;
+      this.body.add(this.cracks);
+    }
   }
 
   pose(steer: number, yaw: number, spin: number, bounce: number, pitch: number, braking = false, flame = 0) {

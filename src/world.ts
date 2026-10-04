@@ -71,7 +71,7 @@ export class World {
 
   /** Swap the player's car model. */
   setPlayerCar(spec: CarSpec, paint: number) {
-    if (this.car.spec === spec && this.carPaint === paint) return;
+    if (this.car.spec === spec && this.carPaint === paint && !this.car.damaged) return;
     this.scene.remove(this.car.root);
     this.car.dispose();
     this.car = new PlayerCar(spec, paint, this.mats, this.plate, this.route.shadow, this.route.id === 'tokyo');

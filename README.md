@@ -45,6 +45,20 @@ with flames from the exhausts; afterwards the car eases back to its normal top s
 The HUD lamps show how many you have left. In VS RIVALS every rival also has three and
 fires them on straights when they're fighting you for position.
 
+## Damage
+
+The DAMAGE bar shows how much punishment your car can still take. It starts full every race and
+goes from green to yellow to red as it drains:
+
+* hard crashes into traffic, scenery or the back of a rival take a big chunk (more the faster you hit);
+* side-swipes and rival bumps take a little; scraping along a wall wears it down steadily.
+
+You can see the damage on the car: panels crumple in where it was hit, paint is scraped to bare
+metal and soot, the glass cracks, a tail lamp gets smashed, and the engine starts to smoke, grey
+at first and black when it's critical (the bar blinks and the car loses some top speed). At zero
+the engine blows: the car rolls to a stop under black smoke and flames, and it's game over
+(WRECKED). A new race gives you a fresh car.
+
 ## Graphics
 
 The title screen switches between two looks (G, or tap the GRAPHICS line):

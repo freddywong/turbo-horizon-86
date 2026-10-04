@@ -80,6 +80,12 @@ export class Game {
   driftYaw = 0;
   crashT = 0;
   crashYaw = 0;
+  /** car condition 0..100; at 0 the engine gives out and the run is over */
+  hp = 100;
+  wrecked = false;
+  private dmgCool = 0;
+  private scrapeDmg = 0;
+  private smokeT = 0;
   wheelSpin = 0;
   bounce = 0;
   shakeKick = 0;
@@ -149,6 +155,7 @@ export class Game {
     this.driftYaw = 0;
     this.crashT = 0;
     this.stage = 0;
+    this.wrecked = false;
     this.world.resetTraffic(this.pos);
     this.world.particles.clear();
   }
@@ -181,6 +188,9 @@ export class Game {
   startRace() {
     this.paused = false;
     this.resetPlayer(false);
+    this.hp = 100;
+    this.wrecked = false;
+    this.applyCar();
     this.turbos = TURBOS;
     this.turboT = 0;
     this.raceTime = 0;
@@ -473,7 +483,7 @@ export class Game {
       const v = this.speed;
       const st = this.spec.stats;
       const boost = this.turboT > 0;
-      const vlim = this.vmax * (boost ? TURBO_SPEED : 1);
+      const vlim = this.vmax * (boost ? TURBO_SPEED : 1) * this.limp();
       if (c.accel) this.speed += 30 * st.accel * (boost ? 1.9 : 1) * (1 - Math.pow(Math.min(1, v / vlim), 1.8)) * dt + 2 * dt;
       else if (c.brake) this.speed -= 58 * dt;
       else this.speed -= (3 + v * 0.035) * dt;
@@ -507,6 +517,15 @@ export class Game {
           this.speed -= v * 0.9 * dt;
           this.shakeKick = 0.25;
           if (Math.random() < dt * 12) this.audio.scrape();
+          if (!demo && this.state === 'race') {
+            this.hp -= 3 * dt;
+            this.scrapeDmg += dt;
+            if (this.scrapeDmg > 0.6) {
+              this.scrapeDmg = 0;
+              this.world.car.hit(0.12, scrape > 0 ? 'right' : 'left');
+            }
+            if (this.hp <= 0) this.wreck();
+          }
         }
       }
       offroad = Math.abs(this.px) > ROAD_HALF + 1.0;
@@ -515,13 +534,19 @@ export class Game {
         this.bounce = Math.random() * 0.08 * Math.min(1, v / 30);
         this.shakeKick = Math.max(this.shakeKick, 0.12);
       } else this.bounce = 0;
-      if (!demo && offroad && v > 12 && w.hitProp(this.pos, this.px)) this.crash(true);
+      if (!demo && offroad && v > 12 && w.hitProp(this.pos, this.px)) {
+        this.damage(12 + v * 0.12, 0.6 + Math.min(0.4, v / 200), this.px > 0 ? 'right' : 'left');
+        this.crash(true);
+      }
 
       const car = w.hitTraffic(this.pos, this.px);
       if (car) {
         if (demo) this.speed = Math.min(this.speed, car.v * 0.9);
-        else if (v - car.v > 36) this.crash(true);
-        else {
+        else if (v - car.v > 36) {
+          this.damage(10 + (v - car.v) * 0.14, 0.5 + Math.min(0.5, (v - car.v) / 150), 'front');
+          this.crash(true);
+        } else {
+          if (this.dmgCool <= 0) this.damage(5, 0.25, car.x > this.px ? 'right' : 'left');
           this.speed = car.v * 0.75;
           this.px += Math.sign(this.px - car.x || 1) * 1.2;
           this.shakeKick = 0.3;
@@ -536,10 +561,16 @@ export class Game {
         r.x -= side * 0.9;
         if (r.d > this.pos) {
           // we ran into the back of them
-          if (v - r.v > 45 && !demo) this.crash(true);
-          else this.speed = Math.min(this.speed, r.v * 0.92);
+          if (v - r.v > 45 && !demo) {
+            this.damage(9 + (v - r.v) * 0.1, 0.5, 'front');
+            this.crash(true);
+          } else {
+            this.speed = Math.min(this.speed, r.v * 0.92);
+            if (!demo && this.dmgCool <= 0) this.damage(2.5, 0.15, 'front');
+          }
         } else {
           r.bumpT = 0.6;
+          if (!demo && this.dmgCool <= 0) this.damage(2, 0.15, Math.abs(r.d - this.pos) < 2 ? (side > 0 ? 'left' : 'right') : 'rear');
         }
         this.shakeKick = Math.max(this.shakeKick, 0.25);
         if (!demo) this.audio.crash(false);
@@ -568,7 +599,7 @@ export class Game {
     while (g < GEARS.length - 1 && this.speed > GEARS[g] * gs) g++;
     const rpm = 0.25 + 0.75 * Math.min(1, (this.speed - GEARS[g - 1] * gs) / ((GEARS[g] - GEARS[g - 1]) * gs));
     const audible = this.state !== 'attract' && this.state !== 'select';
-    this.audio.engine(audible, rpm, c.accel ? 1 : 0);
+    this.audio.engine(audible && !this.wrecked, rpm, c.accel ? 1 : 0);
     this.audio.skid(audible ? skid * Math.min(1, this.speed / 20) : 0);
 
     // backfire on up-shifts and when lifting off at speed
@@ -596,6 +627,8 @@ export class Game {
       const col = sand ? 0xf2dca0 : seg.zone === 'hills' ? 0xc8b07a : 0xd8c898;
       for (const sx of [-0.9, 0.9]) P.spawn(this.pos - 1.5, this.px + sx, 0.3, this.speed * 0.5, sx * 2, 1.8, 0.6, 0.4, 2.2, col);
     }
+    this.dmgCool = Math.max(0, this.dmgCool - dt);
+    this.engineSmoke(dt);
     if (scrape && Math.random() < dt * 60) {
       for (let i = 0; i < 2; i++) P.spawn(this.pos + Math.random() * 2 - 1, this.px + scrape * 0.9, 0.5, this.speed * 0.8, -scrape * (2 + Math.random() * 3), 3 + Math.random() * 3, 0.35, 0.13, -1, Math.random() < 0.5 ? 0xffe040 : 0xff8a20);
     }
@@ -605,6 +638,58 @@ export class Game {
       steer: this.steer, yaw: this.driftYaw + this.crashYaw, spin: this.wheelSpin, bounce: this.bounce,
       brake: (c.brake && this.speed > 1) || this.crashT > 0, flame: this.flameT,
     });
+  }
+
+  /** Top-speed factor: a badly damaged car limps. */
+  private limp() {
+    return this.hp >= 35 ? 1 : 0.86 + 0.14 * (this.hp / 35);
+  }
+
+  /** Takes condition off the car and dents the model where it was hit. */
+  private damage(amount: number, severity: number, where: 'front' | 'rear' | 'left' | 'right') {
+    if (this.state !== 'race' || this.wrecked) return;
+    this.hp = Math.max(0, this.hp - amount);
+    this.dmgCool = 0.5;
+    this.world.car.hit(severity, where);
+    const before = this.hp + amount;
+    if (before >= 55 && this.hp < 55) this.world.car.breakLamp(Math.random() < 0.5 ? -1 : 1);
+    if (this.hp <= 0) this.wreck();
+    else if (this.hp < 25 && this.hp + amount >= 25) this.flash('WARNING!', 'HEAVY DAMAGE', 2.0);
+  }
+
+  /** Out of condition: the engine blows, the car rolls to a stop in a cloud of smoke. */
+  private wreck() {
+    if (this.wrecked) return;
+    this.hp = 0;
+    this.wrecked = true;
+    this.turboT = 0;
+    this.audio.crash(true);
+    this.audio.pop();
+    if (this.mode === 'rivals') this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name, Infinity, this.raceTime);
+    this.go('over');
+    this.audio.sad();
+    this.audio.music(null);
+    this.saveScore();
+  }
+
+  /** Smoke (and at the end fire) from the engine bay as the condition drops. */
+  private engineSmoke(dt: number) {
+    if (this.hp >= 50 || !['race', 'over', 'goal'].includes(this.state)) return;
+    const rate = this.wrecked ? 30 : this.hp < 25 ? 14 : 5;
+    this.smokeT += dt * rate;
+    if (this.smokeT < 1) return;
+    this.smokeT -= 1;
+    const st = this.spec.stations;
+    const front = ['r32', 'supra', 'rx7'].includes(this.spec.id);
+    const z = front ? st[0].z + 0.9 : st[st.length - 1].z - 0.9;
+    const top = front ? st[1].top : st[st.length - 2].top;
+    const d = this.pos - z, x = this.px + (Math.random() - 0.5) * 0.6;
+    const col = this.wrecked ? (Math.random() < 0.5 ? 0x222222 : 0x3a3a3a) : this.hp < 25 ? 0x6a6a6a : 0xb8b8b8;
+    const P = this.world.particles;
+    P.spawn(d, x, top + 0.1, this.speed * 0.85, (Math.random() - 0.5) * 0.8, 1.2 + Math.random(), 1.6 + Math.random(), 0.45, 3, col);
+    if (this.wrecked && this.t < 6 && Math.random() < 0.5) {
+      P.spawn(d, x, top + 0.05, this.speed * 0.9, (Math.random() - 0.5) * 0.4, 1.5, 0.35, 0.3, 0.5, Math.random() < 0.5 ? 0xff8a20 : 0xffd040);
+    }
   }
 
   private crash(big: boolean) {
@@ -731,7 +816,10 @@ export class Game {
           if (this.t > 3 && this.bonusLeft <= 0 && blink) h.text(this.touch ? 'TAP TO CONTINUE' : 'PRESS ENTER', HUD_W / 2, 330, 24, YELLOW, 'center');
         }
         if (this.state === 'over' && !(this.table.length && this.t > 2.5)) {
-          if (this.t < 2.5) h.text('TIME UP', HUD_W / 2, 180, 48, RED, 'center');
+          if (this.t < 2.5) {
+            h.text(this.wrecked ? 'WRECKED' : 'TIME UP', HUD_W / 2, 180, 48, RED, 'center');
+            if (this.wrecked) h.text('ENGINE BLOWN', HUD_W / 2, 240, 24, ORANGE, 'center');
+          }
           else {
             h.text('GAME OVER', HUD_W / 2, 170, 48, RED, 'center');
             h.text(`SCORE ${this.score}`, HUD_W / 2, 250, 24, WHITE, 'center');
@@ -762,7 +850,7 @@ export class Game {
     const h = this.hud;
     const x0 = HUD_W / 2 - 330, w = 660, y0 = 96;
     h.box(x0, y0, w, 330, 0x101030, this.place === 1 && this.finishTime >= 0 ? YELLOW : WHITE, 4);
-    const title = this.finishTime < 0 ? 'TIME UP  -  DID NOT FINISH' : this.place === 1 ? 'YOU WIN!' : `YOU FINISHED ${ordinal(this.place)}`;
+    const title = this.finishTime < 0 ? `${this.wrecked ? 'WRECKED' : 'TIME UP'}  -  DID NOT FINISH` : this.place === 1 ? 'YOU WIN!' : `YOU FINISHED ${ordinal(this.place)}`;
     h.text(title, HUD_W / 2, y0 + 16, 16, this.finishTime < 0 ? RED : YELLOW, 'center');
     this.table.forEach((r, i) => {
       const y = y0 + 52 + i * 30;
@@ -797,6 +885,17 @@ export class Game {
       h.text('POS', px - 12, py + 8, 16, YELLOW, 'right');
       h.text(p, px, py, 32, this.place === 1 ? YELLOW : WHITE);
       h.text('/8', px + p.length * 32 + 4, py + 16, 16, WHITE);
+    }
+
+    // damage bar: the car's remaining condition, green -> yellow -> red, blinking when critical
+    {
+      const n = 10, sw = 15;
+      const bx = this.touch ? 20 : HUD_W - 20 - n * (sw + 2), by = this.touch ? (this.mode === 'rivals' ? 270 : 236) : 64;
+      const col = this.hp > 60 ? 0x40e040 : this.hp > 30 ? YELLOW : RED;
+      const crit = this.hp < 25 && this.state === 'race';
+      h.text('DAMAGE', bx, by, 16, crit && blink ? RED : YELLOW);
+      const lit = Math.ceil((this.hp / 100) * n);
+      for (let i = 0; i < n; i++) h.rect(bx + i * (sw + 2), by + 22, sw, 12, i < lit && (!crit || blink) ? col : 0x202040);
     }
 
     // speed + tach
