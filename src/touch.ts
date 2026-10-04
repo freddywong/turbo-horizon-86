@@ -17,6 +17,7 @@ export class TouchControls {
   enabled = false;
   private autoBtn: HTMLDivElement;
   private turboBtn!: HTMLDivElement;
+  private fireBtn!: HTMLDivElement;
 
   constructor(private input: Input, private stage: HTMLElement, private onEnable: () => void) {
     this.root = document.createElement('div');
@@ -37,7 +38,8 @@ export class TouchControls {
     mk('drift', 'DRIFT', 'Space');
     mk('pause', 'II', 'Escape');
     mk('radio', 'MUSIC', 'KeyN');
-    this.turboBtn = mk('turbo', 'TURBO\n3', 'KeyT');
+    this.turboBtn = mk('turbo', 'TURBO\n5', 'KeyT');
+    this.fireBtn = mk('fire hidden', 'FIRE', 'KeyF');
     this.autoBtn = mk('auto', 'AUTO\nGAS', '');
     this.rotate = document.createElement('div');
     this.rotate.id = 'rotate';
@@ -72,6 +74,7 @@ export class TouchControls {
   private codeAt(x: number, y: number): string | null {
     if (!this.root.classList.contains('show')) return null;
     for (const b of this.btns) {
+      if (b.el.classList.contains('hidden')) continue;
       const r = b.el.getBoundingClientRect();
       const pad = 10;
       if (x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad) return b.code;
@@ -121,6 +124,11 @@ export class TouchControls {
     if (!this.pointers.has(e.pointerId)) return;
     this.pointers.delete(e.pointerId);
     this.sync();
+  }
+
+  /** The FIRE button only appears in races with weapons. */
+  setFire(show: boolean) {
+    if (this.fireBtn.classList.contains('hidden') === show) this.fireBtn.classList.toggle('hidden', !show);
   }
 
   /** Shows how many boosts are left on the TURBO button. */

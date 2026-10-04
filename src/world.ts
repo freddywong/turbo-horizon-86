@@ -31,6 +31,14 @@ interface NetTraffic {
 }
 
 const tmp = { x: 0, y: 0, z: 0, h: 0 };
+const tmp2 = { x: 0, y: 0, z: 0, h: 0 };
+const MAX_TRACERS = 48;
+
+/** A bullet streak, kept in track coordinates so it stays put while everything moves. */
+interface Tracer { d0: number; x0: number; y0: number; d1: number; x1: number; y1: number; life: number }
+
+/** Who a car is shooting at this frame: -1 = the player, a rival index, or null. */
+export interface GunAim { target: number | null; flash: boolean }
 
 /** One fully built route: scene graph, road, scenery, traffic and the player's car. */
 export class World {
@@ -75,6 +83,13 @@ export class World {
     this.car = new PlayerCar(ROSTER[0], ROSTER[0].paints[0], mats, this.plate, this.route.shadow, this.route.id === 'tokyo');
     this.scene.add(this.car.root);
     this.particles = new Particles(this.scene);
+    const tg = new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(MAX_TRACERS * 6), 3));
+    this.tracerMesh = new THREE.LineSegments(tg, new THREE.LineBasicMaterial({
+      color: 0xffe890, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    }));
+    this.tracerMesh.frustumCulled = false;
+    this.scene.add(this.tracerMesh);
   }
 
   /** Swap the player's car model. */
@@ -129,6 +144,42 @@ export class World {
   }
 
   private net: NetTraffic | null = null;
+  private tracers: Tracer[] = [];
+  private tracerMesh: THREE.LineSegments;
+  /** the player's gun this frame (target = rival index) */
+  playerGun: GunAim = { target: null, flash: false };
+
+  /**
+   * A shot from a car at (d, x) towards (td, tx). Misses fly past and wide.
+   * Sparks on a hit; a puff of dust where a miss lands.
+   */
+  shoot(d: number, x: number, td: number, tx: number, hit: boolean) {
+    const side = Math.sign(tx - x) || 1;
+    const sx = x + side * 1.0, sy = 1.25;
+    let ex = tx, ed = td, ey = 0.8;
+    if (!hit) {
+      ex += (Math.random() - 0.5) * 6;
+      ed += (td - d) * 0.3 + (Math.random() - 0.5) * 6;
+      ey = Math.random() < 0.5 ? 0.05 : 1.6 + Math.random();
+    }
+    if (this.tracers.length >= MAX_TRACERS) this.tracers.shift();
+    this.tracers.push({ d0: d + Math.sign(td - d) * 0.5, x0: sx, y0: sy, d1: ed, x1: ex, y1: ey, life: 0.07 });
+    const P = this.particles;
+    if (hit) {
+      for (let i = 0; i < 4; i++) {
+        P.spawn(td + (Math.random() - 0.5) * 2, tx + (Math.random() - 0.5) * 1.6, 0.6 + Math.random() * 0.6, 0, (Math.random() - 0.5) * 5,
+          2 + Math.random() * 3, 0.3, 0.12, -1, Math.random() < 0.5 ? 0xffe040 : 0xffffff);
+      }
+    } else if (ey < 0.1) P.spawn(ed, ex, 0.1, 0, 0, 0.6, 0.5, 0.35, 1.5, 0xc8c0a8);
+  }
+
+  /** Points the lean-out gunner of a car at (d, x) towards (td, tx). */
+  private aimCar(car: PlayerCar, d: number, x: number, td: number, tx: number, flash: boolean) {
+    const dx = tx - x, dd = td - d;
+    const side = Math.abs(dx) > 0.4 ? Math.sign(dx) : 1;
+    const ax = dx - side * 1.1; // from the window, not the car's centre
+    car.aim(side, Math.atan2(-ax, Math.max(-60, Math.min(60, dd))), flash);
+  }
   /** race time driving the shared traffic (online races) */
   netTime = 0;
 
@@ -272,6 +323,12 @@ export class World {
     this.car.root.position.set(px, 0, 0);
     this.car.pose(pose.steer, pose.yaw, pose.spin, pose.bounce, Math.atan2(yF - yB, 4), pose.brake, pose.flame);
 
+    // the player's gunner
+    const pg = this.playerGun;
+    const pt = pg.target !== null ? this.rivals[pg.target] : null;
+    if (pt) this.aimCar(this.car, pos, px, pt.d, pt.x, pg.flash);
+    else this.car.aim(0);
+
     // rival drivers
     this.rivals.forEach((r, i) => {
       const car = this.rivalCars[i];
@@ -287,6 +344,11 @@ export class World {
       car.setNear(Math.abs(r.d - pos) < 28);
       car.root.position.set(tmp.x, tmp.y, tmp.z);
       car.pose(r.steer, -tmp.h - r.steer * 0.08, r.spin, 0, Math.atan2(f - b, 4), r.braking, r.turboT > 0 ? 1 : 0);
+      if (r.gunT > 0) {
+        const t = r.gunTo === -1 ? { d: pos, x: px } : this.rivals[r.gunTo];
+        if (t) this.aimCar(car, r.d, r.x, t.d, t.x, Math.random() < 0.5);
+        else car.aim(0);
+      } else car.aim(0);
     });
 
     // camera: low, behind, always looking straight down the player's heading
@@ -298,5 +360,25 @@ export class World {
     camera.lookAt(px * 0.82, lookY, -30);
     this.data.backdrop.update(camera.position, v.heading);
     this.particles.render(v, camera);
+    this.renderTracers(v);
+  }
+
+  private renderTracers(v: View) {
+    const attr = this.tracerMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    let n = 0;
+    for (const t of this.tracers) {
+      if (!v.sample(t.d0, t.x0, tmp) || !v.sample(t.d1, t.x1, tmp2)) continue;
+      attr.setXYZ(n * 2, tmp.x, tmp.y + t.y0, tmp.z);
+      attr.setXYZ(n * 2 + 1, tmp2.x, tmp2.y + t.y1, tmp2.z);
+      n++;
+    }
+    attr.needsUpdate = true;
+    this.tracerMesh.geometry.setDrawRange(0, n * 2);
+  }
+
+  /** Ages the bullet streaks (call once per frame). */
+  tickTracers(dt: number) {
+    for (const t of this.tracers) t.life -= dt;
+    this.tracers = this.tracers.filter((t) => t.life > 0);
   }
 }

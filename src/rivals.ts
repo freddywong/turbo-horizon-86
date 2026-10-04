@@ -3,6 +3,7 @@ import { CarSpec } from './cars/spec';
 import { Rng } from './rng';
 import { LANE_W, ROAD_HALF, SEG, Track } from './track';
 import { TrafficCar } from './world';
+import { AMMO, TURBO_TIME } from './rules';
 
 /** Fictional drivers. skill scales top speed, corner how little they lift in bends. */
 const DRIVERS: { name: string; skill: number; corner: number; aggro: number }[] = [
@@ -33,6 +34,13 @@ export interface Rival {
   bumpT: number;
   turbos: number; // boosts left
   turboT: number; // time left on the active boost
+  // weapons
+  ammo: number;
+  gunTaken: number; // gun damage taken from the player (capped)
+  burst: number; // rounds left in the current burst
+  fireCool: number;
+  gunT: number; // >0 while shooting (gunner leaning out)
+  gunTo: number; // target: -1 = the player, otherwise a rival index
   /** online: another human player, driven by their network updates instead of the AI */
   remote?: { id: string; d: number; x: number; v: number; at: number; hp: number };
 }
@@ -40,7 +48,7 @@ export interface Rival {
 const KMH = 3.6;
 
 /** Builds a field of 7 rivals in different cars, lined up ahead of the player on a 2-wide grid. */
-export function makeGrid(playerCar: CarSpec, startPos: number, seed: number): Rival[] {
+export function makeGrid(playerCar: CarSpec, startPos: number, seed: number, turbos = 3, weapons = false): Rival[] {
   const rng = new Rng(seed);
   const cars = ROSTER.filter((c) => c !== playerCar);
   // shuffle the cars so every race has a different field
@@ -57,7 +65,8 @@ export function makeGrid(playerCar: CarSpec, startPos: number, seed: number): Ri
       d: startPos + 9 + row * 9, x: side * LANE_W * 0.55, v: 0,
       vmax: (spec.stats.vmax / KMH) * dr.skill, corner: dr.corner, aggro: dr.aggro,
       lane: side * rng.range(1, 4), steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0,
-      turbos: 3, turboT: 0,
+      turbos, turboT: 0,
+      ammo: weapons ? AMMO : 0, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
     };
   });
 }
@@ -110,7 +119,7 @@ export function updateRivals(rivals: Rival[], dt: number, track: Track, traffic:
     } else if (r.turbos > 0 && c2 < 0.0009 && r.d < goal - 300 && gap > -200 && gap < 120
       && Math.random() < dt * (0.05 + r.aggro * 0.1)) {
       r.turbos--;
-      r.turboT = 3;
+      r.turboT = TURBO_TIME;
     }
     if (r.d > goal + 250) vt = 0; // parked in the run-out after the finish
     if (r.bumpT > 0) {

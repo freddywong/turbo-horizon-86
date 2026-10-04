@@ -317,6 +317,9 @@ export class PlayerCar {
   private geos: THREE.BufferGeometry[] = [];
 
   private hubs: THREE.Mesh[] = [];
+  /** the driver leaning out of each side window with a gun (-1 left, +1 right) */
+  private gunners: { group: THREE.Group; arm: THREE.Group; flash: THREE.Mesh }[] = [];
+  private gunSide = 1;
   private detail: THREE.Object3D[] = [];
   private paintwork: THREE.Mesh[] = []; // dents + scrapes
   private dentable: THREE.Mesh[] = []; // dents only (glass, lamps, plate)
@@ -421,6 +424,7 @@ export class PlayerCar {
         this.detail.push(hub);
       }
     }
+    this.buildGunners(paint, hm ? hm.lit : mats.lit, hm ? hm.glow : mats.glow, !!hm);
     this.root.add(this.body);
   }
 
@@ -543,6 +547,81 @@ export class PlayerCar {
       this.cracks.renderOrder = 2;
       this.body.add(this.cracks);
     }
+  }
+
+  /** Builds the lean-out shooter for both sides (hidden until aim() shows one). */
+  private buildGunners(paint: number, lit: THREE.Material, glow: THREE.Material, tiled: boolean) {
+    const st = this.spec.stations;
+    const rfI = st.findIndex((x) => x.seg === 'rf');
+    const ws = st.find((x) => x.seg === 'ws') ?? st[1];
+    const rf = rfI >= 0 ? st[rfI] : ws;
+    const z = rf.z + 0.15;
+    const belt = at(st, z, 'belt'), w = at(st, z, 'w');
+    const suit = new THREE.Color(paint).lerp(new THREE.Color(0x202030), 0.55).getHex();
+    for (const s of [-1, 1]) {
+      const body = new GeoBuilder(tiled), arm = new GeoBuilder(tiled), fl = new GeoBuilder(tiled);
+      // shoulders and helmet out of the window, leaning towards the side
+      body.box(s * 0.12, 0.12, 0, 0.34, 0.3, 0.26, [suit, suit]);
+      const r = 0.13, hx = s * 0.22, hy = 0.42;
+      for (let j = 0; j < 4; j++) {
+        for (let i = 0; i < 8; i++) {
+          const p = (a: number, b: number): V3 => {
+            const th = (b / 4) * Math.PI, ph = (a / 8) * Math.PI * 2;
+            return [hx + Math.sin(th) * Math.cos(ph) * r, hy + Math.cos(th) * r, Math.sin(th) * Math.sin(ph) * r];
+          };
+          body.quad(p(i, j), p(i + 1, j), p(i + 1, j + 1), p(i, j + 1), j === 1 ? paint : 0xf0f0ec);
+        }
+      }
+      body.quad([hx - 0.09, hy - 0.04, -0.125], [hx + 0.09, hy - 0.04, -0.125], [hx + 0.09, hy + 0.04, -0.115], [hx - 0.09, hy + 0.04, -0.115], 0x101820);
+      // arm + compact gun, modelled pointing forward (-z) from the shoulder pivot
+      arm.box(0, 0, -0.22, 0.08, 0.08, 0.44, suit);
+      arm.box(0, 0.02, -0.5, 0.06, 0.09, 0.3, [0x1a1a1c, 0x2a2a2e]);
+      arm.box(0, -0.06, -0.47, 0.04, 0.1, 0.05, 0x1a1a1c); // magazine
+      // muzzle flash: a star of glowing quads at the barrel
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * Math.PI;
+        const c = Math.cos(a) * 0.14, d = Math.sin(a) * 0.14;
+        fl.quad([-c, -d, 0], [c, d, 0], [c, d, -0.32], [-c, -d, -0.32], 0xffe070);
+      }
+      fl.quad([-0.07, -0.07, 0.001], [0.07, -0.07, 0.001], [0.07, 0.07, 0.001], [-0.07, 0.07, 0.001], 0xfff8d0);
+      const group = new THREE.Group();
+      const add = (g: GeoBuilder, m: THREE.Material, parent: THREE.Object3D) => {
+        const geo = g.build();
+        this.geos.push(geo);
+        const mesh = new THREE.Mesh(geo, m);
+        parent.add(mesh);
+        return mesh;
+      };
+      add(body, lit, group);
+      const armG = new THREE.Group();
+      armG.position.set(s * 0.26, 0.24, 0);
+      add(arm, lit, armG);
+      const flash = add(fl, glow, armG);
+      flash.position.set(0, 0.02, -0.66);
+      flash.visible = false;
+      group.add(armG);
+      group.position.set(s * (w - 0.12), belt - 0.02, z);
+      group.visible = false;
+      this.body.add(group);
+      this.gunners.push({ group, arm: armG, flash });
+    }
+  }
+
+  /**
+   * Shooting pose: side -1/+1 shows the driver leaning out of that window with
+   * the gun turned to `yaw` (radians, 0 = straight ahead, + to the left);
+   * side 0 hides them. `flash` lights the muzzle for this frame.
+   */
+  aim(side: number, yaw = 0, flash = false) {
+    if (side) this.gunSide = side;
+    this.gunners.forEach((g, i) => {
+      const on = side !== 0 && (i === 0 ? -1 : 1) === this.gunSide;
+      g.group.visible = on;
+      if (!on) return;
+      g.arm.rotation.set(0, yaw, 0);
+      g.flash.visible = flash;
+      if (flash) g.flash.rotation.z = Math.random() * Math.PI;
+    });
   }
 
   pose(steer: number, yaw: number, spin: number, bounce: number, pitch: number, braking = false, flame = 0) {

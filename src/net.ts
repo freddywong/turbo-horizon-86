@@ -29,6 +29,8 @@ export interface GoMsg {
   raceId: string;
   route: number;
   seed: number;
+  turbos: number;
+  weapons: boolean;
   players: { id: string; name: string; car: number; paint: number }[];
 }
 
@@ -42,7 +44,11 @@ export interface StMsg {
   tb: boolean;
   hp: number;
   fin: number; // race time at the finish, -1 while racing
+  gun: string; // peer id of whoever they're shooting at, '' when not firing
 }
+
+/** Rounds that hit `to`, decided by the shooter. */
+export interface HitMsg { r: string; to: string; n: number }
 
 interface Transport {
   selfId: string;
@@ -114,6 +120,7 @@ export class Net {
   me = { name: 'PLAYER', car: 0, paint: 0, status: 'lobby' as Status, raceId: '' };
   onGo: ((m: GoMsg, from: string) => void) | null = null;
   onSt: ((m: StMsg, from: string) => void) | null = null;
+  onHit: ((m: HitMsg, from: string) => void) | null = null;
 
   constructor(readonly room: string, local: boolean) {
     (local ? Promise.resolve(localTransport(room)) : trysteroTransport(room))
@@ -124,6 +131,7 @@ export class Net {
         tr.on('hi', (d, f) => this.gotHi(d, f));
         tr.on('go', (d, f) => this.gotGo(d, f));
         tr.on('st', (d, f) => this.gotSt(d, f));
+        tr.on('hit', (d, f) => this.gotHit(d, f));
         tr.onJoin((id) => this.sendHi(id));
         tr.onLeave((id) => this.peers.delete(id));
         this.sendHi();
@@ -155,6 +163,16 @@ export class Net {
 
   sendSt(m: StMsg) {
     this.tr?.send('st', { p: PROTO, ...m });
+  }
+
+  sendHit(m: HitMsg) {
+    this.tr?.send('hit', { p: PROTO, ...m });
+  }
+
+  private gotHit(d: unknown, from: string) {
+    const m = d as Record<string, unknown>;
+    if (!m || m.p !== PROTO) return;
+    this.onHit?.({ r: str(m.r, 24), to: str(m.to, 64), n: Math.round(num(m.n, 0, 10)) }, from);
   }
 
   leave() {
@@ -198,7 +216,10 @@ export class Net {
       id: str(p?.id, 64), name: cleanName(str(p?.name, 40)) || 'PLAYER',
       car: Math.round(num(p?.car, 0, 63)), paint: Math.round(num(p?.paint, 0, 15)),
     })).filter((p) => p.id);
-    const go: GoMsg = { raceId: str(m.raceId, 24), route: Math.round(num(m.route, 0, 1)), seed: Math.round(num(m.seed, 0, 1e9)), players };
+    const go: GoMsg = {
+      raceId: str(m.raceId, 24), route: Math.round(num(m.route, 0, 1)), seed: Math.round(num(m.seed, 0, 1e9)),
+      turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, players,
+    };
     if (go.raceId) this.onGo?.(go, from);
   }
 
@@ -207,7 +228,7 @@ export class Net {
     if (!m || m.p !== PROTO) return;
     this.onSt?.({
       r: str(m.r, 24), d: num(m.d, -1e3, 1e6), x: num(m.x, -50, 50), v: num(m.v, 0, 200), steer: num(m.steer, -2, 2),
-      br: m.br === true, tb: m.tb === true, hp: num(m.hp, 0, 100, 100), fin: num(m.fin, -1, 1e5, -1),
+      br: m.br === true, tb: m.tb === true, hp: num(m.hp, 0, 100, 100), fin: num(m.fin, -1, 1e5, -1), gun: str(m.gun, 64),
     }, from);
   }
 }

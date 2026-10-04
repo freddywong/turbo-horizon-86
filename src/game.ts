@@ -6,8 +6,9 @@ import { Input } from './input';
 import { LANE_W, ROAD_HALF, SEG } from './track';
 import { ROSTER } from './cars/roster';
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
-import { GoMsg, Net, roomFromHash, StMsg } from './net';
+import { GoMsg, HitMsg, Net, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
+import { AMMO, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 
@@ -20,9 +21,6 @@ const KMH = 3.6;
 const GEARS = [0, 18, 34, 50, 66, 84];
 const STEER_RATE = 25;
 const CF = 0.82; // centrifugal push in curves
-export const TURBOS = 3; // boosts per race, for every driver
-const TURBO_TIME = 3; // seconds
-const TURBO_SPEED = 1.18; // top speed multiplier while boosting
 
 const loadHi = (): number => {
   try {
@@ -57,6 +55,21 @@ const loadMusic = (): number => {
 const saveMusic = (v: number) => {
   try {
     localStorage.setItem('th86-music', String(v));
+  } catch {
+    /* storage unavailable */
+  }
+};
+const loadNum = (key: string, def: number): number => {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? def : parseInt(v, 10);
+  } catch {
+    return def;
+  }
+};
+const saveNum = (key: string, v: number) => {
+  try {
+    localStorage.setItem(key, String(v));
   } catch {
     /* storage unavailable */
   }
@@ -139,8 +152,27 @@ export class Game {
   private tableT = 0;
   raceTime = 0;
   /** turbo boosts left this race, and time left on the active one */
-  turbos = 3;
+  turbos = TURBO_DEFAULT;
   turboT = 0;
+  /** menu settings: boosts per race (1-9) and weapons on/off (VS RIVALS, online) */
+  turboCount = Math.max(1, Math.min(9, loadNum('th86-turbos', TURBO_DEFAULT) || TURBO_DEFAULT));
+  weaponsSetting = loadNum('th86-weapons', 1) === 1;
+  // this race
+  raceTurbos = TURBO_DEFAULT;
+  weapons = false;
+  ammo = 0;
+  private fireCool = 0;
+  private firingT = 0;
+  private gunTarget: number | null = null;
+  private lastGunTarget: number | null = null;
+  private gunP = 0;
+  private noTargetT = 0;
+  private hitFlash = 0;
+  /** gun damage taken so far from each shooter (capped at GUN_CAP each) */
+  private gunFrom = new Map<string, number>();
+  private pendingHits = new Map<string, number>();
+  private hitSendT = 0;
+  private onlineGo: GoMsg | null = null;
   finishTime = -1;
   place = 8;
   private table: ResultRow[] = [];
@@ -217,14 +249,24 @@ export class Game {
     this.hp = 100;
     this.wrecked = false;
     this.applyCar();
-    this.turbos = TURBOS;
+    const go = this.mode === 'online' ? this.onlineGo : null;
+    this.raceTurbos = go ? go.turbos : this.turboCount;
+    this.turbos = this.raceTurbos;
     this.turboT = 0;
+    this.weapons = go ? go.weapons : this.mode === 'rivals' && this.weaponsSetting;
+    this.ammo = this.weapons ? AMMO : 0;
+    this.fireCool = 0;
+    this.firingT = 0;
+    this.gunTarget = this.lastGunTarget = null;
+    this.hitFlash = 0;
+    this.gunFrom.clear();
+    this.pendingHits.clear();
     this.raceTime = 0;
     this.finishTime = -1;
     this.table = [];
     if (this.mode === 'rivals') {
       // start from the back of the grid; lighter traffic, pushed further up the road
-      this.world.setRivals(makeGrid(this.spec, this.pos, Date.now() & 0xffff));
+      this.world.setRivals(makeGrid(this.spec, this.pos, Date.now() & 0xffff, this.raceTurbos, this.weapons));
       this.world.resetTraffic(this.pos, 10, 520);
       this.place = 8;
     } else this.world.setRivals([]);
@@ -326,8 +368,13 @@ export class Game {
         if (inp.hit('ArrowLeft', 'KeyA')) dc = -1;
         if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
         if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
+        if (inp.hit('KeyT')) this.cycleTurbos();
+        if (inp.hit('KeyV') && this.mode === 'rivals') this.toggleWeapons();
         for (const tp of inp.taps) {
-          if (tp.y > 370 && tp.y < 405 && tp.x > HUD_W / 2) this.nextTrack();
+          if (tp.y > 150 && tp.y < 186) {
+            if (this.mode === 'rivals' && tp.x > HUD_W / 2) this.toggleWeapons();
+            else this.cycleTurbos();
+          } else if (tp.y > 370 && tp.y < 405 && tp.x > HUD_W / 2) this.nextTrack();
           else if (tp.y > 405 && tp.x > HUD_W / 2 - 150 && tp.x < HUD_W / 2 + 150) go = true;
           else if (tp.x < 160) dc = -1;
           else if (tp.x > HUD_W - 160) dc = 1;
@@ -446,6 +493,7 @@ export class Game {
         break;
       }
     }
+    if (['race', 'goal', 'over'].includes(this.state)) this.guns(dt);
     // rival drivers
     const w = this.world;
     if (w.rivals.length && ['countdown', 'race', 'goal', 'over'].includes(this.state)) {
@@ -464,6 +512,23 @@ export class Game {
       this.hi = this.score;
       saveHi(this.hi);
     }
+  }
+
+  /** T: boosts per race 1-9 (wraps). */
+  private cycleTurbos() {
+    this.turboCount = (this.turboCount % 9) + 1;
+    saveNum('th86-turbos', this.turboCount);
+    this.audio.blip();
+  }
+  /** V: weapons on/off. */
+  private toggleWeapons() {
+    this.weaponsSetting = !this.weaponsSetting;
+    saveNum('th86-weapons', this.weaponsSetting ? 1 : 0);
+    this.audio.blip();
+  }
+  /** One-line summary of the race settings. */
+  private settingsLine(weapons: boolean) {
+    return `${this.touch ? '' : 'T '}TURBOS ${this.turboCount}${weapons ? `   ${this.touch ? '' : 'V '}WEAPONS ${this.weaponsSetting ? 'ON' : 'OFF'}` : ''}`;
   }
 
   /** Car parked on the start straight, camera circling it (car select, lobby). */
@@ -508,6 +573,7 @@ export class Game {
       this.net = new Net(roomFromHash() ?? 'lobby', local);
       this.net.onGo = (m) => this.acceptGo(m);
       this.net.onSt = (m, from) => this.gotSt(m, from);
+      this.net.onHit = (m, from) => this.gotHit(m, from);
     }
     this.net.setMe({ name, car: this.carIdx, paint: this.paintIdx, status: 'lobby', raceId: '' });
     this.toLobby();
@@ -548,12 +614,16 @@ export class Game {
     if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
     if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
     if (inp.hit('KeyR')) route = true;
+    let turb = inp.hit('KeyT'), weap = inp.hit('KeyV');
     let exit = inp.hit('Escape', 'KeyQ');
     for (const tp of inp.taps) {
       if (tp.y > 405 && Math.abs(tp.x - HUD_W / 2) < 150) start = true;
       else if (tp.y > 405 && tp.x < HUD_W / 2 - 160) route = true;
       else if (tp.y < 50 && tp.x < 150) exit = true;
-      else if (tp.y > 60 && tp.y < 135 && tp.x < HUD_W - 330) dc = 1;
+      else if (tp.y >= 140 && tp.y < 196 && tp.x < 330) {
+        if (tp.y < 168) turb = true;
+        else weap = true;
+      } else if (tp.y > 60 && tp.y < 135 && tp.x < HUD_W - 330) dc = 1;
       else if (tp.y >= 135 && tp.y < 400 && tp.x < HUD_W - 330) dp = 1;
     }
     if (exit) return this.leaveOnline();
@@ -583,6 +653,8 @@ export class Game {
         this.px = 0;
         this.audio.music(this.trackId());
       }
+      if (turb) this.cycleTurbos();
+      if (weap) this.toggleWeapons();
       if (start && net?.status === 'online') this.startOnline();
     }
     if (this.pending && raceClock() >= this.pending.at) this.beginOnlineRace(this.pending.go);
@@ -597,6 +669,8 @@ export class Game {
       raceId: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
       route: this.routeIdx,
       seed: Math.floor(Math.random() * 1e9),
+      turbos: this.turboCount,
+      weapons: this.weaponsSetting,
       players: [{ id: net.selfId, name: this.playerName || 'PLAYER', car: this.carIdx, paint: this.paintIdx },
         ...others.map((p) => ({ id: p.id, name: p.name, car: p.car, paint: p.paint }))],
     };
@@ -609,6 +683,7 @@ export class Game {
     if (!go.players.some((p) => p.id === this.net!.selfId)) return; // joined after it was called
     // two players pressing START at once: everyone keeps the lowest race id
     if (this.pending && this.pending.go.raceId <= go.raceId) return;
+    this.onlineGo = go;
     this.pending = { go, at: raceClock() + 2 };
     this.audio.coin();
   }
@@ -616,6 +691,7 @@ export class Game {
   private beginOnlineRace(go: GoMsg) {
     const net = this.net!;
     this.pending = null;
+    this.onlineGo = go;
     this.setWorld(go.route);
     this.raceId = go.raceId;
     this.startRace();
@@ -634,6 +710,7 @@ export class Game {
       rivals.push({
         name: p.name, spec, paint: spec.paints[p.paint % spec.paints.length], d: g.d, x: g.x, v: 0, vmax: 0, corner: 0, aggro: 0,
         lane: 0, steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0, turbos: 0, turboT: 0,
+        ammo: 0, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
         remote: { id: p.id, d: g.d, x: g.x, v: 0, at: raceClock(), hp: 100 },
       });
     });
@@ -661,6 +738,20 @@ export class Game {
       n.hp = m.hp;
     }
     if (m.fin >= 0 && r.finished < 0) r.finished = m.fin;
+    // their gunner: who they're shooting at
+    if (m.gun) {
+      const to = m.gun === this.net?.selfId ? -1 : this.world.rivals.findIndex((o) => o.remote?.id === m.gun);
+      if (to !== i) {
+        r.gunTo = to;
+        r.gunT = 0.3;
+      }
+    }
+  }
+
+  /** Rounds another player says hit us. */
+  private gotHit(m: HitMsg, from: string) {
+    if (!this.raceId || m.r !== this.raceId || m.to !== this.net?.selfId) return;
+    if (m.n > 0) this.takeGunHit(from, m.n);
   }
 
   /** Online bookkeeping every frame: heartbeat, our position at ~15 Hz, live results. */
@@ -675,7 +766,15 @@ export class Game {
       net.sendSt({
         r: this.raceId, d: this.pos, x: this.px, v: this.speed, steer: this.steer, br: this.input.brake && this.speed > 1,
         tb: this.turboT > 0, hp: this.hp, fin: this.finishTime,
+        gun: this.firingT > 0 && this.lastGunTarget !== null ? this.world.rivals[this.lastGunTarget]?.remote?.id ?? '' : '',
       });
+    }
+    // our hits on other players, batched
+    this.hitSendT -= dt;
+    if (this.hitSendT <= 0 && this.pendingHits.size) {
+      this.hitSendT = 0.2;
+      for (const [to, n] of this.pendingHits) net.sendHit({ r: this.raceId, to, n });
+      this.pendingHits.clear();
     }
     // results fill in as the others cross the line
     if (this.table.length && (this.state === 'goal' || this.state === 'over')) {
@@ -918,10 +1017,124 @@ export class Game {
     this.hp = Math.max(0, this.hp - amount);
     this.dmgCool = 0.5;
     this.world.car.hit(severity, where);
+    this.afterDamage(amount);
+  }
+
+  private afterDamage(amount: number) {
     const before = this.hp + amount;
     if (before >= 55 && this.hp < 55) this.world.car.breakLamp(Math.random() < 0.5 ? -1 : 1);
     if (this.hp <= 0) this.wreck();
-    else if (this.hp < 25 && this.hp + amount >= 25) this.flash('WARNING!', 'HEAVY DAMAGE', 2.0);
+    else if (this.hp < 25 && before >= 25) this.flash('WARNING!', 'HEAVY DAMAGE', 2.0);
+  }
+
+  /** Bullets hit us: small dents, and no one shooter can take more than half the bar. */
+  private takeGunHit(from: string, n: number) {
+    if (this.state !== 'race' || this.wrecked) return;
+    const taken = this.gunFrom.get(from) ?? 0;
+    const dmg = Math.min(n * PER_HIT, GUN_CAP - taken);
+    if (dmg <= 0) return;
+    this.gunFrom.set(from, taken + dmg);
+    this.hp = Math.max(0, this.hp - dmg);
+    const wh = ['left', 'right', 'rear'] as const;
+    this.world.car.hit(0.1, wh[Math.floor(Math.random() * 3)]);
+    this.hitFlash = 0.25;
+    this.shakeKick = Math.max(this.shakeKick, 0.15);
+    this.audio.ping();
+    this.afterDamage(dmg);
+  }
+
+  /** Our round hit rival i. */
+  private hitRival(i: number) {
+    const r = this.world.rivals[i];
+    if (r.remote) {
+      this.pendingHits.set(r.remote.id, (this.pendingHits.get(r.remote.id) ?? 0) + 1);
+      return;
+    }
+    if (r.gunTaken >= GUN_CAP) return;
+    r.gunTaken += PER_HIT;
+    r.bumpT = Math.max(r.bumpT, 0.25);
+    this.world.rivalHit(i, 0.1);
+  }
+
+  /** Weapons: auto-aim, our fire, the computer drivers shooting back, other players' gunfire. */
+  private guns(dt: number) {
+    const w = this.world, rivals = w.rivals, inp = this.input;
+    this.hitFlash = Math.max(0, this.hitFlash - dt);
+    this.firingT = Math.max(0, this.firingT - dt);
+    this.noTargetT = Math.max(0, this.noTargetT - dt);
+    this.fireCool = Math.max(0, this.fireCool - dt);
+    w.playerGun.flash = false;
+    // auto-aim: the nearest racer in range, ahead or (closer) behind
+    let best: number | null = null, bd = Infinity;
+    if (this.weapons && !this.wrecked) {
+      rivals.forEach((r, i) => {
+        const dd = r.d - this.pos, dx = r.x - this.px;
+        if (!inRange(dd, dx)) return;
+        const dist = Math.hypot(dd, dx);
+        if (dist < bd) {
+          bd = dist;
+          best = i;
+        }
+      });
+    }
+    this.gunTarget = best;
+    this.gunP = best !== null ? hitChance(bd) : 0;
+    const firing = this.weapons && this.state === 'race' && !this.wrecked && this.crashT <= 0 && inp.held('KeyF');
+    if (firing && (best === null || this.ammo <= 0)) this.noTargetT = 0.3;
+    if (firing && best !== null && this.ammo > 0) {
+      this.firingT = 0.35;
+      this.lastGunTarget = best;
+      if (this.fireCool <= 0) {
+        this.fireCool = 1 / FIRE_RATE;
+        this.ammo--;
+        const r = rivals[best];
+        const hit = Math.random() < this.gunP;
+        w.shoot(this.pos, this.px, r.d, r.x, hit);
+        w.playerGun.flash = true;
+        this.audio.gun();
+        if (hit) this.hitRival(best);
+      }
+    }
+    w.playerGun.target = this.firingT > 0 ? this.lastGunTarget : null;
+
+    rivals.forEach((r) => {
+      r.gunT = Math.max(0, r.gunT - dt);
+      if (r.remote) {
+        // another player firing: show it (their hits arrive as messages)
+        if (r.gunT <= 0) return;
+        r.fireCool -= dt;
+        if (r.fireCool > 0) return;
+        r.fireCool = 1 / FIRE_RATE;
+        const t = r.gunTo === -1 ? { d: this.pos, x: this.px } : rivals[r.gunTo];
+        if (!t) return;
+        w.shoot(r.d, r.x, t.d, t.x, Math.random() < hitChance(Math.hypot(t.d - r.d, t.x - r.x)));
+        this.audio.gun(0.4);
+        return;
+      }
+      // the computer drivers shoot back in bursts
+      if (!this.weapons || this.state !== 'race' || this.wrecked || r.ammo <= 0 || r.finished >= 0) return;
+      const dd = this.pos - r.d, dx = this.px - r.x;
+      if (!inRange(dd, dx)) {
+        r.burst = 0;
+        return;
+      }
+      if (r.burst <= 0) {
+        if (Math.random() < dt * (0.06 + r.aggro * 0.14)) r.burst = 3 + Math.floor(Math.random() * 4);
+        return;
+      }
+      r.gunT = 0.35;
+      r.gunTo = -1;
+      r.fireCool -= dt;
+      if (r.fireCool > 0) return;
+      r.fireCool = 1 / FIRE_RATE;
+      r.burst--;
+      r.ammo--;
+      const hit = Math.random() < hitChance(Math.hypot(dd, dx));
+      w.shoot(r.d, r.x, this.pos, this.px, hit);
+      this.audio.gun(0.5);
+      if (hit) this.takeGunHit(`ai:${r.name}`, 1);
+    });
+    w.tickTracers(dt);
   }
 
   /** Out of condition: the engine blows, the car rolls to a stop in a cloud of smoke. */
@@ -1044,6 +1257,7 @@ export class Game {
         h.text(s.make, HUD_W / 2, 64, 16, CYAN, 'center');
         h.text(s.name, HUD_W / 2, 88, 32, WHITE, 'center');
         h.text(`${s.year}  ${s.group}`, HUD_W / 2, 130, 16, PINK, 'center');
+        h.text(this.settingsLine(this.mode === 'rivals'), HUD_W / 2, 160, 16, YELLOW, 'center');
         // big arrows
         h.text('<', 40, 210, 48, blink ? YELLOW : WHITE, 'center');
         h.text('>', HUD_W - 40, 210, 48, blink ? YELLOW : WHITE, 'center');
@@ -1134,6 +1348,9 @@ export class Game {
     h.text(s.make, 40, 76, 16, CYAN);
     h.text(s.name, 40, 98, 24, WHITE);
     h.text(this.touch ? 'TAP NAME: CAR   TAP CAR: COLOUR' : '< > CAR   ^ v COLOUR', 40, 130, 8, 0x8a8aa8);
+    h.text(`${this.touch ? 'TAP ' : 'T  '}TURBOS ${this.turboCount}`, 40, 148, 16, YELLOW);
+    h.text(`${this.touch ? 'TAP ' : 'V  '}WEAPONS ${this.weaponsSetting ? 'ON' : 'OFF'}`, 40, 174, 16, this.weaponsSetting ? ORANGE : 0x8a8aa8);
+    h.text('YOUR SETTINGS APPLY IF YOU PRESS START', 40, 198, 8, 0x8a8aa8);
     // player list
     const lx = HUD_W - 320, ly = 70;
     h.box(lx, ly, 300, 40 + Math.min(8, others.length + 1) * 34 + (others.length > 7 ? 16 : 0), 0x101030, 0x3a3a5a, 3);
@@ -1165,6 +1382,8 @@ export class Game {
       h.text(String(n), HUD_W / 2, 206, 64, YELLOW, 'center');
       const rt = this.worlds[this.pending.go.route].route;
       h.text(`${rt.lines[0]} ${rt.lines[1]}`, HUD_W / 2, 284, 16, WHITE, 'center');
+      const g = this.pending.go;
+      h.text(`TURBOS ${g.turbos}   WEAPONS ${g.weapons ? 'ON' : 'OFF'}`, HUD_W / 2, 308, 16, g.weapons ? ORANGE : YELLOW, 'center');
       return;
     }
     if (others.some((p) => p.status === 'race')) h.text('RACE IN PROGRESS - JOIN THE NEXT ONE', HUD_W / 2, 386, 8, ORANGE, 'center');
@@ -1251,8 +1470,33 @@ export class Game {
     // turbo stock: one lamp per boost left, and a draining bar while one is firing
     const tx = t ? 20 : 220, ty = t ? sy + 112 : HUD_H - 80;
     h.text('TURBO', tx, ty, 16, this.turboT > 0 && blink ? WHITE : ORANGE);
-    for (let i = 0; i < TURBOS; i++) h.box(tx + 92 + i * 26, ty - 2, 20, 20, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, 3);
-    if (this.turboT > 0) h.rect(tx + 92, ty + 22, (this.turboT / TURBO_TIME) * (TURBOS * 26 - 6), 5, YELLOW);
+    const tn = this.raceTurbos, ts = tn > 5 ? 13 : 20, tstep = ts + (tn > 5 ? 4 : 6);
+    for (let i = 0; i < tn; i++) h.box(tx + 92 + i * tstep, ty - 2 + (20 - ts) / 2, ts, ts, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, tn > 5 ? 2 : 3);
+    if (this.turboT > 0) h.rect(tx + 92, ty + 22, (this.turboT / TURBO_TIME) * (tn * tstep - 6), 5, YELLOW);
+    if (this.weapons) {
+      // ammo strip, lock-on bracket over the target, NO TARGET, red flash when we're hit
+      const ax = t ? 20 : HUD_W - 190, ay = t ? 314 : 106;
+      h.text('AMMO', ax, ay, 16, this.ammo ? CYAN : RED);
+      h.text(String(this.ammo).padStart(2, '0'), ax + 136, ay, 16, WHITE);
+      for (let i = 0; i < AMMO; i++) h.rect(ax + i * 5.6, ay + 22, 3, 10, i < this.ammo ? YELLOW : 0x303040);
+      if (this.gunTarget !== null && this.state === 'race') {
+        const p = this.world.rivalScreenPos(this.gunTarget, this.camera, HUD_W, HUD_H);
+        if (p) {
+          const c = this.gunP > 0.6 ? RED : YELLOW, r = Math.max(10, Math.min(34, 700 / p.dist)), cy = p.y + r * 1.1;
+          for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+            h.rect(p.x + sx * r - (sx > 0 ? 10 : 0), cy + sy * r - (sy > 0 ? 3 : 0), 10, 3, c);
+            h.rect(p.x + sx * r - (sx > 0 ? 3 : 0), cy + sy * r - (sy > 0 ? 10 : 0), 3, 10, c);
+          }
+        }
+      }
+      if (this.noTargetT > 0) h.text(this.ammo ? 'NO TARGET' : 'OUT OF AMMO', HUD_W / 2, 124, 16, this.ammo ? WHITE : RED, 'center');
+      if (this.hitFlash > 0) {
+        h.rect(0, 0, HUD_W, 6, RED);
+        h.rect(0, HUD_H - 6, HUD_W, 6, RED);
+        h.rect(0, 0, 6, HUD_H, RED);
+        h.rect(HUD_W - 6, 0, 6, HUD_H, RED);
+      }
+    }
 
     // course progress bar
     const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 24, y = t ? 118 : HUD_H - 34;

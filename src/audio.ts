@@ -327,6 +327,18 @@ export class Audio {
     this.burst(0.09, 0.5, 900);
     this.tone(70, 0.08, 'square', 0.25, 0, 40);
   }
+  /** Gunshot: a short, sharp crack (quieter when it's someone else's, far away). */
+  gun(vol = 1) {
+    if (!this.ctx) return;
+    this.burst(0.07, 0.45 * vol, 2600);
+    this.tone(160, 0.05, 'square', 0.18 * vol, 0, 60);
+  }
+  /** Bullet hitting your own car: a metallic ping. */
+  ping() {
+    if (!this.ctx) return;
+    this.tone(1800 + Math.random() * 900, 0.12, 'triangle', 0.22, 0, 900);
+    this.burst(0.04, 0.25, 6000, 0, 'highpass');
+  }
   /** Turbo kick: a rising whoosh with a growl under it. */
   turbo() {
     if (!this.ctx) return;

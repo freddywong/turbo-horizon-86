@@ -39,11 +39,30 @@ fullscreen and lock to landscape where the browser allows it.
 
 ## Turbo
 
-Every race you get three turbo boosts (T or Shift, or the TURBO button on touch screens).
-Each one gives about three seconds of extra acceleration and roughly 18% more top speed,
-with flames from the exhausts; afterwards the car eases back to its normal top speed.
-The HUD lamps show how many you have left. In VS RIVALS every rival also has three and
-fires them on straights when they're fighting you for position.
+Every race you get a set number of turbo boosts: 5 by default. Change it from 1 to 9 with T (or tap
+"TURBOS") on the car-select screen or in the online lobby. In an online race the settings of whoever
+presses START apply to everyone. Fire one with T or Shift, or the TURBO button on phones. Each boost
+gives five seconds of extra acceleration and roughly 18% more top speed, with flames from the exhausts.
+Afterwards the car eases back to its normal top speed. The HUD lamps show how many you have left. In
+VS RIVALS every computer driver gets the same number and fires them on straights when they're fighting
+you for position.
+
+## Weapons
+
+VS RIVALS and online races can be played with guns: WEAPONS ON/OFF (V, or tap) on the car-select
+screen or in the online lobby. It's on by default.
+
+* Hold **F** (or the red **FIRE** button on phones) and your driver leans out of the window and shoots.
+* **Aiming is automatic.** It locks onto the nearest racer up to 90 m ahead or 35 m behind (a bracket
+  marks the target; red means a good chance to hit). Traffic is never targeted. Close up almost every
+  round hits; far away it's a spray.
+* **30 rounds per race.** A hit does a small dent and takes about 1.7% of the damage bar. That's much
+  less than a crash, and **one shooter's whole clip can take at most half the bar**. Several shooters
+  together, or gunfire on top of crash damage, can still wreck you.
+* In VS RIVALS the computer drivers shoot back in short bursts. Your hits dent them and make them lift
+  for a moment.
+* Online, the shooter's game decides what hits and tells the victim's game, which applies the damage
+  (and the cap).
 
 ## Online multiplayer
 

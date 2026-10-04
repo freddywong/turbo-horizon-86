@@ -67,7 +67,10 @@ async function boot() {
     last = now;
     const driving = (game.state === 'race' || game.state === 'countdown') && !game.paused;
     if (touch.update(driving) && driving) game.paused = true;
-    if (touch.enabled) touch.setTurbo(game.turbos, game.turboT > 0);
+    if (touch.enabled) {
+      touch.setTurbo(game.turbos, game.turboT > 0);
+      touch.setFire(game.weapons);
+    }
     game.update(dt);
     game.draw();
     input.endFrame();
