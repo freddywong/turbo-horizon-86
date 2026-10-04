@@ -75,7 +75,9 @@ Race real people from the link **https://freddywong.github.io/turbo-horizon-86/#
 phones and computers, with no account and no sign-in.
 
 1. Open the link and type your name. You go straight into the **online lobby**.
-2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the car name / the car), and a route (R, or tap ROUTE).
+2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the ◀ ▶ arrows and the colour swatches), and a route (R, or tap ROUTE).
+   TURBOS, WEAPONS and AMMO have their own ◀ ▶ / ON-OFF buttons. The lobby shows the driving keys as keycaps, or on a
+   phone a picture of where each on-screen button is. The keys you need also show under the 3-2-1 countdown.
 3. **Anyone** can press START. Everyone in the lobby (up to 8) gets a short countdown and lines up on
    the same grid with the same traffic. Players who arrive while a race is running wait in the lobby
    for the next one.

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Audio, TRACKS } from './audio';
 import { GFX } from './gfx';
-import { CYAN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
+import { CYAN, GREEN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
 import { Input } from './input';
 import { LANE_W, ROAD_HALF, SEG } from './track';
 import { ROSTER } from './cars/roster';
@@ -18,6 +18,9 @@ type Mode = 'arcade' | 'rivals' | 'online';
 const MODES: Mode[] = ['arcade', 'rivals', 'online'];
 // route-select grid
 const CARD_X = 39, CARD_Y = 80, CARD_STEP_X = 262, CARD_STEP_Y = 100;
+/** Online lobby left panel: positions shared by the drawing and the tap zones. */
+const LOBBY = { x0: 28, x1: 378, mid: 203, carY: 72, carH: 46, paintY: 122, turbY: 142, weapY: 166, ammoY: 190, chipH: 20, minusX: 190, plusX: 284 };
+const GREY = 0x8a8aa8;
 
 const VMAX = 82; // reference top speed (~295 km/h) for camera / gearing
 const KMH = 3.6;
@@ -531,8 +534,8 @@ export class Game {
   }
 
   /** T: boosts per race 1-9 (wraps). */
-  private cycleTurbos() {
-    this.turboCount = (this.turboCount % 9) + 1;
+  private cycleTurbos(dir = 1) {
+    this.turboCount = ((this.turboCount - 1 + dir + 9) % 9) + 1;
     saveNum('th86-turbos', this.turboCount);
     this.audio.blip();
   }
@@ -543,8 +546,9 @@ export class Game {
     this.audio.blip();
   }
   /** B: rounds per race (30-150). */
-  private cycleAmmo() {
-    this.ammoCount = AMMO_STEPS[(AMMO_STEPS.indexOf(this.ammoCount) + 1) % AMMO_STEPS.length];
+  private cycleAmmo(dir = 1) {
+    const n = AMMO_STEPS.length;
+    this.ammoCount = AMMO_STEPS[(Math.max(0, AMMO_STEPS.indexOf(this.ammoCount)) + dir + n) % n];
     saveNum('th86-ammo', this.ammoCount);
     this.audio.blip();
   }
@@ -637,18 +641,27 @@ export class Game {
     if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
     if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
     if (inp.hit('KeyR')) route = true;
-    let turb = inp.hit('KeyT'), weap = inp.hit('KeyV'), ammo = inp.hit('KeyB');
+    let turb = inp.hit('KeyT') ? 1 : 0, weap = inp.hit('KeyV'), ammo = inp.hit('KeyB') ? 1 : 0, paint = -1;
     let exit = inp.hit('Escape', 'KeyQ');
+    const L = LOBBY;
     for (const tp of inp.taps) {
+      const inX = (x0: number, w: number) => tp.x >= x0 - 4 && tp.x < x0 + w + 4;
+      const row = (y: number) => tp.y >= y - 3 && tp.y < y + L.chipH + 3;
       if (tp.y > 405 && Math.abs(tp.x - HUD_W / 2) < 150) start = true;
       else if (tp.y > 405 && tp.x < HUD_W / 2 - 160) route = true;
       else if (tp.y < 50 && tp.x < 150) exit = true;
-      else if (tp.y >= 140 && tp.y < 218 && tp.x < 330) {
-        if (tp.y < 166) turb = true;
-        else if (tp.y < 192) weap = true;
-        else ammo = true;
-      } else if (tp.y > 60 && tp.y < 135 && tp.x < HUD_W - 330) dc = 1;
-      else if (tp.y >= 135 && tp.y < 400 && tp.x < HUD_W - 330) dp = 1;
+      else if (tp.y >= L.carY && tp.y < L.carY + L.carH && tp.x < L.x1) dc = tp.x < L.x0 + 40 ? -1 : 1;
+      else if (tp.y >= L.paintY - 4 && tp.y < L.paintY + 16 && tp.x < L.x1) {
+        const n = this.spec.paints.length, sx = L.mid - (n * 22 - 6) / 2;
+        const k = Math.floor((tp.x - sx + 3) / 22);
+        paint = k >= 0 && k < n ? k : -1;
+        if (paint < 0) dp = 1;
+      } else if (row(L.turbY) && inX(L.minusX, 28)) turb = -1;
+      else if (row(L.turbY) && inX(L.plusX, 28)) turb = 1;
+      else if (row(L.weapY) && inX(L.minusX, L.plusX + 28 - L.minusX)) weap = true;
+      else if (row(L.ammoY) && inX(L.minusX, 28)) ammo = -1;
+      else if (row(L.ammoY) && inX(L.plusX, 28)) ammo = 1;
+      else if (tp.y >= 135 && tp.y < 400 && tp.x > L.x1 && tp.x < HUD_W - 330) dp = 1;
     }
     if (exit) return this.leaveOnline();
     if (net?.status === 'error') {
@@ -663,6 +676,10 @@ export class Game {
         this.paintIdx = 0;
       }
       if (dp) this.paintIdx = (this.paintIdx + 1) % this.spec.paints.length;
+      if (paint >= 0 && paint !== this.paintIdx) {
+        this.paintIdx = paint;
+        dp = 1;
+      }
       if (dc || dp) {
         this.audio.blip();
         this.applyCar();
@@ -677,9 +694,9 @@ export class Game {
         this.px = 0;
         this.audio.music(this.trackId());
       }
-      if (turb) this.cycleTurbos();
+      if (turb) this.cycleTurbos(turb);
       if (weap) this.toggleWeapons();
-      if (ammo) this.cycleAmmo();
+      if (ammo) this.cycleAmmo(ammo);
       if (start && net?.status === 'online') this.startOnline();
     }
     if (this.pending && raceClock() >= this.pending.at) this.beginOnlineRace(this.pending.go);
@@ -1357,6 +1374,7 @@ export class Game {
           const n = 3 - Math.floor(this.t);
           if (n > 0) h.text(String(n), HUD_W / 2, 180, 64, n === 1 ? RED : YELLOW, 'center');
           h.text(route.stageNames[0], HUD_W / 2, 280, 16, WHITE, 'center');
+          this.countdownHelp();
         }
         if (this.table.length && (this.state === 'goal' ? this.t > 2.5 : this.t > 2.5)) {
           this.resultsTable(blink);
@@ -1409,31 +1427,59 @@ export class Game {
       : net.status === 'error' ? "COULDN'T CONNECT" : others.length ? `${others.length + 1} PLAYERS HERE` : 'WAITING FOR PLAYERS...';
     h.text(status, HUD_W / 2, 46, 16, net?.status === 'error' ? RED : CYAN, 'center');
     // your car, settings, stats and controls on a see-through panel
-    h.shade(28, 68, 350, 316);
-    h.text(s.make, 40, 76, 16, CYAN);
-    h.text(s.name, 40, 98, 24, WHITE);
-    h.text(this.touch ? 'TAP NAME: CAR   TAP CAR: COLOUR' : '< > CAR   ^ v COLOUR', 40, 130, 8, 0x8a8aa8);
-    h.text(`${this.touch ? 'TAP ' : 'T  '}TURBOS ${this.turboCount}`, 40, 148, 16, YELLOW);
-    h.text(`${this.touch ? 'TAP ' : 'V  '}WEAPONS ${this.weaponsSetting ? 'ON' : 'OFF'}`, 40, 174, 16, this.weaponsSetting ? ORANGE : 0x8a8aa8);
-    h.text(`${this.touch ? 'TAP ' : 'B  '}AMMO ${this.ammoCount}`, 40, 200, 16, this.weaponsSetting ? YELLOW : 0x8a8aa8);
-    h.text('YOUR SETTINGS APPLY IF YOU PRESS START', 40, 224, 8, 0x8a8aa8);
+    const L = LOBBY, kb = !this.touch;
+    h.shade(L.x0, 68, L.x1 - L.x0, 316);
+    // car: arrows either side of the name, paint swatches under it
+    h.chip(L.x0 + 6, L.carY + 4, 30, L.carH - 8, '←', YELLOW);
+    h.chip(L.x1 - 36, L.carY + 4, 30, L.carH - 8, '→', YELLOW);
+    h.text(s.make, L.mid, L.carY + 2, 16, CYAN, 'center');
+    const big = s.name.length <= 11;
+    h.text(s.name, L.mid, L.carY + (big ? 20 : 24), big ? 24 : 16, WHITE, 'center');
+    const n = s.paints.length, sx = L.mid - (n * 22 - 6) / 2;
+    s.paints.forEach((c, i) => {
+      const on = i === this.paintIdx % n;
+      h.rect(sx + i * 22 - 2, L.paintY - 2, 20, 16, on ? YELLOW : 0x3a3a5a);
+      h.rect(sx + i * 22, L.paintY, 16, 12, c);
+    });
+    if (kb) {
+      h.keycap(L.x0 + 12, L.paintY - 2, '←');
+      h.keycap(L.x0 + 30, L.paintY - 2, '→');
+      h.text('CAR', L.x0 + 52, L.paintY + 2, 8, GREY);
+      h.text('PAINT', L.x1 - 48, L.paintY + 2, 8, GREY, 'right');
+      h.keycap(L.x1 - 44, L.paintY - 2, '↑');
+      h.keycap(L.x1 - 26, L.paintY - 2, '↓');
+    }
+    // race settings: < value > chips, with the key that changes each
+    const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) => {
+      h.text(label, L.x0 + 12, y + 3, 16, on ? YELLOW : GREY);
+      if (toggle) h.chip(L.minusX, y, L.plusX + 28 - L.minusX, L.chipH, val, on ? ORANGE : GREY, 16, on ? 0x5a2a10 : 0x1a1a3a);
+      else {
+        h.chip(L.minusX, y, 28, L.chipH, '←', on ? CYAN : GREY);
+        h.text(val, (L.minusX + L.plusX + 28) / 2, y + 3, 16, on ? WHITE : GREY, 'center');
+        h.chip(L.plusX, y, 28, L.chipH, '→', on ? CYAN : GREY);
+      }
+      if (kb) h.keycap(L.x1 - 34, y + 1, key, 18);
+    };
+    setting(L.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
+    setting(L.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
+    setting(L.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
+    h.text('YOUR SETTINGS APPLY IF YOU START THE RACE', L.mid, 216, 8, GREY, 'center');
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
-      ['SPEED', (s.stats.vmax - 260) / 90, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, 0x40e040],
+      ['SPEED', (s.stats.vmax - 260) / 90, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
     ];
     bars.forEach(([label, v, c], i) => {
-      const y = 244 + i * 16;
+      const y = 232 + i * 12;
       h.text(label, 40, y + 1, 8, YELLOW);
       const lit = Math.round(Math.max(0.1, Math.min(1, v)) * 12);
-      for (let k = 0; k < 12; k++) h.rect(96 + k * 11, y, 9, 10, k < lit ? c : 0x202040);
+      for (let k = 0; k < 12; k++) h.rect(96 + k * 11, y, 9, 8, k < lit ? c : 0x202040);
     });
-    h.text(`${s.stats.vmax} KM/H`, 236, 245, 8, WHITE);
+    h.text(`${s.stats.vmax} KM/H`, 236, 233, 8, WHITE);
     // how to drive
-    h.text('CONTROLS', 40, 300, 8, YELLOW);
-    const lines = this.touch
-      ? ['< > STEER   GAS  BRAKE  DRIFT', 'TURBO BUTTON   FIRE BUTTON (WEAPONS)', 'AUTO GAS HOLDS THE THROTTLE', 'II PAUSE   MUSIC CHANGES THE SONG']
-      : ['UP GAS   DOWN BRAKE   < > STEER', 'SPACE DRIFT   T OR SHIFT TURBO', 'F FIRE (WEAPONS ON)   N MUSIC', 'ESC PAUSE   M MUTE'];
-    lines.forEach((t, i) => h.text(t, 40, 316 + i * 14, 8, WHITE));
+    h.rect(L.x0 + 8, 272, L.x1 - L.x0 - 16, 1, 0x3a3a5a);
+    h.text(kb ? 'DRIVING KEYS' : 'DRIVING BUTTONS', L.mid, 278, 8, YELLOW, 'center');
+    if (kb) this.keyGuide(40, 294);
+    else this.buttonGuide(L.x0 + 10, 292);
     // player list
     const lx = HUD_W - 320, ly = 70;
     h.box(lx, ly, 300, 40 + Math.min(8, others.length + 1) * 34 + (others.length > 7 ? 16 : 0), 0x101030, 0x3a3a5a, 3);
@@ -1474,6 +1520,74 @@ export class Game {
     const ready = net?.status === 'online';
     h.box(HUD_W / 2 - 150, 410, 300, 50, ready ? 0x1a8a3a : 0x202030, ready && blink ? YELLOW : WHITE);
     h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, 427, 16, ready ? WHITE : 0x8a8aa8, 'center');
+  }
+
+  /** Desktop: two columns of keycaps, each action in its touch button's colour. */
+  private keyGuide(x: number, y: number) {
+    const h = this.hud, fire = this.weaponsSetting;
+    const rows: [string[], string, number][][] = [
+      [[['↑'], 'GAS', GREEN], [['SPACE'], 'DRIFT', CYAN]],
+      [[['↓'], 'BRAKE', RED], [['T'], 'TURBO', ORANGE]],
+      [[['←', '→'], 'STEER', WHITE], [['F'], fire ? 'FIRE' : 'FIRE (OFF)', fire ? RED : GREY]],
+      [[['ESC'], 'PAUSE', GREY], [['N'], 'MUSIC', PINK]],
+    ];
+    rows.forEach((r, i) => r.forEach(([keys, act, c], j) => {
+      let kx = x + j * 168;
+      for (const k of keys) kx += h.keycap(kx, y + i * 22, k, 18) + 3;
+      h.text(act, kx + 5, y + i * 22 + 5, 8, c);
+    }));
+  }
+
+  /** Touch: the on-screen buttons in their real places, same border colours. */
+  private buttonGuide(x: number, y: number) {
+    const h = this.hud, w = 330, ht = 88, fire = this.weaponsSetting;
+    h.box(x, y, w, ht, 0x0a0a1a, 0x3a3a5a, 1); // the phone screen
+    // left thumb: steer pads
+    h.text('STEER', x + 45, y + ht - 50, 8, WHITE, 'center');
+    h.chip(x + 8, y + ht - 38, 34, 30, '←', WHITE);
+    h.chip(x + 48, y + ht - 38, 34, 30, '→', WHITE);
+    // right thumb: inner column fire / drift / brake, outer turbo / gas
+    const ox = x + w - 66, ix = x + w - 128;
+    if (fire) h.chip(ix, y + 6, 56, 18, 'FIRE', RED);
+    h.chip(ix, y + 28, 56, 18, 'DRIFT', CYAN);
+    h.chip(ix, y + 50, 56, 30, 'BRAKE', RED);
+    h.chip(ox, y + 24, 58, 20, 'TURBO', ORANGE);
+    h.chip(ox, y + 48, 58, 32, 'GAS', GREEN);
+    // middle: auto gas, and the small buttons along the top
+    h.text('MUSIC AUTO II', x + w - 8, y + 8, 8, GREY, 'right');
+    h.text('AUTO GAS', x + 140, y + 30, 8, GREEN, 'center');
+    h.text('IS ON', x + 140, y + 42, 8, GREEN, 'center');
+    h.text('TAP AUTO', x + 140, y + 58, 8, GREY, 'center');
+    h.text('TO TURN OFF', x + 140, y + 70, 8, GREY, 'center');
+  }
+
+  /** Under the 3-2-1: the few controls you need to get going. */
+  private countdownHelp() {
+    const h = this.hud, fire = this.weapons, y = 318;
+    if (this.touch) {
+      const items: [string, number][] = [['STEER LEFT THUMB', WHITE], ['GAS', GREEN], ['BRAKE', RED], ['DRIFT', CYAN], ['TURBO', ORANGE]];
+      if (fire) items.push(['FIRE', RED]);
+      const ws = items.map(([t]) => t.length * 8 + 16), tot = ws.reduce((a, b) => a + b, 0) + (items.length - 1) * 8;
+      let x = HUD_W / 2 - tot / 2;
+      h.shade(x - 8, y - 6, tot + 16, 34, 0.5);
+      items.forEach(([t, c], i) => {
+        h.chip(x, y, ws[i], 22, t, c);
+        x += ws[i] + 8;
+      });
+      return;
+    }
+    const items: [string[], string, number][] = [[['↑'], 'GAS', GREEN], [['↓'], 'BRAKE', RED], [['←', '→'], 'STEER', WHITE], [['SPACE'], 'DRIFT', CYAN], [['T'], 'TURBO', ORANGE]];
+    if (fire) items.push([['F'], 'FIRE', RED]);
+    const width = (it: [string[], string, number]) => it[0].reduce((a, k) => a + h.keyW(k, 18) + 3, 0) + 5 + it[1].length * 8;
+    const tot = items.reduce((a, it) => a + width(it), 0) + (items.length - 1) * 18;
+    let x = HUD_W / 2 - tot / 2;
+    h.shade(x - 10, y - 6, tot + 20, 32, 0.5);
+    for (const it of items) {
+      let kx = x;
+      for (const k of it[0]) kx += h.keycap(kx, y, k, 18) + 3;
+      h.text(it[1], kx + 5, y + 5, 8, it[2]);
+      x += width(it) + 18;
+    }
   }
 
   /** Online: name tags over the other players' cars. */

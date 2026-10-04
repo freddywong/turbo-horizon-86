@@ -38,6 +38,46 @@ export class Hud {
     this.g.fillRect(x, y, w, h);
   }
 
+  /** Solid pixel triangle pointing up/down/left/right, centred on (cx, cy). */
+  arrow(cx: number, cy: number, dir: 'up' | 'down' | 'left' | 'right', s: number, c: number) {
+    const n = Math.max(2, Math.round(s / 2));
+    for (let i = 0; i < n; i++) {
+      const len = (i + 1) * 2 - 1;
+      if (dir === 'up') this.rect(cx - i, cy - n / 2 + i, len, 1, c);
+      else if (dir === 'down') this.rect(cx - i, cy + n / 2 - i, len, 1, c);
+      else if (dir === 'left') this.rect(cx - n / 2 + i, cy - i, 1, len, c);
+      else this.rect(cx + n / 2 - i, cy - i, 1, len, c);
+    }
+  }
+
+  private static ARROWS: Record<string, 'up' | 'down' | 'left' | 'right'> = { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' };
+
+  /** Width keycap() will use for this label. */
+  keyW(label: string, h = 16): number {
+    if (Hud.ARROWS[label]) return h;
+    this.g.font = `${h >= 20 ? 16 : 8}px ${PIXEL_FONT}`;
+    return Math.max(h, Math.ceil(this.g.measureText(label).width) + 10);
+  }
+
+  /** A keyboard key: light border, dark face, label inside. Returns its width. */
+  keycap(x: number, y: number, label: string, h = 16, c = WHITE): number {
+    const fs = h >= 20 ? 16 : 8, w = this.keyW(label, h), a = Hud.ARROWS[label];
+    this.rect(x + 1, y + 2, w, h, 0x05050f); // key depth
+    this.box(x, y, w, h, 0x2a2a4a, c, 1);
+    this.rect(x + 1, y + 1, w - 2, 1, 0x50507a);
+    if (a) this.arrow(x + w / 2 - 0.5, y + h / 2, a, h - 6, c);
+    else this.text(label, x + w / 2, y + (h - fs) / 2 + 1, fs, c, 'center');
+    return w;
+  }
+
+  /** A tappable on-screen button: coloured border, label or arrow centred. */
+  chip(x: number, y: number, w: number, h: number, label: string, c: number, fs = 8, fill = 0x1a1a3a) {
+    this.box(x, y, w, h, fill, c, 2);
+    const a = Hud.ARROWS[label];
+    if (a) this.arrow(x + w / 2 - 0.5, y + h / 2, a, Math.min(w, h) - 8, c);
+    else this.text(label, x + w / 2, y + (h - fs) / 2 + 1, fs, c, 'center');
+  }
+
   box(x: number, y: number, w: number, h: number, fill: number, border: number, bw = 4) {
     const g = this.g;
     g.fillStyle = hex(border);
