@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export type V3 = [number, number, number];
 
@@ -17,6 +18,21 @@ export class GeoBuilder {
   private m: THREE.Matrix4 | null = null;
   private tmp = new THREE.Vector3();
   private c = new THREE.Color();
+
+  /** tiled: always emit the `tile` attribute (for materials patched with atlasPatch). */
+  constructor(tiled = false) {
+    this.hasTile = tiled;
+  }
+
+  /** Every face added inside fn samples texture-array layer `layer` (uv must be given). */
+  layer(layer: number, fn: () => void): this {
+    const prev = this.curTile;
+    this.hasTile = true;
+    this.curTile = [layer, 0, 0];
+    fn();
+    this.curTile = prev;
+    return this;
+  }
 
   /** Apply a transform to every point added inside fn. */
   with(m: THREE.Matrix4, fn: () => void): this {
@@ -155,12 +171,20 @@ export class GeoBuilder {
     return this;
   }
 
-  build(): THREE.BufferGeometry {
+  /** smooth: weld matching corners so faces of the same colour share Gouraud-blended normals. */
+  build(smooth = false): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
     if (this.hasUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
     if (this.hasTile) g.setAttribute('tile', new THREE.Float32BufferAttribute(this.tiles, 3));
+    if (smooth) {
+      const m = mergeVertices(g, 1e-4);
+      g.dispose();
+      m.computeVertexNormals();
+      m.computeBoundingSphere();
+      return m;
+    }
     g.computeVertexNormals();
     g.computeBoundingSphere();
     return g;

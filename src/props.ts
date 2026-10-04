@@ -4,8 +4,9 @@ import { ROAD_HALF, SEG } from './track';
 import { Rng } from './rng';
 import { GFX, haloTexture } from './gfx';
 import { atlasPatch, FACADE, facadeAtlas, tileOffset } from './textures';
+import { carMaterials } from './cars/mats';
 
-export type MatKind = 'lit' | 'glow' | 'sign' | 'halo' | 'facade' | 'facadeLit';
+export type MatKind = 'lit' | 'glow' | 'sign' | 'halo' | 'facade' | 'facadeLit' | 'car' | 'carGlow' | 'glass';
 export interface PropPart { geo: THREE.BufferGeometry; mat: MatKind; tint?: boolean }
 export interface PropDef { parts: PropPart[]; radius: number; max: number; len?: number }
 export type UV = [number, number, number, number];
@@ -13,6 +14,7 @@ export type UV = [number, number, number, number];
 export interface Materials {
   lit: THREE.Material; glow: THREE.Material; sign: THREE.Material; halo: THREE.Material; paint: THREE.Material;
   facade: THREE.Material; facadeLit: THREE.Material;
+  car: THREE.Material; carGlow: THREE.Material; glass: THREE.Material;
 }
 
 let facadeTex: THREE.Texture | null = null;
@@ -25,9 +27,13 @@ export function makeMaterials(signTex: THREE.Texture): Materials {
     atlasPatch(facade, facadeTex);
     atlasPatch(facadeLit, facadeTex);
   }
+  const cm = GFX.modern ? carMaterials() : null;
   return {
     facade,
     facadeLit,
+    car: cm?.lit ?? facade,
+    carGlow: cm?.glow ?? facadeLit,
+    glass: cm?.glass ?? facadeLit,
     lit: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
     sign: new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }),

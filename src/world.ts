@@ -208,6 +208,7 @@ export class World {
       const b = tmp.y;
       v.sample(r.d, r.x, tmp);
       car.root.visible = true;
+      car.setNear(Math.abs(r.d - pos) < 28);
       car.root.position.set(tmp.x, tmp.y, tmp.z);
       car.pose(r.steer, -tmp.h - r.steer * 0.08, r.spin, 0, Math.atan2(f - b, 4), r.braking, r.turboT > 0 ? 1 : 0);
     });

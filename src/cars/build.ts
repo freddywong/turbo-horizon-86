@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GeoBuilder, V3 } from '../geom';
 import { GFX } from '../gfx';
 import { CarSpec, Light, Station } from './spec';
+import { brakeGeoHD, buildBodyHD, wheelGeoHD } from './hd';
+import { carMaterials } from './mats';
 
 const GLASS = 0x18283c, GLASS_SIDE = 0x22364c, DARK = 0x141416, BLACK = 0x0a0a0c, CHROME = 0xc8ccd4;
 
@@ -313,22 +315,54 @@ export class PlayerCar {
   private flames: THREE.Mesh;
   private geos: THREE.BufferGeometry[] = [];
 
+  private hubs: THREE.Mesh[] = [];
+  private detail: THREE.Object3D[] = [];
+  private near = true;
+
+  /** Level of detail: far-off cars drop the cabin and brake hardware. */
+  setNear(near: boolean) {
+    if (near === this.near) return;
+    this.near = near;
+    for (const o of this.detail) o.visible = near;
+  }
+
   constructor(public spec: CarSpec, paint: number, mats: CarMats, plateUv: [number, number, number, number], shadow = 0x3c3c46, night = false) {
-    const cg = buildBody(spec, paint);
-    const s = new GeoBuilder();
-    const { y, z } = cg.plate;
-    s.quad([-0.27, y - 0.08, z], [0.27, y - 0.08, z], [0.27, y + 0.08, z], [-0.27, y + 0.08, z], 0xffffff, plateUv);
     const add = (geo: THREE.BufferGeometry, m: THREE.Material, parent: THREE.Object3D) => {
       this.geos.push(geo);
       const mesh = new THREE.Mesh(geo, m);
       parent.add(mesh);
       return mesh;
     };
-    add(cg.lit.build(), mats.paint ?? mats.lit, this.body);
-    if (!cg.glow.empty) add(cg.glow.build(), mats.glow, this.body);
+    const hd = GFX.modern;
+    const hm = hd ? carMaterials() : null;
+    let plate: { y: number; z: number }, tailZ: number;
+    let wheelPos: { x: number; z: number; r: number; hw: number }[];
+    if (hm) {
+      const cg = buildBodyHD(spec, paint);
+      add(cg.skin.build(true), hm.paint, this.body);
+      add(cg.body.build(), hm.paint, this.body);
+      this.detail.push(add(cg.cabin.build(), hm.lit, this.body));
+      add(cg.glass.build(), hm.glass, this.body).renderOrder = 1;
+      add(cg.glow.build(), hm.glow, this.body);
+      this.brake = add(cg.brake.empty ? new GeoBuilder().tri([0, 0, 0], [0, 0, 0], [0, 0, 0], 0).build() : cg.brake.build(), hm.glow, this.body);
+      plate = cg.plate;
+      tailZ = cg.tailZ;
+      wheelPos = cg.wheels;
+    } else {
+      const cg = buildBody(spec, paint);
+      add(cg.lit.build(), mats.paint ?? mats.lit, this.body);
+      if (!cg.glow.empty) add(cg.glow.build(), mats.glow, this.body);
+      this.brake = add(cg.brake.empty ? new GeoBuilder().tri([0, 0, 0], [0, 0, 0], [0, 0, 0], 0).build() : cg.brake.build(), mats.glow, this.body);
+      plate = cg.plate;
+      tailZ = cg.tailZ;
+      const w = spec.wheels, hw = w.hw ?? 0.18;
+      wheelPos = [{ x: w.fx, z: w.fz, r: w.r, hw }, { x: w.rx, z: w.rz, r: w.r * 1.03, hw: hw * 1.15 }];
+    }
+    const s = new GeoBuilder();
+    const { y, z } = plate;
+    s.quad([-0.27, y - 0.08, z], [0.27, y - 0.08, z], [0.27, y + 0.08, z], [-0.27, y + 0.08, z], 0xffffff, plateUv);
     add(s.build(), mats.sign, this.body);
     if (night && mats.halo) add(tailHalos(spec, 0.45, 0.45).build(), mats.halo, this.body);
-    this.brake = add(cg.brake.empty ? new GeoBuilder().tri([0, 0, 0], [0, 0, 0], [0, 0, 0], 0).build() : cg.brake.build(), mats.glow, this.body);
 
     const f = new GeoBuilder();
     for (const e of spec.exhaust) {
@@ -338,7 +372,7 @@ export class PlayerCar {
     const fg = f.build();
     fg.rotateX(Math.PI / 2); // +y -> +z (backwards), -z offsets -> +y heights
     this.flames = add(fg, mats.glow, this.body);
-    this.flames.position.set(0, 0, cg.tailZ + 0.05);
+    this.flames.position.set(0, 0, tailZ + (hd ? 0.12 : 0.05));
     this.flames.visible = false;
 
     // sprite-style shadow: kept inside the car's footprint so it only peeks out under the sills
@@ -355,12 +389,19 @@ export class PlayerCar {
     add(sh.build(), new THREE.MeshBasicMaterial({ color: shadow, side: THREE.DoubleSide }), this.root);
 
     const w = spec.wheels;
-    const hw = w.hw ?? 0.18;
-    for (const [x, z, out] of [[-w.fx, w.fz, -1], [w.fx, w.fz, 1], [-w.rx, w.rz, -1], [w.rx, w.rz, 1]]) {
-      const rr = z > 0 ? w.r * 1.03 : w.r;
-      const mesh = add(wheelGeo(rr, z > 0 ? hw * 1.15 : hw, out, w.rim, w.spokes), mats.lit, this.root);
-      mesh.position.set(x, rr, z);
+    const style = spec.rimStyle ?? 'star';
+    for (const [k, side] of [[0, -1], [0, 1], [1, -1], [1, 1]]) {
+      const wp = wheelPos[k];
+      const geo = hm ? wheelGeoHD(wp.r, wp.hw, side, style, w.rim) : wheelGeo(wp.r, wp.hw, side, w.rim, w.spokes);
+      const mesh = add(geo, hm ? hm.lit : mats.lit, this.root);
+      mesh.position.set(side * wp.x, wp.r, wp.z);
       this.wheels.push(mesh as THREE.Mesh);
+      if (hm) {
+        const hub = add(brakeGeoHD(wp.r, wp.hw, side, spec.id === '959' || spec.id === 'nsx' ? 0x2a2a2e : 0xc81810), hm.lit, this.root);
+        hub.position.copy(mesh.position);
+        this.hubs.push(hub as THREE.Mesh);
+        this.detail.push(hub);
+      }
     }
     this.root.add(this.body);
   }
@@ -377,5 +418,6 @@ export class PlayerCar {
     this.flames.visible = flame > 0;
     if (flame > 0) this.flames.scale.set(1, 1, 0.6 + Math.random() * 0.8);
     this.wheels.forEach((wm, i) => wm.rotation.set(spin, i < 2 ? -steer * 0.35 : 0, 0, 'YXZ'));
+    this.hubs.forEach((h, i) => h.rotation.set(0, i < 2 ? -steer * 0.35 : 0, 0));
   }
 }

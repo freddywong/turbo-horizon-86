@@ -56,8 +56,16 @@ The title screen switches between two looks (G, or tap the GRAPHICS line):
     Tokyo office blocks with lit, blinded and dark windows; rooftop AC units, water tanks, masts
   * roadside detail: reflector posts, km markers, people on the promenade and beach, beach huts,
     seagulls, barrier reflectors, emergency phones, tunnel jet fans
-  * detailed cars: framed lamps, reversing lights, plate frames, diffusers, door lines and
-    handles, window seals; traffic with bumpers, mirrors, wipers and roof rails
+  * high-detail cars (about 5,000 polygons each): smooth, Gouraud-shaded bodywork with
+    swage lines and rounded shoulders, wheel arches cut into the body with flared lips,
+    tinted see-through glass over a modelled cabin (seats, dashboard, steering wheel and a
+    helmeted driver; the McLaren F1 has its centre seat), textured tail lamps, headlamps,
+    grilles and louvres, treaded tyres with lettered sidewalls, cut-out rims (five-spoke,
+    six-spoke, multi-spoke, mesh, "telephone dial") with the brake disc and caliper behind,
+    pillars, wipers, mirrors, shut lines, handles, fuel filler, side markers, rear fog lamp,
+    multi-part exhausts and diffusers
+  * traffic with the same smooth bodies, glass with drivers inside, hubcapped wheels,
+    bumpers and textured lamps
   * ships, a lighthouse and sun glitter on the horizon; aircraft lights over Tokyo
   * smooth sky and sun gradients, glossy car paint, sky-tinted lighting, light halos and
     glowing tail lights at night, soft tyre smoke, a lens flare from the Miami sun
@@ -125,7 +133,9 @@ overtaking, and the time bonus at the goal.
 * `src/props.ts`, `src/routes/*`: hand-built low-poly props (a few dozen polygons each),
   drawn with one `InstancedMesh` per prop part.
 * `src/cars/`: a spec-driven car builder. Each car is a list of body cross-sections
-  plus its tail lights, wings, intakes and exhausts.
+  plus its tail lights, wings, intakes and exhausts. `build.ts` makes the 1986 models;
+  `hd.ts` resamples the sections along splines into the 1992 models and adds the cabin,
+  glass and wheels, textured from the car-part tiles in `textures.ts`.
 * `src/rivals.ts`: the computer drivers, their AI and the race classification.
 * `src/touch.ts`: the multi-touch on-screen controls.
 * `src/backdrop.ts`: stepped-gradient sky dome, sun/moon discs, cut-out clouds,

@@ -64,6 +64,11 @@ export interface CarSpec {
   front?: 'popup' | 'rect' | 'round' | 'slim'; // headlight style
   exhaust: { x: number; y: number; r: number }[];
   plateY: number;
+  /** '92 detail: wheel style, arch flare (m), seat layout, cabin trim colour */
+  rimStyle?: 'star' | 'six' | 'multi' | 'mesh' | 'dial' | 'steel';
+  arch?: number;
+  drive?: 'L' | 'R' | 'C';
+  trim?: number;
   stats: { vmax: number; accel: number; grip: number }; // vmax km/h; others ~1.0
 }
 

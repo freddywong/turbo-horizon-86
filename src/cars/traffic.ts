@@ -1,5 +1,8 @@
 import { PropDef } from '../props';
+import { GFX } from '../gfx';
+import * as THREE from 'three';
 import { addStaticWheels, buildBody, tailHalos } from './build';
+import { buildBodyHD, wheelInto } from './hd';
 import { boxy, CarSpec, Light, Station } from './spec';
 
 const RED = 0xc01810;
@@ -54,6 +57,7 @@ export const TRAFFIC: Record<string, CarSpec> = {
 
 /** Turns a traffic spec into an instanced prop (body + wheels lit, lights glowing). */
 export function trafficProp(s: CarSpec, opts: { taxi?: boolean; night?: boolean } = {}): PropDef {
+  if (GFX.modern) return trafficPropHD(s, opts);
   const cg = buildBody(s, 0xffffff, true);
   addStaticWheels(cg.lit, s);
   const glow = cg.glow;
@@ -65,6 +69,35 @@ export function trafficProp(s: CarSpec, opts: { taxi?: boolean; night?: boolean 
   const parts = [{ geo: cg.lit.build(), mat: 'lit' as const }];
   const out: PropDef = { parts, radius: 0, max: 40, len: (st[st.length - 1].z - st[0].z) / 2 + 2.2 };
   if (!glow.empty) out.parts.push({ geo: glow.build(), mat: 'glow' });
+  if (opts.night) out.parts.push({ geo: tailHalos(s, 0.8).build(), mat: 'halo', tint: false });
+  return out;
+}
+
+/** '92 traffic: smooth body, textured lamps, glass with occupants, treaded wheels with hubcaps. */
+function trafficPropHD(s: CarSpec, opts: { taxi?: boolean; night?: boolean }): PropDef {
+  const cg = buildBodyHD(s, 0xffffff, true);
+  const inner = cg.cabin; // untinted: occupants, wheels
+  for (const wp of cg.wheels) {
+    for (const side of [-1, 1]) {
+      inner.with(new THREE.Matrix4().makeTranslation(side * wp.x, wp.r, wp.z), () => wheelInto(inner, wp.r, wp.hw, side, 'steel', 0xb8bcc4, 8, false));
+    }
+  }
+  const glow = cg.glow;
+  if (opts.taxi) {
+    const rf = s.stations.find((x) => x.seg === 'rf')!;
+    glow.box(0, rf.top + 0.12, rf.z + 0.4, 0.5, 0.22, 0.3, 0xffe080);
+  }
+  const st = s.stations;
+  const out: PropDef = {
+    parts: [
+      { geo: cg.skin.build(true), mat: 'car', tint: true },
+      { geo: cg.body.build(), mat: 'car', tint: true },
+      { geo: inner.build(), mat: 'car', tint: false },
+      { geo: glow.build(), mat: 'carGlow', tint: false },
+      { geo: cg.glass.build(), mat: 'glass', tint: false },
+    ],
+    radius: 0, max: 40, len: (st[st.length - 1].z - st[0].z) / 2 + 2.2,
+  };
   if (opts.night) out.parts.push({ geo: tailHalos(s, 0.8).build(), mat: 'halo', tint: false });
   return out;
 }

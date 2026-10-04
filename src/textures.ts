@@ -455,3 +455,274 @@ export function facadeAtlas(): THREE.Texture {
   for (let t = 0; t < 16; t++) paintFacade(p, t);
   return arrayTexture(cv);
 }
+
+// --------------------------------------------------------------------------
+// Car parts
+// --------------------------------------------------------------------------
+
+/**
+ * Car part tiles. Lenses and grilles are greyscale so the vertex colour tints
+ * them; rim faces carry alpha (cut-out spokes show the brake disc behind).
+ * Round parts are mapped polar: uv (0.5, 0.5) is the centre.
+ */
+export const CARTEX = {
+  LENS: 0, LENS_ROUND: 1, LENS_BAR: 2, MESH: 3, LOUVRE: 4, TREAD: 5,
+  RIM_STAR: 6, RIM_MULTI: 7, RIM_MESH: 8, RIM_DIAL: 9, SIDEWALL: 10, RIM_STEEL: 11,
+  PLAIN: 12, HEADLAMP: 13, SEAT: 14, RIM_SIX: 15,
+} as const;
+export type RimStyle = 'star' | 'six' | 'multi' | 'mesh' | 'dial' | 'steel';
+export const RIM_TILE: Record<RimStyle, number> = {
+  star: CARTEX.RIM_STAR, six: CARTEX.RIM_SIX, multi: CARTEX.RIM_MULTI, mesh: CARTEX.RIM_MESH, dial: CARTEX.RIM_DIAL, steel: CARTEX.RIM_STEEL,
+};
+
+function paintCarPart(p: Painter, tile: number) {
+  const ox = (tile % COLS) * T, oy = Math.floor(tile / COLS) * T;
+  const g = p.g;
+  p.seed(tile * 15485863 + 3);
+  const R = (x: number, y: number, w: number, h: number, c: string) => { g.fillStyle = c; g.fillRect(ox + x, oy + y, w, h); };
+  const C = T / 2;
+  const circle = (r: number, c: string, x = C, y = C) => { g.fillStyle = c; g.beginPath(); g.arc(ox + x, oy + y, r, 0, Math.PI * 2); g.fill(); };
+  const ring = (r: number, w: number, c: string) => { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.arc(ox + C, oy + C, r, 0, Math.PI * 2); g.stroke(); };
+  /** wheel hub: centre cap and lug nuts */
+  const hub = (nuts: number, r = 14) => {
+    circle(r + 3, p.grey(0.55));
+    circle(r, p.grey(0.92));
+    for (let k = 0; k < nuts; k++) {
+      const a = (k / nuts) * Math.PI * 2;
+      circle(2.6, p.grey(0.35), C + Math.cos(a) * r * 0.62, C + Math.sin(a) * r * 0.62);
+    }
+    circle(4, p.grey(0.7));
+  };
+  /** outer rim lip with a shaded barrel edge */
+  const lip = () => {
+    ring(61, 6, p.grey(1));
+    ring(57, 2, p.grey(0.6));
+  };
+  g.save();
+  g.beginPath();
+  g.rect(ox, oy, T, T);
+  g.clip();
+  g.clearRect(ox, oy, T, T);
+  switch (tile) {
+    case CARTEX.LENS: {
+      // ribbed rectangular tail lens: bright cells, darker frame and ribs
+      R(0, 0, T, T, p.grey(0.55));
+      R(6, 8, T - 12, T - 16, p.grey(0.88));
+      for (let y = 10; y < T - 10; y += 9) R(6, y, T - 12, 2, p.grey(0.62));
+      for (let x = 10; x < T - 8; x += 14) R(x, 8, 1, T - 16, p.grey(0.7));
+      const grd = g.createRadialGradient(ox + C, oy + C, 4, ox + C, oy + C, 60);
+      grd.addColorStop(0, 'rgba(255,255,255,0.75)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd;
+      g.fillRect(ox, oy, T, T);
+      break;
+    }
+    case CARTEX.LENS_ROUND: {
+      // round lamp: chrome-free lens with fresnel rings and a hot centre
+      R(0, 0, T, T, p.grey(0.5));
+      circle(62, p.grey(0.6));
+      for (let r = 58; r > 8; r -= 7) {
+        circle(r, p.grey(0.72 + (58 - r) / 200));
+        ring(r, 1.5, p.grey(0.55 + (58 - r) / 250));
+      }
+      circle(12, p.grey(1));
+      break;
+    }
+    case CARTEX.LENS_BAR: {
+      R(0, 0, T, T, p.grey(0.7));
+      for (let x = 0; x < T; x += 4) R(x, 0, 2, T, p.grey(0.9));
+      R(0, 0, T, 10, p.grey(0.5));
+      R(0, T - 10, T, 10, p.grey(0.5));
+      R(0, C - 3, T, 6, p.grey(1));
+      break;
+    }
+    case CARTEX.MESH: {
+      // woven diamond mesh: light wires over dark holes
+      R(0, 0, T, T, p.grey(0.12));
+      g.strokeStyle = p.grey(0.85);
+      g.lineWidth = 1.6;
+      for (let k = -T; k < T * 2; k += 10) {
+        g.beginPath(); g.moveTo(ox + k, oy); g.lineTo(ox + k + T, oy + T); g.stroke();
+        g.beginPath(); g.moveTo(ox + k, oy + T); g.lineTo(ox + k + T, oy); g.stroke();
+      }
+      break;
+    }
+    case CARTEX.LOUVRE: {
+      for (let y = 0; y < T; y += 16) {
+        const grd = g.createLinearGradient(0, oy + y, 0, oy + y + 16);
+        grd.addColorStop(0, p.grey(1));
+        grd.addColorStop(0.55, p.grey(0.7));
+        grd.addColorStop(0.6, p.grey(0.08));
+        grd.addColorStop(1, p.grey(0.15));
+        g.fillStyle = grd;
+        g.fillRect(ox, oy + y, T, 16);
+      }
+      break;
+    }
+    case CARTEX.TREAD: {
+      // tread blocks: u runs round the tyre, v across it
+      p.noise(ox, oy, 0.85, 0.05);
+      for (const x of [30, 62, 94]) R(x, 0, 5, T, p.grey(0.25));
+      for (let y = 0; y < T; y += 16) {
+        for (const [x0, x1] of [[0, 30], [35, 62], [67, 94], [99, T]]) {
+          g.strokeStyle = p.grey(0.32);
+          g.lineWidth = 2.5;
+          g.beginPath(); g.moveTo(ox + x0, oy + y + (x0 < 64 ? 0 : 6)); g.lineTo(ox + x1, oy + y + (x0 < 64 ? 6 : 0)); g.stroke();
+        }
+      }
+      break;
+    }
+    case CARTEX.SIDEWALL: {
+      // u runs round the tyre (two repeats), v from the rim (0) to the tread (1)
+      R(0, 0, T, T, p.grey(0.16));
+      R(0, T - 10, T, 10, p.grey(0.1));
+      R(0, 0, T, 6, p.grey(0.24));
+      g.fillStyle = p.grey(0.62);
+      g.font = 'bold 28px monospace';
+      g.textBaseline = 'middle';
+      g.save();
+      g.translate(ox + 2, oy + C);
+      g.scale(0.58, 1.3);
+      g.fillText('TURBO-R', 0, 0);
+      g.restore();
+      break;
+    }
+    case CARTEX.HEADLAMP: {
+      R(0, 0, T, T, p.grey(0.55));
+      const grd = g.createRadialGradient(ox + C, oy + C, 2, ox + C, oy + C, 58);
+      grd.addColorStop(0, p.grey(1));
+      grd.addColorStop(0.3, p.grey(0.95));
+      grd.addColorStop(0.75, p.grey(0.72));
+      grd.addColorStop(1, p.grey(0.5));
+      g.fillStyle = grd;
+      g.fillRect(ox + 4, oy + 4, T - 8, T - 8);
+      g.strokeStyle = 'rgba(0,0,0,0.12)';
+      g.lineWidth = 1;
+      for (let k = 8; k < T; k += 10) {
+        g.beginPath(); g.moveTo(ox + k, oy); g.lineTo(ox + k, oy + T); g.stroke();
+        g.beginPath(); g.moveTo(ox, oy + k); g.lineTo(ox + T, oy + k); g.stroke();
+      }
+      break;
+    }
+    case CARTEX.SEAT: {
+      // pleated upholstery with stitched bolsters
+      R(0, 0, T, T, p.grey(0.8));
+      for (let x = 24; x < T - 24; x += 10) R(x, 0, 2, T, p.grey(0.55));
+      R(0, 0, 20, T, p.grey(0.65));
+      R(T - 20, 0, 20, T, p.grey(0.65));
+      break;
+    }
+    case CARTEX.RIM_STAR: {
+      lip();
+      g.fillStyle = p.grey(0.92);
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        g.save();
+        g.translate(ox + C, oy + C);
+        g.rotate(a);
+        g.beginPath(); g.moveTo(-9, 0); g.lineTo(-6, 59); g.lineTo(6, 59); g.lineTo(9, 0); g.fill();
+        g.fillStyle = p.grey(0.6);
+        g.fillRect(-1, 10, 2, 46);
+        g.fillStyle = p.grey(0.92);
+        g.restore();
+      }
+      hub(5);
+      break;
+    }
+    case CARTEX.RIM_SIX: {
+      lip();
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        g.save();
+        g.translate(ox + C, oy + C);
+        g.rotate(a);
+        g.fillStyle = p.grey(0.9);
+        g.fillRect(-7, 0, 5, 59);
+        g.fillRect(2, 0, 5, 59);
+        g.restore();
+      }
+      hub(5, 16);
+      break;
+    }
+    case CARTEX.RIM_MULTI: {
+      lip();
+      for (let k = 0; k < 7; k++) {
+        const a = (k / 7) * Math.PI * 2;
+        g.save();
+        g.translate(ox + C, oy + C);
+        g.rotate(a);
+        g.fillStyle = p.grey(0.92);
+        g.beginPath(); g.moveTo(-4, 8); g.quadraticCurveTo(-14, 34, -6, 59); g.lineTo(5, 59); g.quadraticCurveTo(-2, 34, 6, 8); g.fill();
+        g.restore();
+      }
+      hub(5);
+      break;
+    }
+    case CARTEX.RIM_MESH: {
+      // cross-laced mesh rim with a polished lip
+      g.save();
+      g.beginPath(); g.arc(ox + C, oy + C, 58, 0, Math.PI * 2); g.clip();
+      g.strokeStyle = p.grey(0.88);
+      g.lineWidth = 3;
+      for (let k = 0; k < 20; k++) {
+        const a = (k / 20) * Math.PI * 2;
+        for (const d of [-0.5, 0.5]) {
+          g.beginPath();
+          g.moveTo(ox + C + Math.cos(a) * 14, oy + C + Math.sin(a) * 14);
+          g.lineTo(ox + C + Math.cos(a + d) * 60, oy + C + Math.sin(a + d) * 60);
+          g.stroke();
+        }
+      }
+      g.restore();
+      lip();
+      hub(5, 16);
+      break;
+    }
+    case CARTEX.RIM_DIAL: {
+      // "telephone dial": a solid disc with round holes
+      circle(60, p.grey(0.86));
+      g.globalCompositeOperation = 'destination-out';
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        circle(15, '#000', C + Math.cos(a) * 36, C + Math.sin(a) * 36);
+      }
+      g.globalCompositeOperation = 'source-over';
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        g.strokeStyle = p.grey(0.55);
+        g.lineWidth = 2;
+        g.beginPath(); g.arc(ox + C + Math.cos(a) * 36, oy + C + Math.sin(a) * 36, 16, 0, Math.PI * 2); g.stroke();
+      }
+      lip();
+      hub(5);
+      break;
+    }
+    case CARTEX.RIM_STEEL: {
+      // plain hubcap (opaque) for traffic
+      circle(62, p.grey(0.45));
+      circle(52, p.grey(0.9));
+      ring(40, 2, p.grey(0.6));
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        circle(4, p.grey(0.4), C + Math.cos(a) * 46, C + Math.sin(a) * 46);
+      }
+      circle(14, p.grey(0.7));
+      break;
+    }
+    default:
+      R(0, 0, T, T, '#ffffff');
+  }
+  g.restore();
+}
+
+let carTex: THREE.Texture | null = null;
+/** The car part tiles as a 16-layer texture array (shared by every car). */
+export function carAtlas(): THREE.Texture {
+  if (carTex) return carTex;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = T * COLS;
+  const p = new Painter(cv);
+  for (let t = 0; t < 16; t++) paintCarPart(p, t);
+  carTex = arrayTexture(cv);
+  return carTex;
+}
