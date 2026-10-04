@@ -20,6 +20,14 @@ export interface TrafficCar {
   tint: number;
   laneTarget: number;
   passed: boolean;
+  wrap?: number;
+}
+
+/** Online races: every player's traffic comes from one seed and race time, so all see the same cars. */
+interface NetTraffic {
+  start: number;
+  len: number;
+  cars: { d0: number; v: number; lanes: number[]; period: number }[];
 }
 
 const tmp = { x: 0, y: 0, z: 0, h: 0 };
@@ -115,11 +123,79 @@ export class World {
   }
 
   resetTraffic(pos: number, count = this.route.trafficCount, from = 160) {
+    this.net = null;
     this.traffic = [];
     for (let i = 0; i < count; i++) this.traffic.push(this.spawnCar(pos + from + i * 75 + this.rng.range(0, 40)));
   }
 
+  private net: NetTraffic | null = null;
+  /** race time driving the shared traffic (online races) */
+  netTime = 0;
+
+  /** Seeded traffic spread from the grid to the goal, moving as a function of race time. */
+  setNetTraffic(seed: number, startPos: number) {
+    const rng = new Rng(seed);
+    const start = startPos + 160;
+    const len = this.track.goalDist + 100 - start;
+    const n = Math.max(6, Math.round((this.route.trafficCount * len) / 1100 * 0.7));
+    const net: NetTraffic = { start, len, cars: [] };
+    this.traffic = [];
+    for (let i = 0; i < n; i++) {
+      const lanes: number[] = [rng.int(0, LANES - 1)];
+      for (let k = 1; k < 32; k++) lanes.push(Math.max(0, Math.min(LANES - 1, lanes[k - 1] + (rng.chance(0.5) ? rng.sign() : 0))));
+      net.cars.push({ d0: ((i + rng.next() * 0.6) / n) * len, v: rng.range(28, 50), lanes, period: rng.range(8, 20) });
+      this.traffic.push({
+        d: start + net.cars[i].d0, x: this.laneX(lanes[0]), laneTarget: lanes[0], v: net.cars[i].v,
+        t: rng.pick(this.data.trafficTypes), tint: rng.pick(this.route.trafficColors), passed: false, wrap: 0,
+      });
+    }
+    this.net = net;
+    this.netTime = 0;
+  }
+
+  private updateNetTraffic(playerPos: number, onPass: () => void) {
+    const net = this.net!, t = this.netTime;
+    this.traffic.forEach((c, i) => {
+      const nc = net.cars[i];
+      const raw = nc.d0 + nc.v * t;
+      const wrap = Math.floor(raw / net.len);
+      if (wrap !== c.wrap) {
+        c.wrap = wrap;
+        c.passed = false;
+      }
+      c.d = net.start + raw - wrap * net.len;
+      const k = Math.floor(t / nc.period);
+      const lane = nc.lanes[k % nc.lanes.length], prev = nc.lanes[Math.max(0, k - 1) % nc.lanes.length];
+      const f = Math.min(1, (t - k * nc.period) / 1.5), e = f * f * (3 - 2 * f);
+      c.x = this.laneX(prev) + (this.laneX(lane) - this.laneX(prev)) * e;
+      c.laneTarget = lane;
+      if (!c.passed && c.d < playerPos - 3 && c.d > playerPos - 40) {
+        c.passed = true;
+        onPass();
+      }
+    });
+  }
+
+  /** Crash damage on rival i's model (online players' crashes). */
+  rivalHit(i: number, severity: number) {
+    const wh = ['front', 'rear', 'left', 'right'] as const;
+    this.rivalCars[i]?.hit(severity, wh[Math.floor(Math.random() * 4)]);
+  }
+
+  /** Where rival i's car sits on the HUD canvas (for name tags), or null if off screen / far. */
+  rivalScreenPos(i: number, camera: THREE.Camera, w: number, h: number): { x: number; y: number; dist: number } | null {
+    const car = this.rivalCars[i];
+    if (!car || !car.root.visible) return null;
+    const p = car.root.position.clone();
+    p.y += 1.9;
+    const dist = p.distanceTo(camera.position);
+    p.project(camera);
+    if (p.z > 1 || Math.abs(p.x) > 1.1 || Math.abs(p.y) > 1.1) return null;
+    return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h, dist };
+  }
+
   updateTraffic(dt: number, playerPos: number, onPass: () => void) {
+    if (this.net) return this.updateNetTraffic(playerPos, onPass);
     const goal = this.track.goalDist;
     for (const c of this.traffic) {
       c.d += c.v * dt;

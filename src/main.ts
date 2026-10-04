@@ -6,6 +6,7 @@ import { Game } from './game';
 import { GFX } from './gfx';
 import { Hud } from './hud';
 import { Input } from './input';
+import { NameBox } from './nameui';
 import { miami } from './routes/miami';
 import { tokyo } from './routes/tokyo';
 import { TouchControls } from './touch';
@@ -46,6 +47,10 @@ async function boot() {
     input.tap(((e.clientX - r.left) / r.width) * 852, ((e.clientY - r.top) / r.height) * 480);
   });
   (window as unknown as { game: Game }).game = game;
+  // phones: show TAP prompts from the start (the name box swallows the first touch)
+  if (window.matchMedia?.('(pointer: coarse)').matches) game.touch = true;
+  game.nameBox = new NameBox(stage);
+  game.boot();
 
   const fit = () => {
     const s = Math.min(window.innerWidth / W, window.innerHeight / H) || 1;
@@ -58,7 +63,7 @@ async function boot() {
 
   let last = performance.now();
   const frame = (now: number) => {
-    const dt = Math.min(1 / 30, (now - last) / 1000);
+    const dt = Math.max(0, Math.min(1 / 30, (now - last) / 1000));
     last = now;
     const driving = (game.state === 'race' || game.state === 'countdown') && !game.paused;
     if (touch.update(driving) && driving) game.paused = true;

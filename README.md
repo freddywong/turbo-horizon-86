@@ -45,6 +45,31 @@ with flames from the exhausts; afterwards the car eases back to its normal top s
 The HUD lamps show how many you have left. In VS RIVALS every rival also has three and
 fires them on straights when they're fighting you for position.
 
+## Online multiplayer
+
+Race real people from the link **https://freddywong.github.io/turbo-horizon-86/#join**. It works on
+phones and computers, with no account and no sign-in.
+
+1. Open the link and type your name. You go straight into the **online lobby**.
+2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the car name / the car), and a route (R, or tap ROUTE).
+3. **Anyone** can press START. Everyone in the lobby (up to 8) gets a short countdown and lines up on
+   the same grid with the same traffic. Players who arrive while a race is running wait in the lobby
+   for the next one.
+4. Name tags show who's who, POS shows your place, and the results fill in as people finish. After
+   the race everyone goes back to the lobby.
+
+Use `#join=yourcode` (e.g. `.../#join=friday`) for a private lobby that only people with that link find.
+You can also pick ONLINE on the mode screen.
+
+How it works: there's no game server. Browsers find each other through free public Nostr relays
+(via the [Trystero](https://github.com/dmotz/trystero) library) and then talk directly over WebRTC.
+Most home and office Wi-Fi works. Some mobile-carrier and corporate networks block direct
+connections; such a player won't see the others, but can still race solo. Fixing that would need a
+TURN relay server. The claude.ai version of the game is single-player only.
+
+For testing several tabs in one browser without the internet, add `?net=local`
+(`http://localhost:5173/?net=local#join`).
+
 ## Damage
 
 The DAMAGE bar shows how much punishment your car can still take. It starts full every race and

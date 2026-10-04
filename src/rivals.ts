@@ -33,6 +33,8 @@ export interface Rival {
   bumpT: number;
   turbos: number; // boosts left
   turboT: number; // time left on the active boost
+  /** online: another human player, driven by their network updates instead of the AI */
+  remote?: { id: string; d: number; x: number; v: number; at: number; hp: number };
 }
 
 const KMH = 3.6;
@@ -62,6 +64,9 @@ export function makeGrid(playerCar: CarSpec, startPos: number, seed: number): Ri
 
 interface Body { d: number; x: number; v: number; len: number }
 
+/** Local wall clock in seconds, for timing network updates. */
+export const raceClock = () => performance.now() / 1000;
+
 /**
  * Arcade AI: drives the racing line, lifts for tight bends, swerves round anything
  * slower in its path and rubber-bands gently so the pack stays in view.
@@ -70,6 +75,20 @@ export function updateRivals(rivals: Rival[], dt: number, track: Track, traffic:
   player: { pos: number; px: number; speed: number }, raceTime: number, running: boolean) {
   const goal = track.goalDist;
   for (const r of rivals) {
+    if (r.remote) {
+      // extrapolate from the last update and ease towards it (updates arrive ~15 times a second)
+      const n = r.remote;
+      if (raceClock() - n.at > 3) n.v = 0; // they dropped out: the car rolls to a stop
+      const age = Math.min(1, raceClock() - n.at);
+      const td = n.d + n.v * age;
+      r.v = n.v;
+      r.d += r.v * dt;
+      r.d += (td - r.d) * Math.min(1, dt * 6);
+      if (Math.abs(td - r.d) > 30) r.d = td;
+      r.x += (n.x - r.x) * Math.min(1, dt * 8);
+      r.spin -= (r.v * dt) / 0.37;
+      continue;
+    }
     if (!running) {
       r.v = 0;
       continue;

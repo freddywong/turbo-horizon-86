@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@fontsource/press-start-2p": "^5.0.0",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "trystero": "^0.25.4"
   },
   "devDependencies": {
     "@types/three": "^0.170.0",

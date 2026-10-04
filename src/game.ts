@@ -3,13 +3,17 @@ import { Audio, TRACKS } from './audio';
 import { GFX, setGfx } from './gfx';
 import { CYAN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
 import { Input } from './input';
-import { ROAD_HALF, SEG } from './track';
+import { LANE_W, ROAD_HALF, SEG } from './track';
 import { ROSTER } from './cars/roster';
-import { fmtTime, makeGrid, ordinal, playerPosition, results, ResultRow, updateRivals } from './rivals';
+import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
+import { GoMsg, Net, roomFromHash, StMsg } from './net';
+import { NameBox } from './nameui';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 
-type State = 'attract' | 'select' | 'carselect' | 'countdown' | 'race' | 'goal' | 'over';
+type State = 'attract' | 'select' | 'carselect' | 'name' | 'lobby' | 'countdown' | 'race' | 'goal' | 'over';
+type Mode = 'arcade' | 'rivals' | 'online';
+const MODES: Mode[] = ['arcade', 'rivals', 'online'];
 
 const VMAX = 82; // reference top speed (~295 km/h) for camera / gearing
 const KMH = 3.6;
@@ -53,6 +57,20 @@ const loadMusic = (): number => {
 const saveMusic = (v: number) => {
   try {
     localStorage.setItem('th86-music', String(v));
+  } catch {
+    /* storage unavailable */
+  }
+};
+const loadName = (): string => {
+  try {
+    return localStorage.getItem('th86-name') ?? '';
+  } catch {
+    return '';
+  }
+};
+const saveName = (v: string) => {
+  try {
+    localStorage.setItem('th86-name', v);
   } catch {
     /* storage unavailable */
   }
@@ -110,7 +128,15 @@ export class Game {
   /** -1 = the route's own theme, otherwise an index into TRACKS. */
   musicIdx = loadMusic();
   /** ARCADE: classic time attack. RIVALS: an 8-car race against computer drivers. */
-  mode: 'arcade' | 'rivals' = 'arcade';
+  mode: Mode = 'arcade';
+  // online play
+  net: Net | null = null;
+  nameBox: NameBox | null = null;
+  playerName = loadName();
+  private pending: { go: GoMsg; at: number } | null = null;
+  private raceId = '';
+  private netSendT = 0;
+  private tableT = 0;
   raceTime = 0;
   /** turbo boosts left this race, and time left on the active one */
   turbos = 3;
@@ -225,10 +251,11 @@ export class Game {
         else if (tp.y >= 280 && tp.y < 310) act = 'quit';
       }
       if (act === 'resume') this.paused = false;
-      else if (act === 'restart') this.startRace();
-      else if (act === 'quit') { this.paused = false; this.toSelect(); }
+      else if (act === 'restart' && this.mode !== 'online') this.startRace();
+      else if (act === 'quit') { this.paused = false; if (this.mode === 'online') this.toLobby(); else this.toSelect(); }
       this.audio.engine(false, 0, 0);
       this.audio.skid(0);
+      this.netTick(dt);
       return;
     }
     this.t += dt;
@@ -267,12 +294,16 @@ export class Game {
             if (i === this.routeIdx) go = true;
             else pick = i;
           } else if (tp.y >= 320 && tp.y < 380) {
-            const m = tp.x < HUD_W / 2 ? 'arcade' : 'rivals';
-            if (m !== this.mode) toggle = true;
+            const m = MODES[Math.max(0, Math.min(2, Math.floor((tp.x - (HUD_W / 2 - 375)) / 250)))];
+            if (m !== this.mode) {
+              this.mode = m;
+              this.audio.blip();
+            }
           } else if (tp.y >= 380) go = true;
         }
         if (toggle) {
-          this.mode = this.mode === 'arcade' ? 'rivals' : 'arcade';
+          const dn = inp.hit('ArrowDown', 'KeyS') ? 1 : 2;
+          this.mode = MODES[(MODES.indexOf(this.mode) + dn) % 3];
           this.audio.blip();
         }
         if (pick >= 0) {
@@ -281,7 +312,11 @@ export class Game {
           this.resetPlayer(true);
         }
         if (inp.hit('Escape')) { this.go('attract'); this.audio.music('title'); }
-        else if (go) { this.audio.coin(); this.toCarSelect(); }
+        else if (go) {
+          this.audio.coin();
+          if (this.mode === 'online') this.toName();
+          else this.toCarSelect();
+        }
         break;
       }
       case 'carselect': {
@@ -314,13 +349,20 @@ export class Game {
           this.audio.coin();
           this.startRace();
         }
-        this.updateWorld(dt, { steer: 0, yaw: 0, spin: 0, bounce: 0 });
-        const a = this.t * 0.45 + 0.6;
-        const cam = this.camera;
-        cam.fov = 40;
-        cam.updateProjectionMatrix();
-        cam.position.set(this.px + Math.sin(a) * 7, 2.0, Math.cos(a) * 7);
-        cam.lookAt(this.px, 0.35, 0);
+        this.showroom(dt);
+        break;
+      }
+      case 'name': {
+        this.speed = 0;
+        if (inp.hit('Escape') && this.nameBox) {
+          this.nameBox.hide();
+          this.toSelect();
+        }
+        this.showroom(dt);
+        break;
+      }
+      case 'lobby': {
+        this.lobby(dt);
         break;
       }
       case 'countdown': {
@@ -338,7 +380,7 @@ export class Game {
           this.flash('GO!', '', 1.0);
         }
         if (inp.hit('Escape')) this.paused = true;
-        if (inp.hit('KeyR')) this.startRace();
+        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
       case 'race': {
@@ -361,7 +403,7 @@ export class Game {
         }
         if (this.pos >= this.world.track.goalDist) {
           this.bonusLeft = Math.max(0, this.timeLeft);
-          if (this.mode === 'rivals') {
+          if (this.mode !== 'arcade') {
             this.finishTime = this.raceTime;
             this.place = playerPosition(this.world.rivals, this.pos, this.finishTime);
             this.score += [1000000, 600000, 400000, 250000, 150000, 100000, 50000, 20000][this.place - 1];
@@ -372,14 +414,14 @@ export class Game {
           this.audio.music(null);
         } else if (this.timeLeft <= 0) {
           this.timeLeft = 0;
-          if (this.mode === 'rivals') this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name, Infinity, this.raceTime);
+          if (this.mode !== 'arcade') this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name, Infinity, this.raceTime);
           this.go('over');
           this.audio.sad();
           this.audio.music(null);
           this.saveScore();
         }
         if (inp.hit('Escape')) this.paused = true;
-        if (inp.hit('KeyR')) this.startRace();
+        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
       case 'goal': {
@@ -393,14 +435,14 @@ export class Game {
           if (Math.floor(this.t * 12) % 2 === 0) this.audio.blip();
           if (this.bonusLeft <= 0) this.saveScore();
         }
-        if (this.t > 3 && this.bonusLeft <= 0 && (inp.confirm || inp.taps.length || this.t > 14)) this.toSelect();
-        if (inp.hit('KeyR')) this.startRace();
+        if (this.t > 3 && this.bonusLeft <= 0 && (inp.confirm || inp.taps.length || this.t > 14)) this.afterRace();
+        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
       case 'over': {
         this.drive(dt, { accel: false, brake: this.t > 1, steer: 0, drift: false }, false);
-        if (this.t > 2.5 && (inp.confirm || inp.taps.length || this.t > 12)) this.toSelect();
-        if (inp.hit('KeyR')) this.startRace();
+        if (this.t > 2.5 && (inp.confirm || inp.taps.length || this.t > 12)) this.afterRace();
+        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
     }
@@ -413,12 +455,237 @@ export class Game {
         { pos: this.pos, px: this.px, speed: this.speed }, this.raceTime, running);
       if (this.state === 'race' || this.state === 'countdown') this.place = playerPosition(w.rivals, this.pos, -1);
     }
+    w.netTime = this.raceTime;
+    this.netTick(dt);
   }
 
   private saveScore() {
     if (this.score > this.hi) {
       this.hi = this.score;
       saveHi(this.hi);
+    }
+  }
+
+  /** Car parked on the start straight, camera circling it (car select, lobby). */
+  private showroom(dt: number) {
+    this.updateWorld(dt, { steer: 0, yaw: 0, spin: 0, bounce: 0 });
+    const a = this.t * 0.45 + 0.6;
+    const cam = this.camera;
+    cam.fov = 40;
+    cam.updateProjectionMatrix();
+    cam.position.set(this.px + Math.sin(a) * 7, 2.0, Math.cos(a) * 7);
+    cam.lookAt(this.px, 0.35, 0);
+  }
+
+  // ------------------------------------------------------------------ online
+  /** Deep link (#join): straight to the name box. */
+  boot() {
+    if (roomFromHash() !== null) {
+      this.mode = 'online';
+      this.toName();
+    }
+  }
+
+  private toName() {
+    this.mode = 'online';
+    this.go('name');
+    this.applyCar();
+    this.resetPlayer(false);
+    this.px = 0;
+    if (!this.nameBox) return this.joinLobby(this.playerName || 'PLAYER');
+    this.nameBox.show(this.playerName, (name) => {
+      this.input.fireFirst(); // the JOIN click unlocks audio
+      this.playerName = name;
+      saveName(name);
+      this.joinLobby(name);
+    });
+  }
+
+  private joinLobby(name: string) {
+    if (!this.net || this.net.status === 'error') {
+      this.net?.leave();
+      const local = new URLSearchParams(location.search).get('net') === 'local';
+      this.net = new Net(roomFromHash() ?? 'lobby', local);
+      this.net.onGo = (m) => this.acceptGo(m);
+      this.net.onSt = (m, from) => this.gotSt(m, from);
+    }
+    this.net.setMe({ name, car: this.carIdx, paint: this.paintIdx, status: 'lobby', raceId: '' });
+    this.toLobby();
+  }
+
+  private toLobby() {
+    this.paused = false;
+    this.pending = null;
+    this.raceId = '';
+    this.world.setRivals([]);
+    this.net?.setMe({ status: 'lobby', raceId: '' });
+    this.go('lobby');
+    this.applyCar();
+    this.resetPlayer(false);
+    this.px = 0;
+    this.audio.music(this.trackId());
+  }
+
+  private leaveOnline() {
+    this.net?.leave();
+    this.net = null;
+    this.pending = null;
+    this.mode = 'arcade';
+    this.toSelect();
+  }
+
+  /** After the results: online players go back to the lobby, everyone else to route select. */
+  private afterRace() {
+    if (this.mode === 'online' && this.net) this.toLobby();
+    else this.toSelect();
+  }
+
+  private lobby(dt: number) {
+    const inp = this.input, net = this.net;
+    this.speed = 0;
+    let dc = 0, dp = 0, route = false, start = inp.confirm;
+    if (inp.hit('ArrowLeft', 'KeyA')) dc = -1;
+    if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
+    if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
+    if (inp.hit('KeyR')) route = true;
+    let exit = inp.hit('Escape', 'KeyQ');
+    for (const tp of inp.taps) {
+      if (tp.y > 405 && Math.abs(tp.x - HUD_W / 2) < 150) start = true;
+      else if (tp.y > 405 && tp.x < HUD_W / 2 - 160) route = true;
+      else if (tp.y < 50 && tp.x < 150) exit = true;
+      else if (tp.y > 60 && tp.y < 135 && tp.x < HUD_W - 330) dc = 1;
+      else if (tp.y >= 135 && tp.y < 400 && tp.x < HUD_W - 330) dp = 1;
+    }
+    if (exit) return this.leaveOnline();
+    if (net?.status === 'error') {
+      if (start) this.joinLobby(this.playerName || 'PLAYER');
+      this.showroom(dt);
+      return;
+    }
+    const locked = !!this.pending;
+    if (!locked) {
+      if (dc) {
+        this.carIdx = (this.carIdx + dc + ROSTER.length) % ROSTER.length;
+        this.paintIdx = 0;
+      }
+      if (dp) this.paintIdx = (this.paintIdx + 1) % this.spec.paints.length;
+      if (dc || dp) {
+        this.audio.blip();
+        this.applyCar();
+        saveCar(this.carIdx, this.paintIdx);
+        net?.setMe({ car: this.carIdx, paint: this.paintIdx });
+      }
+      if (route) {
+        this.audio.blip();
+        this.setWorld(1 - this.routeIdx);
+        this.applyCar();
+        this.resetPlayer(false);
+        this.px = 0;
+        this.audio.music(this.trackId());
+      }
+      if (start && net?.status === 'online') this.startOnline();
+    }
+    if (this.pending && raceClock() >= this.pending.at) this.beginOnlineRace(this.pending.go);
+    this.showroom(dt);
+  }
+
+  /** Anyone may start: everyone in the lobby (up to 8) is put on the grid. */
+  private startOnline() {
+    const net = this.net!;
+    const others = net.list().filter((p) => p.status === 'lobby').slice(0, 7);
+    const go: GoMsg = {
+      raceId: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      route: this.routeIdx,
+      seed: Math.floor(Math.random() * 1e9),
+      players: [{ id: net.selfId, name: this.playerName || 'PLAYER', car: this.carIdx, paint: this.paintIdx },
+        ...others.map((p) => ({ id: p.id, name: p.name, car: p.car, paint: p.paint }))],
+    };
+    net.sendGo(go);
+    this.acceptGo(go);
+  }
+
+  private acceptGo(go: GoMsg) {
+    if (this.state !== 'lobby' || !this.net) return;
+    if (!go.players.some((p) => p.id === this.net!.selfId)) return; // joined after it was called
+    // two players pressing START at once: everyone keeps the lowest race id
+    if (this.pending && this.pending.go.raceId <= go.raceId) return;
+    this.pending = { go, at: raceClock() + 2 };
+    this.audio.coin();
+  }
+
+  private beginOnlineRace(go: GoMsg) {
+    const net = this.net!;
+    this.pending = null;
+    this.setWorld(go.route);
+    this.raceId = go.raceId;
+    this.startRace();
+    // grid: two abreast, in the starter's player order
+    const n = go.players.length, rows = Math.ceil(n / 2);
+    const slot = (i: number) => ({ d: 3 * SEG + (rows - 1 - Math.floor(i / 2)) * 9, x: (i % 2 ? 1 : -1) * LANE_W * 0.55 });
+    const rivals: Rival[] = [];
+    go.players.forEach((p, i) => {
+      const g = slot(i);
+      if (p.id === net.selfId) {
+        this.pos = g.d;
+        this.px = g.x;
+        return;
+      }
+      const spec = ROSTER[p.car % ROSTER.length];
+      rivals.push({
+        name: p.name, spec, paint: spec.paints[p.paint % spec.paints.length], d: g.d, x: g.x, v: 0, vmax: 0, corner: 0, aggro: 0,
+        lane: 0, steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0, turbos: 0, turboT: 0,
+        remote: { id: p.id, d: g.d, x: g.x, v: 0, at: raceClock(), hp: 100 },
+      });
+    });
+    this.world.setRivals(rivals);
+    this.world.setNetTraffic(go.seed, 3 * SEG);
+    this.place = n;
+    net.setMe({ status: 'race', raceId: go.raceId });
+  }
+
+  private gotSt(m: StMsg, from: string) {
+    if (!this.raceId || m.r !== this.raceId) return;
+    const i = this.world.rivals.findIndex((r) => r.remote?.id === from);
+    if (i < 0) return;
+    const r = this.world.rivals[i], n = r.remote!;
+    n.d = m.d;
+    n.x = m.x;
+    n.v = m.v;
+    n.at = raceClock();
+    r.steer = m.steer;
+    r.braking = m.br;
+    r.turboT = m.tb ? 1 : 0;
+    if (m.hp < n.hp - 0.5) {
+      // their crash: dent their car on our screen too
+      this.world.rivalHit(i, Math.min(1, (n.hp - m.hp) / 25));
+      n.hp = m.hp;
+    }
+    if (m.fin >= 0 && r.finished < 0) r.finished = m.fin;
+  }
+
+  /** Online bookkeeping every frame: heartbeat, our position at ~15 Hz, live results. */
+  private netTick(dt: number) {
+    const net = this.net;
+    if (!net) return;
+    net.update(dt);
+    if (this.mode !== 'online' || !this.raceId || !['countdown', 'race', 'goal', 'over'].includes(this.state)) return;
+    this.netSendT -= dt;
+    if (this.netSendT <= 0) {
+      this.netSendT = 1 / 15;
+      net.sendSt({
+        r: this.raceId, d: this.pos, x: this.px, v: this.speed, steer: this.steer, br: this.input.brake && this.speed > 1,
+        tb: this.turboT > 0, hp: this.hp, fin: this.finishTime,
+      });
+    }
+    // results fill in as the others cross the line
+    if (this.table.length && (this.state === 'goal' || this.state === 'over')) {
+      this.tableT -= dt;
+      if (this.tableT <= 0) {
+        this.tableT = 1;
+        this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name,
+          this.finishTime >= 0 ? this.finishTime : Infinity, this.raceTime);
+        this.place = this.table.find((r) => r.player)?.pos ?? this.place;
+      }
     }
   }
 
@@ -665,7 +932,7 @@ export class Game {
     this.turboT = 0;
     this.audio.crash(true);
     this.audio.pop();
-    if (this.mode === 'rivals') this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name, Infinity, this.raceTime);
+    if (this.mode !== 'arcade') this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name, Infinity, this.raceTime);
     this.go('over');
     this.audio.sad();
     this.audio.music(null);
@@ -759,13 +1026,13 @@ export class Game {
         });
         h.text(this.touch ? 'TAP A ROUTE, TAP AGAIN TO GO' : '< >  ROUTE   ^ v  MODE   ENTER  NEXT', HUD_W / 2, 290, 16, WHITE, 'center');
         // mode boxes
-        const modes: ['arcade' | 'rivals', string, string][] = [['arcade', 'ARCADE', 'BEAT THE CLOCK'], ['rivals', 'VS RIVALS', '8-CAR RACE']];
+        const modes: [Mode, string, string][] = [['arcade', 'ARCADE', 'BEAT THE CLOCK'], ['rivals', 'VS RIVALS', '8-CAR RACE'], ['online', 'ONLINE', 'RACE REAL PLAYERS']];
         modes.forEach(([m, label, sub], i) => {
-          const x = i === 0 ? HUD_W / 2 - bw - 20 : HUD_W / 2 + 20;
+          const mw = 236, x = HUD_W / 2 - 375 + i * 250 + 7;
           const sel = m === this.mode;
-          h.box(x, 324, bw, 54, sel ? 0x2a1a50 : 0x141428, sel ? (blink ? PINK : WHITE) : 0x3a3a5a, sel ? 5 : 3);
-          h.text(label, x + bw / 2, 334, 16, sel ? YELLOW : 0x8a8aa8, 'center');
-          h.text(sub, x + bw / 2, 356, 8, sel ? WHITE : 0x8a8aa8, 'center');
+          h.box(x, 324, mw, 54, sel ? 0x2a1a50 : 0x141428, sel ? (blink ? PINK : WHITE) : 0x3a3a5a, sel ? 5 : 3);
+          h.text(label, x + mw / 2, 334, 16, sel ? YELLOW : 0x8a8aa8, 'center');
+          h.text(sub, x + mw / 2, 356, 8, sel ? WHITE : 0x8a8aa8, 'center');
         });
         h.text(`${Math.max(0, Math.ceil(20 - this.t))}`, HUD_W / 2, 92, 32, ORANGE, 'center');
         break;
@@ -797,8 +1064,17 @@ export class Game {
         h.text(this.touch ? 'TAP TO RACE' : 'ENTER  RACE', HUD_W / 2, 427, 16, WHITE, 'center');
         break;
       }
+      case 'name': {
+        h.text('ONLINE  RACE', HUD_W / 2, 20, 24, YELLOW, 'center');
+        break;
+      }
+      case 'lobby': {
+        this.lobbyHud(blink);
+        break;
+      }
       default: {
         this.raceHud(blink);
+        if (this.mode === 'online') this.nameTags();
         if (this.state === 'countdown') {
           const n = 3 - Math.floor(this.t);
           if (n > 0) h.text(String(n), HUD_W / 2, 180, 64, n === 1 ? RED : YELLOW, 'center');
@@ -806,7 +1082,7 @@ export class Game {
         }
         if (this.table.length && (this.state === 'goal' ? this.t > 2.5 : this.t > 2.5)) {
           this.resultsTable(blink);
-        } else if (this.state === 'goal' && this.mode === 'rivals') {
+        } else if (this.state === 'goal' && this.mode !== 'arcade') {
           h.text(this.place === 1 ? 'YOU WIN!' : `${ordinal(this.place)} PLACE`, HUD_W / 2, 150, 64, this.place === 1 ? YELLOW : CYAN, 'center');
           h.text(fmtTime(this.finishTime), HUD_W / 2, 240, 24, WHITE, 'center');
         } else if (this.state === 'goal') {
@@ -845,6 +1121,70 @@ export class Game {
     }
   }
 
+  /** The online waiting room: who's here, your car, the route and START. */
+  private lobbyHud(blink: boolean) {
+    const h = this.hud, net = this.net, s = this.spec;
+    h.text('ONLINE  LOBBY', HUD_W / 2, 14, 24, YELLOW, 'center');
+    h.text(this.touch ? '< EXIT' : 'ESC EXIT', 20, 18, 16, 0x8a8aa8);
+    const others = net?.list() ?? [];
+    const status = !net || net.status === 'connecting' ? 'CONNECTING...'
+      : net.status === 'error' ? "COULDN'T CONNECT" : others.length ? `${others.length + 1} PLAYERS HERE` : 'WAITING FOR PLAYERS...';
+    h.text(status, HUD_W / 2, 46, 16, net?.status === 'error' ? RED : CYAN, 'center');
+    // your car
+    h.text(s.make, 40, 76, 16, CYAN);
+    h.text(s.name, 40, 98, 24, WHITE);
+    h.text(this.touch ? 'TAP NAME: CAR   TAP CAR: COLOUR' : '< > CAR   ^ v COLOUR', 40, 130, 8, 0x8a8aa8);
+    // player list
+    const lx = HUD_W - 320, ly = 70;
+    h.box(lx, ly, 300, 40 + Math.min(8, others.length + 1) * 34 + (others.length > 7 ? 16 : 0), 0x101030, 0x3a3a5a, 3);
+    h.text('PLAYERS', lx + 14, ly + 12, 16, YELLOW);
+    const rows = [{ name: this.playerName || 'PLAYER', car: s.name, st: 'YOU', me: true },
+      ...others.map((p) => ({ name: p.name, car: ROSTER[p.car % ROSTER.length].name, st: p.status === 'race' ? 'RACING' : 'READY', me: false }))];
+    rows.slice(0, 8).forEach((r, i) => {
+      const y = ly + 40 + i * 34;
+      h.text(r.name, lx + 14, y, 16, r.me ? YELLOW : WHITE);
+      h.text(r.st, lx + 286, y + 4, 8, r.st === 'RACING' ? ORANGE : r.me ? YELLOW : 0x40e040, 'right');
+      h.text(r.car, lx + 14, y + 19, 8, 0x8a8aa8);
+    });
+    if (rows.length > 8) h.text(`+${rows.length - 8} MORE`, lx + 14, ly + 40 + 8 * 34, 8, WHITE);
+    // route + start
+    const route = this.world.route;
+    h.box(20, 410, 250, 50, 0x141428, WHITE, 3);
+    h.text(`${this.touch ? 'TAP' : 'R'}  ROUTE`, 145, 418, 8, 0x8a8aa8, 'center');
+    h.text(`${route.lines[0]} ${route.lines[1]}`.slice(0, 15), 145, 434, 16, YELLOW, 'center');
+    if (net?.status === 'error') {
+      h.text('CHECK YOUR CONNECTION, OR PLAY ONLINE AT', HUD_W / 2, 320, 8, WHITE, 'center');
+      h.text('FREDDYWONG.GITHUB.IO/TURBO-HORIZON-86', HUD_W / 2, 340, 16, CYAN, 'center');
+      h.box(HUD_W / 2 - 150, 410, 300, 50, 0x1a5ab8, blink ? YELLOW : WHITE);
+      h.text(this.touch ? 'TAP TO RETRY' : 'ENTER  RETRY', HUD_W / 2, 427, 16, WHITE, 'center');
+      return;
+    }
+    if (this.pending) {
+      const n = Math.max(1, Math.ceil(this.pending.at - raceClock()));
+      h.text('STARTING IN', HUD_W / 2, 170, 24, CYAN, 'center');
+      h.text(String(n), HUD_W / 2, 206, 64, YELLOW, 'center');
+      const rt = this.worlds[this.pending.go.route].route;
+      h.text(`${rt.lines[0]} ${rt.lines[1]}`, HUD_W / 2, 284, 16, WHITE, 'center');
+      return;
+    }
+    if (others.some((p) => p.status === 'race')) h.text('RACE IN PROGRESS - JOIN THE NEXT ONE', HUD_W / 2, 386, 8, ORANGE, 'center');
+    else if (!others.length) h.text('SHARE THIS PAGE LINK TO INVITE PLAYERS', HUD_W / 2, 386, 8, WHITE, 'center');
+    const ready = net?.status === 'online';
+    h.box(HUD_W / 2 - 150, 410, 300, 50, ready ? 0x1a8a3a : 0x202030, ready && blink ? YELLOW : WHITE);
+    h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, 427, 16, ready ? WHITE : 0x8a8aa8, 'center');
+  }
+
+  /** Online: name tags over the other players' cars. */
+  private nameTags() {
+    const h = this.hud;
+    this.world.rivals.forEach((r, i) => {
+      const p = this.world.rivalScreenPos(i, this.camera, HUD_W, HUD_H);
+      if (!p || p.dist > 140) return;
+      const size = p.dist < 45 ? 16 : 8;
+      h.text(r.name, p.x, p.y - size, size, r.finished >= 0 ? YELLOW : WHITE, 'center');
+    });
+  }
+
   /** Final classification after a race against the rivals. */
   private resultsTable(blink: boolean) {
     const h = this.hud;
@@ -877,20 +1217,20 @@ export class Game {
     h.text(`STAGE ${Math.min(this.stage + 1, route.stageNames.length)}`, HUD_W - 20, 16, 16, YELLOW, 'right');
     const km = Math.max(0, (this.pos - 3 * SEG) / 1000);
     h.text(`${km.toFixed(1)}KM`, HUD_W - 20, 38, 16, WHITE, 'right');
-    if (this.mode === 'rivals' && this.world.rivals.length && this.state === 'race') {
+    if (this.mode !== 'arcade' && this.world.rivals.length && this.state === 'race') {
       // live race position, in the gap under the timer
       // on phones the course bar sits under the timer, so the position goes under the speed gauge
       const p = ordinal(this.place);
       const px = this.touch ? 84 : HUD_W / 2 - 52, py = this.touch ? 222 : 90;
       h.text('POS', px - 12, py + 8, 16, YELLOW, 'right');
       h.text(p, px, py, 32, this.place === 1 ? YELLOW : WHITE);
-      h.text('/8', px + p.length * 32 + 4, py + 16, 16, WHITE);
+      h.text(`/${this.world.rivals.length + 1}`, px + p.length * 32 + 4, py + 16, 16, WHITE);
     }
 
     // damage bar: the car's remaining condition, green -> yellow -> red, blinking when critical
     {
       const n = 10, sw = 15;
-      const bx = this.touch ? 20 : HUD_W - 20 - n * (sw + 2), by = this.touch ? (this.mode === 'rivals' ? 270 : 236) : 64;
+      const bx = this.touch ? 20 : HUD_W - 20 - n * (sw + 2), by = this.touch ? (this.mode !== 'arcade' ? 270 : 236) : 64;
       const col = this.hp > 60 ? 0x40e040 : this.hp > 30 ? YELLOW : RED;
       const crit = this.hp < 25 && this.state === 'race';
       h.text('DAMAGE', bx, by, 16, crit && blink ? RED : YELLOW);
