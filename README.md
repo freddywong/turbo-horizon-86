@@ -8,7 +8,6 @@ and nothing is downloaded at runtime. All audio is synthesised with Web Audio.
 ## Run
 
 ```bash
-cd arcade-racer
 npm install
 npm run dev      # then open the printed URL
 npm run build    # type-check + production build into dist/
