@@ -23,6 +23,8 @@ const MODE_X = 39, MODE_STEP = 262, MODE_W = 250, MODE_Y = 330, MODE_H = 46, GO_
 /** Online lobby left panel: positions shared by the drawing and the tap zones. */
 const LOBBY = { x0: 28, x1: 378, mid: 203, carY: 72, carH: 46, paintY: 122, turbY: 142, weapY: 166, ammoY: 190, chipH: 20, minusX: 190, plusX: 284 };
 const GREY = 0x8a8aa8;
+/** Car select: side arrows, the two bottom panels and the RACE button. */
+const CSEL = { arrowX: 14, arrowY: 170, arrowW: 46, arrowH: 84, lx: 20, py: 296, ph: 98, paintY: 306, swX: 106, turbY: 330, weapY: 352, ammoY: 374, minusX: 146, plusX: 234, goY: 410 };
 
 const VMAX = 82; // reference top speed (~295 km/h) for camera / gearing
 const KMH = 3.6;
@@ -383,23 +385,39 @@ export class Game {
       case 'carselect': {
         // parked on the start straight, camera circles the car
         this.speed = 0;
-        let dc = 0, dp = 0, go = inp.confirm || this.t > 25;
+        let dc = 0, dp = 0, go = inp.confirm || this.t > 25, back = false;
         if (inp.hit('ArrowLeft', 'KeyA')) dc = -1;
         if (inp.hit('ArrowRight', 'KeyD')) dc = 1;
         if (inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS')) dp = 1;
         if (inp.hit('KeyT')) this.cycleTurbos();
         if (inp.hit('KeyV') && this.mode === 'rivals') this.toggleWeapons();
         if (inp.hit('KeyB') && this.mode === 'rivals') this.cycleAmmo();
+        let paint = -1;
+        const C = CSEL, rx = HUD_W - C.lx - 300;
         for (const tp of inp.taps) {
-          if (tp.y > 150 && tp.y < 186) {
-            if (this.mode !== 'rivals' || tp.x < HUD_W * 0.33) this.cycleTurbos();
-            else if (tp.x < HUD_W * 0.66) this.toggleWeapons();
-            else this.cycleAmmo();
-          } else if (tp.y > 370 && tp.y < 405 && tp.x > HUD_W / 2) this.nextTrack();
-          else if (tp.y > 405 && tp.x > HUD_W / 2 - 150 && tp.x < HUD_W / 2 + 150) go = true;
-          else if (tp.x < 160) dc = -1;
-          else if (tp.x > HUD_W - 160) dc = 1;
-          else dp = 1;
+          const row = (y: number) => tp.y >= y - 3 && tp.y < y + LOBBY.chipH + 3;
+          const at = (x0: number, w: number) => tp.x >= rx + x0 - 4 && tp.x < rx + x0 + w + 4;
+          if (tp.y < 44 && tp.x < 150) back = true;
+          else if (tp.y >= C.goY - 4 && Math.abs(tp.x - HUD_W / 2) < 134) go = true;
+          else if (tp.y >= C.goY - 4 && tp.x < HUD_W / 2 - 134) this.nextTrack();
+          else if (tp.y >= C.goY - 4) dc = 1;
+          else if (tp.x >= rx && tp.y >= C.py && tp.y < C.py + C.ph) {
+            const np = this.spec.paints.length;
+            if (row(C.paintY) && tp.x >= rx + C.swX - 3 && tp.x < rx + C.swX + np * 24) paint = Math.floor((tp.x - rx - C.swX + 3) / 24);
+            else if (row(C.turbY) && at(C.minusX, 28)) this.cycleTurbos(-1);
+            else if (row(C.turbY) && at(C.plusX, 28)) this.cycleTurbos(1);
+            else if (this.mode === 'rivals' && row(C.weapY) && at(C.minusX, C.plusX + 28 - C.minusX)) this.toggleWeapons();
+            else if (this.mode === 'rivals' && row(C.ammoY) && at(C.minusX, 28)) this.cycleAmmo(-1);
+            else if (this.mode === 'rivals' && row(C.ammoY) && at(C.plusX, 28)) this.cycleAmmo(1);
+          } else if (tp.y >= C.py) { /* performance panel: nothing to tap */ }
+          else if (tp.x < C.arrowX + C.arrowW + 50) dc = -1;
+          else if (tp.x > HUD_W - C.arrowX - C.arrowW - 50) dc = 1;
+          else if (tp.y > 150) dp = 1;
+        }
+        if (paint >= 0 && paint < this.spec.paints.length && paint !== this.paintIdx) {
+          this.paintIdx = paint;
+          this.audio.blip();
+          this.applyCar();
         }
         if (dc) {
           this.carIdx = (this.carIdx + dc + ROSTER.length) % ROSTER.length;
@@ -411,7 +429,7 @@ export class Game {
           this.audio.blip();
         }
         if (dc || dp) this.applyCar();
-        if (inp.hit('Escape')) this.toSelect();
+        if (inp.hit('Escape') || back) this.toSelect();
         else if (go) {
           saveCar(this.carIdx, this.paintIdx);
           this.audio.coin();
@@ -554,12 +572,6 @@ export class Game {
     saveNum('th86-ammo', this.ammoCount);
     this.audio.blip();
   }
-  /** One-line summary of the race settings. */
-  private settingsLine(weapons: boolean) {
-    const k = (key: string) => (this.touch ? '' : `${key} `);
-    return `${k('T')}TURBOS ${this.turboCount}${weapons ? `  ${k('V')}WEAPONS ${this.weaponsSetting ? 'ON' : 'OFF'}  ${k('B')}AMMO ${this.ammoCount}` : ''}`;
-  }
-
   /** Car parked on the start straight, camera circling it (car select, lobby). */
   private showroom(dt: number) {
     this.updateWorld(dt, { steer: 0, yaw: 0, spin: 0, bounce: 0 });
@@ -1374,31 +1386,76 @@ export class Game {
         break;
       }
       case 'carselect': {
-        const s = this.spec;
-        h.text('SELECT  YOUR  CAR', HUD_W / 2, 20, 24, YELLOW, 'center');
-        h.text(`${Math.max(0, Math.ceil(25 - this.t))}`, HUD_W - 30, 20, 24, ORANGE, 'right');
-        h.text(s.make, HUD_W / 2, 64, 16, CYAN, 'center');
-        h.text(s.name, HUD_W / 2, 88, 32, WHITE, 'center');
-        h.text(`${s.year}  ${s.group}`, HUD_W / 2, 130, 16, PINK, 'center');
-        h.text(this.settingsLine(this.mode === 'rivals'), HUD_W / 2, 160, 16, YELLOW, 'center');
-        // big arrows
-        h.text('<', 40, 210, 48, blink ? YELLOW : WHITE, 'center');
-        h.text('>', HUD_W - 40, 210, 48, blink ? YELLOW : WHITE, 'center');
-        // stat bars
-        const bars: [string, number][] = [
-          ['SPEED', (s.stats.vmax - 260) / 90], ['ACCEL', (s.stats.accel - 0.85) / 0.3], ['GRIP', (s.stats.grip - 0.82) / 0.38],
+        const s = this.spec, C = CSEL, kb = !this.touch;
+        h.text(this.touch ? '< BACK' : 'ESC BACK', 20, 14, 16, GREY);
+        h.text('SELECT  YOUR  CAR', HUD_W / 2, 12, 24, YELLOW, 'center');
+        h.text(`${Math.max(0, Math.ceil(25 - this.t))}`, HUD_W - 30, 12, 24, ORANGE, 'right');
+        // name plate
+        h.text(s.make, HUD_W / 2, 46, 16, CYAN, 'center');
+        h.text(s.name, HUD_W / 2, 66, s.name.length > 14 ? 24 : 32, WHITE, 'center');
+        const tag = `${s.year}  ${s.group}`, tw = tag.length * 8 + 20;
+        h.box(HUD_W / 2 - tw / 2, 104, tw, 18, 0x2a1a50, PINK, 1);
+        h.text(tag, HUD_W / 2, 109, 8, PINK, 'center');
+        // where you are in the line-up
+        const n = ROSTER.length, px0 = HUD_W / 2 - (n * 16) / 2;
+        for (let i = 0; i < n; i++) h.rect(px0 + i * 16 + (i === this.carIdx ? 0 : 3), 130 + (i === this.carIdx ? 0 : 3), i === this.carIdx ? 12 : 6, i === this.carIdx ? 12 : 6, i === this.carIdx ? YELLOW : 0x5a5a8a);
+        // side arrows
+        h.chip(C.arrowX, C.arrowY, C.arrowW, C.arrowH, '←', blink ? YELLOW : WHITE, 8, 0x141428);
+        h.chip(HUD_W - C.arrowX - C.arrowW, C.arrowY, C.arrowW, C.arrowH, '→', blink ? YELLOW : WHITE, 8, 0x141428);
+        if (kb) {
+          h.text('PREV', C.arrowX + C.arrowW / 2, C.arrowY + C.arrowH + 6, 8, GREY, 'center');
+          h.text('NEXT', HUD_W - C.arrowX - C.arrowW / 2, C.arrowY + C.arrowH + 6, 8, GREY, 'center');
+        }
+        // performance
+        h.shade(C.lx, C.py, 300, C.ph, 0.68);
+        h.text('PERFORMANCE', C.lx + 12, C.py + 8, 8, YELLOW);
+        const bars: [string, number, number, string][] = [
+          ['SPEED', (s.stats.vmax - 260) / 90, RED, `${s.stats.vmax}KM/H`],
+          ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE, ''],
+          ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN, ''],
         ];
-        bars.forEach(([label, v], i) => {
-          const y = 330 + i * 22;
-          h.text(label, 40, y, 16, YELLOW);
-          for (let k = 0; k < 12; k++) h.rect(150 + k * 14, y, 11, 16, k < Math.round(Math.max(0.1, Math.min(1, v)) * 12) ? (i === 0 ? RED : i === 1 ? ORANGE : 0x40e040) : 0x202040);
+        bars.forEach(([label, v, c, note], i) => {
+          const y = C.py + 26 + i * 22;
+          h.text(label, C.lx + 12, y + 2, 8, WHITE);
+          const lit = Math.round(Math.max(0.1, Math.min(1, v)) * 12);
+          for (let k = 0; k < 12; k++) h.rect(C.lx + 64 + k * 12, y, 10, 12, k < lit ? c : 0x202040);
+          if (note) h.text(note, C.lx + 288, y + 2, 8, WHITE, 'right');
         });
-        h.text(`${s.stats.vmax} KM/H`, 340, 330, 16, WHITE);
-        h.text(`CAR ${this.carIdx + 1}/${ROSTER.length}`, HUD_W - 30, 330, 16, WHITE, 'right');
-        h.text(this.touch ? 'TAP CAR: COLOUR' : '^ v  COLOUR', HUD_W - 30, 356, 16, CYAN, 'right');
-        h.text(`${this.touch ? 'TAP' : 'N'}  MUSIC: ${this.musicLabel()}`, HUD_W - 30, 382, 16, PINK, 'right');
-        h.box(HUD_W / 2 - 150, 410, 300, 50, 0x1a5ab8, blink ? YELLOW : WHITE);
-        h.text(this.touch ? 'TAP TO RACE' : 'ENTER  RACE', HUD_W / 2, 427, 16, WHITE, 'center');
+        // paint + race settings
+        const rx = HUD_W - C.lx - 300;
+        h.shade(rx, C.py, 300, C.ph, 0.68);
+        h.text('PAINT', rx + 12, C.paintY + 3, 16, WHITE);
+        const np = s.paints.length;
+        s.paints.forEach((c, i) => {
+          const on = i === this.paintIdx % np, x = rx + C.swX + i * 24;
+          h.rect(x - 2, C.paintY - 2, 22, 20, on ? YELLOW : 0x3a3a5a);
+          h.rect(x, C.paintY, 18, 16, c);
+        });
+        if (kb) {
+          h.keycap(rx + 300 - 46, C.paintY, '↑');
+          h.keycap(rx + 300 - 28, C.paintY, '↓');
+        }
+        const row = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) =>
+          this.settingRow(rx + 12, y, rx + C.minusX, rx + C.plusX, kb ? rx + 300 - 34 : -1, label, val, on, key, toggle);
+        row(C.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
+        if (this.mode === 'rivals') {
+          row(C.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
+          row(C.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
+        }
+        // music, race
+        h.note(C.lx + 10, C.goY + 21, PINK);
+        h.text(this.musicLabel(), C.lx + 24, C.goY + 12, 8, PINK);
+        if (kb) {
+          h.keycap(C.lx + 24, C.goY + 26, 'N');
+          h.text('CHANGE SONG', C.lx + 46, C.goY + 30, 8, GREY);
+        } else h.text('TAP TO CHANGE', C.lx + 24, C.goY + 28, 8, GREY);
+        h.box(HUD_W / 2 - 130, C.goY, 260, 48, 0x1a8a3a, blink ? YELLOW : WHITE);
+        h.text(this.touch ? 'TAP TO RACE' : 'ENTER  RACE', HUD_W / 2, C.goY + 16, 16, WHITE, 'center');
+        h.text(this.touch ? 'TAP THE CAR: NEXT PAINT' : 'CAR', HUD_W - C.lx, C.goY + 18, 8, GREY, 'right');
+        if (kb) {
+          h.keycap(HUD_W - C.lx - 70, C.goY + 14, '←', 18);
+          h.keycap(HUD_W - C.lx - 49, C.goY + 14, '→', 18);
+        }
         break;
       }
       case 'name': {
@@ -1492,16 +1549,8 @@ export class Game {
       h.keycap(L.x1 - 26, L.paintY - 2, '↓');
     }
     // race settings: < value > chips, with the key that changes each
-    const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) => {
-      h.text(label, L.x0 + 12, y + 3, 16, on ? YELLOW : GREY);
-      if (toggle) h.chip(L.minusX, y, L.plusX + 28 - L.minusX, L.chipH, val, on ? ORANGE : GREY, 16, on ? 0x5a2a10 : 0x1a1a3a);
-      else {
-        h.chip(L.minusX, y, 28, L.chipH, '←', on ? CYAN : GREY);
-        h.text(val, (L.minusX + L.plusX + 28) / 2, y + 3, 16, on ? WHITE : GREY, 'center');
-        h.chip(L.plusX, y, 28, L.chipH, '→', on ? CYAN : GREY);
-      }
-      if (kb) h.keycap(L.x1 - 34, y + 1, key, 18);
-    };
+    const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) =>
+      this.settingRow(L.x0 + 12, y, L.minusX, L.plusX, kb ? L.x1 - 34 : -1, label, val, on, key, toggle);
     setting(L.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
     setting(L.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
     setting(L.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
@@ -1562,6 +1611,19 @@ export class Game {
     const ready = net?.status === 'online';
     h.box(HUD_W / 2 - 150, 410, 300, 50, ready ? 0x1a8a3a : 0x202030, ready && blink ? YELLOW : WHITE);
     h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, 427, 16, ready ? WHITE : 0x8a8aa8, 'center');
+  }
+
+  /** A race-setting row: label, then < value > chips (or one ON/OFF chip), then the key that changes it. */
+  private settingRow(x: number, y: number, minusX: number, plusX: number, keyX: number, label: string, val: string, on: boolean, key: string, toggle: boolean) {
+    const h = this.hud, H = LOBBY.chipH;
+    h.text(label, x, y + 3, 16, on ? YELLOW : GREY);
+    if (toggle) h.chip(minusX, y, plusX + 28 - minusX, H, val, on ? ORANGE : GREY, 16, on ? 0x5a2a10 : 0x1a1a3a);
+    else {
+      h.chip(minusX, y, 28, H, '←', on ? CYAN : GREY);
+      h.text(val, (minusX + plusX + 28) / 2, y + 3, 16, on ? WHITE : GREY, 'center');
+      h.chip(plusX, y, 28, H, '→', on ? CYAN : GREY);
+    }
+    if (keyX >= 0) h.keycap(keyX, y + 1, key, 18);
   }
 
   /** Desktop: two columns of keycaps, each action in its touch button's colour. */

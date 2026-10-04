@@ -9,7 +9,7 @@ const pair = (x: number, y: number, r: number) => [{ x, y, r }, { x: -x, y, r }]
 export const ROSTER: CarSpec[] = [
   {
     id: 'testarossa',
-    rimStyle: 'star', trim: 0xb89068, arch: 0.04, front: 'popup', make: 'FERRARI', name: 'TESTAROSSA', year: 1984, group: '80s EXOTIC',
+    rimStyle: 'star', trim: 0xb89068, arch: 0.04, front: 'popup', make: 'FERRARI', name: 'TESTAROSSA', nose: 'bar', year: 1984, group: '80s EXOTIC',
     paints: [0xd8141c, 0xf2f2ee, 0xffd418],
     stations: [
       S(-2.24, 0.88, 0.3, 0.5, 0.56, 0.8, 'p'), S(-1.7, 0.93, 0.24, 0.62, 0.68, 0.86, 'p'), S(-0.85, 0.96, 0.22, 0.74, 0.8, 0.8, 'ws'),
@@ -27,7 +27,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'countach',
-    rimStyle: 'dial', trim: 0xa07850, arch: 0.07, front: 'popup', make: 'LAMBORGHINI', name: 'COUNTACH QV', year: 1985, group: '80s EXOTIC',
+    rimStyle: 'dial', trim: 0xa07850, arch: 0.07, front: 'popup', make: 'LAMBORGHINI', name: 'COUNTACH QV', nose: 'lip', year: 1985, group: '80s EXOTIC',
     paints: [0xf4f4ee, 0xd81818, 0xffd418],
     stations: [
       S(-2.07, 0.86, 0.28, 0.4, 0.44, 0.76, 'p'), S(-1.3, 0.92, 0.24, 0.56, 0.62, 0.84, 'p'), S(-0.75, 0.95, 0.22, 0.66, 0.72, 0.84, 'ws'),
@@ -45,7 +45,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'f40',
-    rimStyle: 'star', trim: 0x8a1814, arch: 0.05, front: 'popup', make: 'FERRARI', name: 'F40', year: 1987, group: '80s EXOTIC',
+    rimStyle: 'star', trim: 0x8a1814, arch: 0.05, front: 'popup', make: 'FERRARI', name: 'F40', nose: 'slots', year: 1987, group: '80s EXOTIC',
     paints: [0xe01818, 0xffd418, 0xf2f2ee],
     stations: [
       S(-2.18, 0.9, 0.27, 0.46, 0.5, 0.8, 'p'), S(-1.5, 0.95, 0.22, 0.6, 0.66, 0.88, 'p'), S(-0.8, 0.97, 0.22, 0.7, 0.76, 0.82, 'ws'),
@@ -63,7 +63,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: '959',
-    rimStyle: 'six', trim: 0x3a3a40, front: 'round', make: 'PORSCHE', name: '959', year: 1986, group: '80s EXOTIC',
+    rimStyle: 'six', trim: 0x3a3a40, front: 'round', make: 'PORSCHE', name: '959', nose: 'twin', year: 1986, group: '80s EXOTIC',
     paints: [0xc8ccd4, 0xf2f2ee, 0xd81818],
     stations: [
       S(-2.13, 0.84, 0.3, 0.5, 0.56, 0.74, 'p'), S(-1.6, 0.9, 0.26, 0.62, 0.7, 0.8, 'p'), S(-0.75, 0.92, 0.25, 0.76, 0.84, 0.72, 'ws'),
@@ -80,7 +80,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'r32',
-    rimStyle: 'six', trim: 0x2a2a30, arch: 0.045, front: 'rect', make: 'NISSAN', name: 'SKYLINE GT-R R32', year: 1989, group: '90s JAPAN',
+    rimStyle: 'six', trim: 0x2a2a30, arch: 0.045, front: 'rect', make: 'NISSAN', name: 'SKYLINE GT-R R32', nose: 'grille', year: 1989, group: '90s JAPAN',
     paints: [0x5a6470, 0xf2f2ee, 0xb81818],
     stations: [
       S(-2.27, 0.82, 0.32, 0.6, 0.66, 0.76, 'p'), S(-1.9, 0.86, 0.3, 0.72, 0.78, 0.8, 'p'), S(-0.55, 0.87, 0.3, 0.8, 0.84, 0.8, 'ws'),
@@ -97,7 +97,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'supra',
-    rimStyle: 'star', trim: 0x3a3a3c, front: 'rect', make: 'TOYOTA', name: 'SUPRA RZ', year: 1993, group: '90s JAPAN',
+    rimStyle: 'star', trim: 0x3a3a3c, front: 'rect', make: 'TOYOTA', name: 'SUPRA RZ', nose: 'mouth', year: 1993, group: '90s JAPAN',
     paints: [0xff6a10, 0xf2f2ee, 0xd81818],
     stations: [
       S(-2.26, 0.84, 0.3, 0.54, 0.6, 0.78, 'p'), S(-1.8, 0.89, 0.27, 0.66, 0.72, 0.84, 'p'), S(-0.5, 0.9, 0.27, 0.76, 0.8, 0.8, 'ws'),
@@ -114,7 +114,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'rx7',
-    rimStyle: 'multi', trim: 0x2a2a2e, front: 'popup', make: 'MAZDA', name: 'RX-7', year: 1992, group: '90s JAPAN',
+    rimStyle: 'multi', trim: 0x2a2a2e, front: 'popup', make: 'MAZDA', name: 'RX-7', nose: 'mouth', year: 1992, group: '90s JAPAN',
     paints: [0xffd418, 0xd81818, 0x2a8a5a],
     stations: [
       S(-2.15, 0.84, 0.3, 0.5, 0.56, 0.76, 'p'), S(-1.6, 0.88, 0.26, 0.62, 0.68, 0.84, 'p'), S(-0.45, 0.88, 0.26, 0.74, 0.78, 0.78, 'ws'),
@@ -131,7 +131,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'nsx',
-    rimStyle: 'multi', trim: 0x1e1e22, front: 'popup', make: 'HONDA', name: 'NSX', year: 1990, group: '90s JAPAN',
+    rimStyle: 'multi', trim: 0x1e1e22, front: 'popup', make: 'HONDA', name: 'NSX', nose: 'slim', year: 1990, group: '90s JAPAN',
     paints: [0xc81820, 0xf2f2ee, 0xffd418],
     stations: [
       S(-2.21, 0.84, 0.3, 0.5, 0.56, 0.76, 'p'), S(-1.6, 0.89, 0.26, 0.62, 0.68, 0.84, 'p'), S(-0.95, 0.9, 0.26, 0.72, 0.78, 0.8, 'ws'),
@@ -149,7 +149,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'diablo',
-    rimStyle: 'dial', trim: 0xb89068, arch: 0.06, front: 'popup', make: 'LAMBORGHINI', name: 'DIABLO', year: 1990, group: '90s SUPERCAR',
+    rimStyle: 'dial', trim: 0xb89068, arch: 0.06, front: 'popup', make: 'LAMBORGHINI', name: 'DIABLO', nose: 'twin', year: 1990, group: '90s SUPERCAR',
     paints: [0x6a2ac8, 0xffd418, 0xf2f2ee],
     stations: [
       S(-2.23, 0.88, 0.28, 0.42, 0.46, 0.78, 'p'), S(-1.4, 0.95, 0.24, 0.58, 0.64, 0.88, 'p'), S(-0.8, 0.98, 0.22, 0.66, 0.72, 0.86, 'ws'),
@@ -167,7 +167,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'mclarenf1',
-    rimStyle: 'mesh', trim: 0x2a2a30, drive: 'C', front: 'slim', make: 'McLAREN', name: 'F1', year: 1992, group: '90s SUPERCAR',
+    rimStyle: 'mesh', trim: 0x2a2a30, drive: 'C', front: 'slim', make: 'McLAREN', name: 'F1', nose: 'mouth', year: 1992, group: '90s SUPERCAR',
     paints: [0xff8a1a, 0xc8ccd4, 0xd81818],
     stations: [
       S(-2.15, 0.82, 0.3, 0.48, 0.52, 0.72, 'p'), S(-1.5, 0.88, 0.26, 0.6, 0.66, 0.82, 'p'), S(-1.0, 0.9, 0.25, 0.68, 0.74, 0.78, 'ws'),
@@ -186,7 +186,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'f355',
-    rimStyle: 'star', trim: 0xb08060, front: 'popup', make: 'FERRARI', name: 'F355', year: 1994, group: '90s SUPERCAR',
+    rimStyle: 'star', trim: 0xb08060, front: 'popup', make: 'FERRARI', name: 'F355', nose: 'mouth', year: 1994, group: '90s SUPERCAR',
     paints: [0xe01818, 0xffd418, 0x1a4a9a],
     stations: [
       S(-2.12, 0.86, 0.3, 0.5, 0.56, 0.78, 'p'), S(-1.5, 0.92, 0.26, 0.62, 0.68, 0.86, 'p'), S(-0.8, 0.94, 0.24, 0.72, 0.78, 0.82, 'ws'),

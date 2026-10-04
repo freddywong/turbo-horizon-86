@@ -62,6 +62,8 @@ export interface CarSpec {
   louvres?: { z0: number; z1: number; n: number; w: number };
   scoop?: boolean; // roof air intake
   front?: 'popup' | 'rect' | 'round' | 'slim'; // headlight style
+  /** air intakes in the nose: full-width bar (default), upper grille + bar, oval mouth, three slots, twin side intakes, thin slit, low slim bar */
+  nose?: 'bar' | 'grille' | 'mouth' | 'slots' | 'twin' | 'lip' | 'slim';
   exhaust: { x: number; y: number; r: number }[];
   plateY: number;
   /** '92 detail: wheel style, arch flare (m), seat layout, cabin trim colour */

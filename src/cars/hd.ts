@@ -346,11 +346,35 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
   const f0 = S0.pts, yb0 = f0[0][1], w0 = f0[2][0];
   const zN = zF - 0.006;
   const fr = spec.front ?? 'popup';
-  // intake grille with a black surround and a splitter lip
-  body.quad([-w0 * 0.74, yb0 + 0.02, zN + 0.002], [w0 * 0.74, yb0 + 0.02, zN + 0.002], [w0 * 0.74, yb0 + 0.19, zN + 0.002], [-w0 * 0.74, yb0 + 0.19, zN + 0.002], BLACK);
-  body.layer(CARTEX.MESH, () => body.quad([-w0 * 0.7, yb0 + 0.04, zN], [w0 * 0.7, yb0 + 0.04, zN], [w0 * 0.7, yb0 + 0.17, zN], [-w0 * 0.7, yb0 + 0.17, zN], MESH_COL, [0, 0, w0 * 6, 1.2]));
+  // air intakes: a black surround with mesh inside, shaped per car
+  const intakeAt = (cx: number, y0: number, y1: number, hw: number, bevel = 0) => {
+    const b = Math.min(bevel, (y1 - y0) / 2, hw / 2);
+    body.poly([[cx - hw + b, y0, zN + 0.002], [cx + hw - b, y0, zN + 0.002], [cx + hw, y0 + b, zN + 0.002], [cx + hw, y1 - b, zN + 0.002],
+      [cx + hw - b, y1, zN + 0.002], [cx - hw + b, y1, zN + 0.002], [cx - hw, y1 - b, zN + 0.002], [cx - hw, y0 + b, zN + 0.002]], BLACK);
+    const ix = hw - 0.025 - b * 0.5, iy0 = y0 + 0.02 + b * 0.4, iy1 = y1 - 0.02 - b * 0.4;
+    if (ix > 0.02 && iy1 > iy0) body.layer(CARTEX.MESH, () => body.quad([cx - ix, iy0, zN], [cx + ix, iy0, zN], [cx + ix, iy1, zN], [cx - ix, iy1, zN], MESH_COL, [0, 0, ix * 12, (iy1 - iy0) * 7]));
+  };
+  const nose = traffic ? 'bar' : spec.nose ?? 'bar';
+  const hyN = (f0[4][1] + f0[6][1]) / 2;
+  if (nose === 'bar' || nose === 'grille') intakeAt(0, yb0 + 0.02, yb0 + 0.19, w0 * 0.74);
+  if (nose === 'grille') intakeAt(0, hyN - 0.035, hyN + 0.035, w0 * 0.3); // slim upper grille between the lamps
+  if (nose === 'slim') intakeAt(0, yb0 + 0.03, yb0 + 0.1, w0 * 0.7, 0.02);
+  if (nose === 'lip') intakeAt(0, yb0 + 0.025, yb0 + 0.065, w0 * 0.6);
+  if (nose === 'mouth') {
+    intakeAt(0, yb0 + 0.03, yb0 + 0.2, w0 * 0.36, 0.06);
+    for (const sx of [-1, 1]) intakeAt(sx * w0 * 0.68, yb0 + 0.04, yb0 + 0.11, w0 * 0.14, 0.02);
+  }
+  if (nose === 'slots') {
+    intakeAt(0, yb0 + 0.03, yb0 + 0.12, w0 * 0.3, 0.02);
+    for (const sx of [-1, 1]) intakeAt(sx * w0 * 0.6, yb0 + 0.05, yb0 + 0.12, w0 * 0.2, 0.02);
+  }
+  if (nose === 'twin') {
+    for (const sx of [-1, 1]) intakeAt(sx * w0 * 0.52, yb0 + 0.03, yb0 + 0.16, w0 * 0.24, 0.03);
+    intakeAt(0, yb0 + 0.04, yb0 + 0.09, w0 * 0.18, 0.015);
+  }
   if (!traffic) {
-    body.box(0, yb0 - 0.02, zF + 0.2, w0 * 1.84, 0.03, 0.5, [BLACK, DARK]);
+    // splitter: a thin lip just proud of the nose, not a plank
+    body.box(0, yb0 - 0.008, zF + 0.1, w0 * 1.62, 0.022, 0.24, [DARK, BLACK]);
     const hy = (f0[4][1] + f0[6][1]) / 2;
     for (const s of [-1, 1]) {
       const x = s * w0 * 0.62;
@@ -516,11 +540,11 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
     });
     if (!wsSt) continue;
     // door mirror: stalk, body-colour pod, silvered glass facing back
-    const zmr = wsSt.z + 0.22, ymr = BELT(zmr) + 0.1, xmr = sideAt(zmr, BELT(zmr) - 0.01);
+    const zmr = wsSt.z + 0.22, ymr = BELT(zmr) + 0.07, xmr = sideAt(zmr, BELT(zmr) - 0.01);
     if (!traffic) {
-      body.box(s * (xmr + 0.04), ymr - 0.05, zmr, 0.1, 0.035, 0.05, BLACK);
-      body.box(s * (xmr + 0.13), ymr, zmr, 0.18, 0.11, 0.1, [paint, paint, shade, BLACK]);
-      body.quad([s * (xmr + 0.05), ymr - 0.045, zmr + 0.052], [s * (xmr + 0.21), ymr - 0.045, zmr + 0.052], [s * (xmr + 0.21), ymr + 0.045, zmr + 0.052], [s * (xmr + 0.05), ymr + 0.045, zmr + 0.052], 0x9aa8b8);
+      body.box(s * (xmr + 0.035), ymr - 0.04, zmr, 0.08, 0.03, 0.04, BLACK);
+      body.box(s * (xmr + 0.11), ymr, zmr, 0.14, 0.08, 0.075, [paint, paint, shade, BLACK]);
+      body.quad([s * (xmr + 0.05), ymr - 0.032, zmr + 0.039], [s * (xmr + 0.17), ymr - 0.032, zmr + 0.039], [s * (xmr + 0.17), ymr + 0.032, zmr + 0.039], [s * (xmr + 0.05), ymr + 0.032, zmr + 0.039], 0x9aa8b8);
     } else body.box(s * (xmr + 0.08), ymr, zmr, 0.14, 0.12, 0.1, [0x1a1a1a, 0x222222, 0x1a1a1a, 0x333333]);
     // door shut lines following the body section; the door ends ahead of any side intake
     const intake = (spec.side ?? []).find((f) => f.kind === 'intake');
@@ -590,8 +614,12 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
   }
   if (spec.scoop && rfI >= 0) {
     const rf = st[rfI];
-    body.box(0, rf.top + 0.08, rf.z + 0.3, 0.34, 0.14, 0.55, [paint, paint, BLACK, shade]);
-    body.layer(CARTEX.MESH, () => body.quad([-0.15, rf.top + 0.03, rf.z + 0.024], [0.15, rf.top + 0.03, rf.z + 0.024], [0.15, rf.top + 0.135, rf.z + 0.024], [-0.15, rf.top + 0.135, rf.z + 0.024], MESH_COL, [0, 0, 2, 1]));
+    // low snorkel faired into the roof: wedge rising towards the back with a mesh mouth facing forward
+    const z0 = rf.z + 0.12, z1 = rf.z + 0.75, yT = rf.top + 0.02, h = 0.085, hw = 0.14;
+    body.poly([[-hw, yT, z0], [-hw, yT + h, z0 + 0.06], [-hw, yT + h * 0.6, z1], [-hw, yT, z1]], shade);
+    body.poly([[hw, yT, z1], [hw, yT + h * 0.6, z1], [hw, yT + h, z0 + 0.06], [hw, yT, z0]], shade);
+    body.quad([-hw, yT + h, z0 + 0.06], [hw, yT + h, z0 + 0.06], [hw, yT + h * 0.6, z1], [-hw, yT + h * 0.6, z1], paint);
+    body.layer(CARTEX.MESH, () => body.quad([hw - 0.02, yT + 0.01, z0], [-hw + 0.02, yT + 0.01, z0], [-hw + 0.02, yT + h - 0.01, z0 + 0.05], [hw - 0.02, yT + h - 0.01, z0 + 0.05], MESH_COL, [0, 0, 2, 1]));
   }
   if (spec.wing) {
     const w = spec.wing;
@@ -627,7 +655,7 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
   if (!traffic && rfI >= 0) {
     // roof aerial
     const rf = st[rfI], rfE = st[rfI + 1];
-    if (spec.group === '90s JAPAN') limb(body, [0.35, TOP(rfE.z) - 0.02, rfE.z + 0.05], [0.4, TOP(rfE.z) + 0.45, rfE.z + 0.35], 0.012, BLACK);
+    if (spec.group === '90s JAPAN') limb(body, [0.35, TOP(rfE.z) - 0.02, rfE.z + 0.05], [0.38, TOP(rfE.z) + 0.26, rfE.z + 0.22], 0.008, BLACK);
     void rf;
   }
 
