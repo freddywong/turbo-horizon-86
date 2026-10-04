@@ -330,8 +330,14 @@ export class Audio {
   /** Gunshot: a short, sharp crack (quieter when it's someone else's, far away). */
   gun(vol = 1) {
     if (!this.ctx) return;
-    this.burst(0.07, 0.45 * vol, 2600);
-    this.tone(160, 0.05, 'square', 0.18 * vol, 0, 60);
+    // each round is a quick double report, so held fire rattles like a machine gun
+    for (const [when, k] of [[0, 1], [0.048, 0.8]] as const) {
+      const p = 0.9 + Math.random() * 0.2, v = vol * k;
+      this.burst(0.045, 0.5 * v, 1900 * p, when, 'bandpass'); // the crack
+      this.burst(0.11, 0.42 * v, 650 * p, when); // the boom
+      this.tone(125 * p, 0.07, 'sine', 0.38 * v, when, 42); // the thump
+      this.burst(0.014, 0.22 * v, 5200, when + 0.004, 'highpass'); // the bolt's clack
+    }
   }
   /** Bullet hitting your own car: a metallic ping. */
   ping() {

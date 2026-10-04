@@ -3,7 +3,7 @@ import { CarSpec } from './cars/spec';
 import { Rng } from './rng';
 import { LANE_W, ROAD_HALF, SEG, Track } from './track';
 import { TrafficCar } from './world';
-import { AMMO, TURBO_TIME } from './rules';
+import { TURBO_TIME } from './rules';
 
 /** Fictional drivers. skill scales top speed, corner how little they lift in bends. */
 const DRIVERS: { name: string; skill: number; corner: number; aggro: number }[] = [
@@ -48,7 +48,7 @@ export interface Rival {
 const KMH = 3.6;
 
 /** Builds a field of 7 rivals in different cars, lined up ahead of the player on a 2-wide grid. */
-export function makeGrid(playerCar: CarSpec, startPos: number, seed: number, turbos = 3, weapons = false): Rival[] {
+export function makeGrid(playerCar: CarSpec, startPos: number, seed: number, turbos = 3, ammo = 0): Rival[] {
   const rng = new Rng(seed);
   const cars = ROSTER.filter((c) => c !== playerCar);
   // shuffle the cars so every race has a different field
@@ -66,7 +66,7 @@ export function makeGrid(playerCar: CarSpec, startPos: number, seed: number, tur
       vmax: (spec.stats.vmax / KMH) * dr.skill, corner: dr.corner, aggro: dr.aggro,
       lane: side * rng.range(1, 4), steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0,
       turbos, turboT: 0,
-      ammo: weapons ? AMMO : 0, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
+      ammo, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
     };
   });
 }

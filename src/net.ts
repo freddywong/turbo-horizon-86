@@ -31,6 +31,7 @@ export interface GoMsg {
   seed: number;
   turbos: number;
   weapons: boolean;
+  ammo: number;
   players: { id: string; name: string; car: number; paint: number }[];
 }
 
@@ -218,7 +219,7 @@ export class Net {
     })).filter((p) => p.id);
     const go: GoMsg = {
       raceId: str(m.raceId, 24), route: Math.round(num(m.route, 0, 1)), seed: Math.round(num(m.seed, 0, 1e9)),
-      turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, players,
+      turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)), players,
     };
     if (go.raceId) this.onGo?.(go, from);
   }

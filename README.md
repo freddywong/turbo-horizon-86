@@ -50,14 +50,15 @@ you for position.
 ## Weapons
 
 VS RIVALS and online races can be played with guns: WEAPONS ON/OFF (V, or tap) on the car-select
-screen or in the online lobby. It's on by default.
+screen or in the online lobby. It's on by default. In online races the settings of whoever presses START apply.
 
 * Hold **F** (or the red **FIRE** button on phones) and your driver leans out of the window and shoots.
 * **Aiming is automatic.** It locks onto the nearest racer up to 90 m ahead or 35 m behind (a bracket
   marks the target; red means a good chance to hit). Traffic is never targeted. Close up almost every
   round hits; far away it's a spray.
-* **30 rounds per race.** A hit does a small dent and takes about 1.7% of the damage bar. That's much
-  less than a crash, and **one shooter's whole clip can take at most half the bar**. Several shooters
+* **Ammo: 100 to 500 rounds per race** (default 300), set with B (or tap AMMO) next to the weapons
+  switch. A hit does a small dent and takes about 1.7% of the damage bar. That's much less than a
+  crash, and **one car's guns can take at most three quarters of your bar**. Several shooters
   together, or gunfire on top of crash damage, can still wreck you.
 * In VS RIVALS the computer drivers shoot back in short bursts. Your hits dent them and make them lift
   for a moment.

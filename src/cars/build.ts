@@ -5,6 +5,7 @@ import { CarSpec, Light, Station } from './spec';
 import { brakeGeoHD, buildBodyHD, wheelGeoHD } from './hd';
 import { carMaterials } from './mats';
 import { shadowGeo, shadowMaterial } from './shadow';
+import { ellipsoid, gunArm, helmet, torso } from './figure';
 
 const GLASS = 0x18283c, GLASS_SIDE = 0x22364c, DARK = 0x141416, BLACK = 0x0a0a0c, CHROME = 0xc8ccd4;
 
@@ -560,31 +561,25 @@ export class PlayerCar {
     const suit = new THREE.Color(paint).lerp(new THREE.Color(0x202030), 0.55).getHex();
     for (const s of [-1, 1]) {
       const body = new GeoBuilder(tiled), arm = new GeoBuilder(tiled), fl = new GeoBuilder(tiled);
-      // shoulders and helmet out of the window, leaning towards the side
-      body.box(s * 0.12, 0.12, 0, 0.34, 0.3, 0.26, [suit, suit]);
-      const r = 0.13, hx = s * 0.22, hy = 0.42;
-      for (let j = 0; j < 4; j++) {
-        for (let i = 0; i < 8; i++) {
-          const p = (a: number, b: number): V3 => {
-            const th = (b / 4) * Math.PI, ph = (a / 8) * Math.PI * 2;
-            return [hx + Math.sin(th) * Math.cos(ph) * r, hy + Math.cos(th) * r, Math.sin(th) * Math.sin(ph) * r];
-          };
-          body.quad(p(i, j), p(i + 1, j), p(i + 1, j + 1), p(i, j + 1), j === 1 ? paint : 0xf0f0ec);
-        }
+      // leaning out of the window: suited torso, neck, full-face helmet
+      torso(body, [s * 0.1, 0.16, 0.02], [0.2, 0.2, 0.14], suit, paint);
+      ellipsoid(body, [s * 0.16, 0.36, 0.0], [0.05, 0.06, 0.05], 0x1a1a1c, 6, 4);
+      helmet(body, [s * 0.2, 0.5, -0.01], 0.135, paint);
+      // the other arm braced on the door
+      ellipsoid(body, [s * 0.02, 0.12, -0.2], [0.05, 0.05, 0.13], suit, 8, 5);
+      ellipsoid(body, [s * 0.0, 0.08, -0.33], [0.045, 0.045, 0.045], 0x141416, 6, 4);
+      const muzzle = gunArm(arm, suit, paint);
+      // muzzle flash: a star of glowing blades and a hot core
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * Math.PI;
+        const c = Math.cos(a) * 0.12, d = Math.sin(a) * 0.12;
+        fl.quad([-c, -d, 0], [c, d, 0], [c * 0.3, d * 0.3, -0.36], [-c * 0.3, -d * 0.3, -0.36], k % 2 ? 0xffc040 : 0xffe890);
       }
-      body.quad([hx - 0.09, hy - 0.04, -0.125], [hx + 0.09, hy - 0.04, -0.125], [hx + 0.09, hy + 0.04, -0.115], [hx - 0.09, hy + 0.04, -0.115], 0x101820);
-      // arm + compact gun, modelled pointing forward (-z) from the shoulder pivot
-      arm.box(0, 0, -0.22, 0.08, 0.08, 0.44, suit);
-      arm.box(0, 0.02, -0.5, 0.06, 0.09, 0.3, [0x1a1a1c, 0x2a2a2e]);
-      arm.box(0, -0.06, -0.47, 0.04, 0.1, 0.05, 0x1a1a1c); // magazine
-      // muzzle flash: a star of glowing quads at the barrel
-      for (let k = 0; k < 3; k++) {
-        const a = (k / 3) * Math.PI;
-        const c = Math.cos(a) * 0.14, d = Math.sin(a) * 0.14;
-        fl.quad([-c, -d, 0], [c, d, 0], [c, d, -0.32], [-c, -d, -0.32], 0xffe070);
-      }
-      fl.quad([-0.07, -0.07, 0.001], [0.07, -0.07, 0.001], [0.07, 0.07, 0.001], [-0.07, 0.07, 0.001], 0xfff8d0);
+      fl.quad([-0.08, -0.08, 0.001], [0.08, -0.08, 0.001], [0.08, 0.08, 0.001], [-0.08, 0.08, 0.001], 0xfffbe0);
       const group = new THREE.Group();
+      const lean = new THREE.Group();
+      lean.rotation.z = -s * 0.32; // lean the upper body out of the window
+      group.add(lean);
       const add = (g: GeoBuilder, m: THREE.Material, parent: THREE.Object3D) => {
         const geo = g.build();
         this.geos.push(geo);
@@ -592,15 +587,15 @@ export class PlayerCar {
         parent.add(mesh);
         return mesh;
       };
-      add(body, lit, group);
+      add(body, lit, lean);
       const armG = new THREE.Group();
-      armG.position.set(s * 0.26, 0.24, 0);
+      armG.position.set(s * 0.26, 0.28, 0);
       add(arm, lit, armG);
       const flash = add(fl, glow, armG);
-      flash.position.set(0, 0.02, -0.66);
+      flash.position.set(...muzzle);
       flash.visible = false;
-      group.add(armG);
-      group.position.set(s * (w - 0.12), belt - 0.02, z);
+      lean.add(armG);
+      group.position.set(s * (w - 0.14), belt - 0.06, z);
       group.visible = false;
       this.body.add(group);
       this.gunners.push({ group, arm: armG, flash });

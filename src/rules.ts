@@ -5,12 +5,13 @@ export const TURBO_SPEED = 1.18; // top speed multiplier while boosting
 export const TURBO_DEFAULT = 5; // boosts per race unless changed in the menu
 
 // ---- weapons ----------------------------------------------------------------
-export const AMMO = 30; // rounds per race
+export const AMMO_STEPS = [100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
+export const AMMO_DEFAULT = 300;
 export const FIRE_RATE = 5; // rounds per second while FIRE is held
-/** Most one shooter's gunfire can take off a car: half the damage bar. */
-export const GUN_CAP = 50;
-/** Damage per round that hits: a whole clip of hits is exactly the cap. */
-export const PER_HIT = GUN_CAP / AMMO;
+/** Most one shooter's gunfire can take off a car: three quarters of the damage bar. */
+export const GUN_CAP = 75;
+/** Damage per round that hits (45 hits reach the cap; more ammo doesn't make a shooter stronger, it just lasts longer). */
+export const PER_HIT = 50 / 30;
 export const RANGE_AHEAD = 90; // metres
 export const RANGE_BEHIND = 35;
 export const RANGE_SIDE = 6;

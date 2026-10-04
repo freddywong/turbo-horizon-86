@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GeoBuilder, V3 } from '../geom';
 import { CARTEX, RIM_TILE, RimStyle } from '../textures';
 import { CarSpec, Light, Seg, Station } from './spec';
+import { ellipsoid, helmet, torso } from './figure';
 
 /**
  * '92 car builder: the spec's few cross-sections are resampled along smooth
@@ -650,10 +651,9 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
       });
       if (seat.driver) {
         // driver: helmet with a paint-colour stripe, shoulders, arms to the wheel
-        ball(cabin, [sx, headY, sz], 0.125, 0xf0f0ec, 10, 6, paint);
-        cabin.quad([sx - 0.09, headY - 0.04, sz - 0.12], [sx + 0.09, headY - 0.04, sz - 0.12], [sx + 0.09, headY + 0.03, sz - 0.11], [sx - 0.09, headY + 0.03, sz - 0.11], 0x101820);
-        cabin.box(sx, headY - 0.17, sz + 0.02, 0.1, 0.08, 0.1, suit);
-        cabin.box(sx, headY - 0.33, sz + 0.04, 0.4, 0.26, 0.22, [suit, scale(suit, 1.1)]);
+        helmet(cabin, [sx, headY, sz], 0.125, paint);
+        ellipsoid(cabin, [sx, headY - 0.16, sz + 0.02], [0.05, 0.06, 0.05], 0x1a1a1c, 6, 4);
+        torso(cabin, [sx, headY - 0.33, sz + 0.04], [0.21, 0.17, 0.12], suit, paint);
         for (const s of [-1, 1]) {
           limb(cabin, [sx + s * 0.18, headY - 0.26, sz + 0.02], [sx + s * 0.16, wheelY - 0.02, wheelZ + 0.05], 0.075, suit);
           ball(cabin, [sx + s * 0.16, wheelY - 0.02, wheelZ + 0.04], 0.04, 0x1a1a1a, 5, 3);
