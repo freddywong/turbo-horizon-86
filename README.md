@@ -61,7 +61,11 @@ screen or in the online lobby. It's on by default. In online races the settings 
   crash, and **one car's guns can take at most three quarters of your bar**. Several shooters
   together, or gunfire on top of crash damage, can still wreck you.
 * In VS RIVALS the computer drivers shoot back in short bursts, but **all of them together can take
-  at most 20% of your bar** with gunfire. Your hits dent them and make them lift for a moment.
+  at most 20% of your bar** with gunfire.
+* **Against computer cars your bullets do 300% damage** (about 5% of their bar per hit). The bar
+  under the lock-on bracket shows how they're holding up. Shot-up cars smoke, lose a tail lamp and
+  limp. At zero they're **wrecked**: they roll to a stop in black smoke and drop out of the race
+  (DNF), and you get 50,000 points.
 * Online, the shooter's game decides what hits and tells the victim's game, which applies the damage
   (and the cap).
 

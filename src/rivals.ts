@@ -34,6 +34,11 @@ export interface Rival {
   bumpT: number;
   turbos: number; // boosts left
   turboT: number; // time left on the active boost
+  // condition (computer cars can be shot to a wreck)
+  hp: number;
+  wrecked: boolean;
+  wreckT: number; // time since wrecked
+  smokeT: number;
   // weapons
   ammo: number;
   gunTaken: number; // gun damage taken from the player (capped)
@@ -66,6 +71,7 @@ export function makeGrid(playerCar: CarSpec, startPos: number, seed: number, tur
       vmax: (spec.stats.vmax / KMH) * dr.skill, corner: dr.corner, aggro: dr.aggro,
       lane: side * rng.range(1, 4), steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0,
       turbos, turboT: 0,
+      hp: 100, wrecked: false, wreckT: 0, smokeT: 0,
       ammo, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
     };
   });
@@ -102,6 +108,16 @@ export function updateRivals(rivals: Rival[], dt: number, track: Track, traffic:
       r.v = 0;
       continue;
     }
+    if (r.wrecked) {
+      // engine blown: rolls to a stop where it is
+      r.wreckT += dt;
+      r.v = Math.max(0, r.v - 22 * dt);
+      r.d += r.v * dt;
+      r.spin -= (r.v * dt) / 0.37;
+      r.braking = true;
+      r.steer *= 1 - dt * 3;
+      continue;
+    }
     const seg = track.seg(Math.floor(r.d / SEG));
     const ahead = track.seg(Math.floor((r.d + 70) / SEG));
     const c2 = Math.max(Math.abs(seg.curve), Math.abs(ahead.curve));
@@ -126,6 +142,7 @@ export function updateRivals(rivals: Rival[], dt: number, track: Track, traffic:
       r.bumpT -= dt;
       vt *= 0.6;
     }
+    if (r.hp < 35) vt *= 0.8 + 0.2 * (r.hp / 35); // badly shot up: limping
 
     // look for anything slower in our path
     const bodies: Body[] = traffic.map((c) => ({ d: c.d, x: c.x, v: c.v, len: trafficLen(c) }));
@@ -197,8 +214,8 @@ export function results(rivals: Rival[], track: Track, playerName: string, playe
   const goal = track.goalDist;
   const rows: Omit<ResultRow, 'pos'>[] = rivals.map((r) => ({
     name: r.name, car: r.spec.name,
-    time: r.finished >= 0 ? r.finished : now + Math.max(0, goal - r.d) / Math.max(20, r.v || r.vmax),
-    player: false, estimated: r.finished < 0,
+    time: r.finished >= 0 ? r.finished : r.wrecked ? Infinity : now + Math.max(0, goal - r.d) / Math.max(20, r.v || r.vmax),
+    player: false, estimated: r.finished < 0 && !r.wrecked,
   }));
   rows.push({ name: playerName, car: playerCar, time: playerTime, player: true, estimated: false });
   rows.sort((a, b) => a.time - b.time);

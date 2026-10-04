@@ -8,7 +8,7 @@ import { ROSTER } from './cars/roster';
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
-import { AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
+import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 
@@ -725,7 +725,7 @@ export class Game {
       rivals.push({
         name: p.name, spec, paint: spec.paints[p.paint % spec.paints.length], d: g.d, x: g.x, v: 0, vmax: 0, corner: 0, aggro: 0,
         lane: 0, steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0, turbos: 0, turboT: 0,
-        ammo: 0, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
+        hp: 100, wrecked: false, wreckT: 0, smokeT: 0, ammo: 0, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
         remote: { id: p.id, d: g.d, x: g.x, v: 0, at: raceClock(), hp: 100 },
       });
     });
@@ -748,9 +748,15 @@ export class Game {
     r.braking = m.br;
     r.turboT = m.tb ? 1 : 0;
     if (m.hp < n.hp - 0.5) {
-      // their crash: dent their car on our screen too
+      // their crash or our bullets: dent their car on our screen too
       this.world.rivalHit(i, Math.min(1, (n.hp - m.hp) / 25));
+      if (n.hp >= 55 && m.hp < 55) this.world.rivalBreakLamp(i);
       n.hp = m.hp;
+    }
+    r.hp = m.hp;
+    if (m.hp <= 0 && !r.wrecked) {
+      r.wrecked = true;
+      r.wreckT = 0;
     }
     if (m.fin >= 0 && r.finished < 0) r.finished = m.fin;
     // their gunner: who they're shooting at
@@ -1071,10 +1077,23 @@ export class Game {
       this.pendingHits.set(r.remote.id, (this.pendingHits.get(r.remote.id) ?? 0) + 1);
       return;
     }
-    if (r.gunTaken >= GUN_CAP - 1e-6) return;
-    r.gunTaken = Math.min(GUN_CAP, r.gunTaken + PER_HIT);
-    r.bumpT = Math.max(r.bumpT, 0.25);
-    this.world.rivalHit(i, 0.1);
+    if (r.wrecked) return;
+    // computer cars: your bullets do triple damage and can finish them off
+    const dmg = PER_HIT * VS_AI_DAMAGE, before = r.hp;
+    r.hp = Math.max(0, r.hp - dmg);
+    r.gunTaken += dmg;
+    r.bumpT = Math.max(r.bumpT, 0.25 + (1 - r.hp / 100) * 0.35);
+    this.world.rivalHit(i, 0.16);
+    if (before >= 55 && r.hp < 55) this.world.rivalBreakLamp(i);
+    if (r.hp <= 0) {
+      r.wrecked = true;
+      r.gunT = 0;
+      r.burst = 0;
+      this.score += 50000;
+      this.flash(`${r.name} WRECKED!`, '+50000', 2.0);
+      this.audio.crash(true);
+      this.audio.pop();
+    }
   }
 
   /** Weapons: auto-aim, our fire, the computer drivers shooting back, other players' gunfire. */
@@ -1090,7 +1109,7 @@ export class Game {
     if (this.weapons && !this.wrecked) {
       rivals.forEach((r, i) => {
         const dd = r.d - this.pos, dx = r.x - this.px;
-        if (!inRange(dd, dx)) return;
+        if (r.wrecked || !inRange(dd, dx)) return;
         const dist = Math.hypot(dd, dx);
         if (dist < bd) {
           bd = dist;
@@ -1133,7 +1152,7 @@ export class Game {
         return;
       }
       // the computer drivers shoot back in bursts
-      if (!this.weapons || this.state !== 'race' || this.wrecked || r.ammo <= 0 || r.finished >= 0) return;
+      if (!this.weapons || this.state !== 'race' || this.wrecked || r.wrecked || r.ammo <= 0 || r.finished >= 0) return;
       const dd = this.pos - r.d, dx = this.px - r.x;
       if (!inRange(dd, dx)) {
         r.burst = 0;
@@ -1175,21 +1194,36 @@ export class Game {
 
   /** Smoke (and at the end fire) from the engine bay as the condition drops. */
   private engineSmoke(dt: number) {
-    if (this.hp >= 50 || !['race', 'over', 'goal'].includes(this.state)) return;
-    const rate = this.wrecked ? 30 : this.hp < 25 ? 14 : 5;
-    this.smokeT += dt * rate;
-    if (this.smokeT < 1) return;
-    this.smokeT -= 1;
-    const st = this.spec.stations;
-    const front = ['r32', 'supra', 'rx7'].includes(this.spec.id);
+    if (['race', 'over', 'goal'].includes(this.state)) {
+      const acc = { t: this.smokeT };
+      this.smokeFrom(acc, dt, this.spec, this.pos, this.px, this.speed, this.hp, this.wrecked, this.t);
+      this.smokeT = acc.t;
+    }
+    // shot-up computer cars smoke too
+    for (const r of this.world.rivals) {
+      if (r.remote && r.wrecked) r.wreckT += dt; // other players' wrecks burn for a while too
+      const acc = { t: r.smokeT };
+      this.smokeFrom(acc, dt, r.spec, r.d, r.x, r.v, r.hp, r.wrecked, r.wreckT);
+      r.smokeT = acc.t;
+    }
+  }
+
+  /** Smoke (and right after a wreck, fire) from a car's engine bay as its condition drops. */
+  private smokeFrom(acc: { t: number }, dt: number, spec: CarSpec, pos: number, px: number, speed: number, hp: number, wrecked: boolean, sinceWreck: number) {
+    if (hp >= 50) return;
+    acc.t += dt * (wrecked ? 30 : hp < 25 ? 14 : 5);
+    if (acc.t < 1) return;
+    acc.t -= 1;
+    const st = spec.stations;
+    const front = ['r32', 'supra', 'rx7'].includes(spec.id);
     const z = front ? st[0].z + 0.9 : st[st.length - 1].z - 0.9;
     const top = front ? st[1].top : st[st.length - 2].top;
-    const d = this.pos - z, x = this.px + (Math.random() - 0.5) * 0.6;
-    const col = this.wrecked ? (Math.random() < 0.5 ? 0x222222 : 0x3a3a3a) : this.hp < 25 ? 0x6a6a6a : 0xb8b8b8;
+    const d = pos - z, x = px + (Math.random() - 0.5) * 0.6;
+    const col = wrecked ? (Math.random() < 0.5 ? 0x222222 : 0x3a3a3a) : hp < 25 ? 0x6a6a6a : 0xb8b8b8;
     const P = this.world.particles;
-    P.spawn(d, x, top + 0.1, this.speed * 0.85, (Math.random() - 0.5) * 0.8, 1.2 + Math.random(), 1.6 + Math.random(), 0.45, 3, col);
-    if (this.wrecked && this.t < 6 && Math.random() < 0.5) {
-      P.spawn(d, x, top + 0.05, this.speed * 0.9, (Math.random() - 0.5) * 0.4, 1.5, 0.35, 0.3, 0.5, Math.random() < 0.5 ? 0xff8a20 : 0xffd040);
+    P.spawn(d, x, top + 0.1, speed * 0.85, (Math.random() - 0.5) * 0.8, 1.2 + Math.random(), 1.6 + Math.random(), 0.45, 3, col);
+    if (wrecked && sinceWreck < 6 && Math.random() < 0.5) {
+      P.spawn(d, x, top + 0.05, speed * 0.9, (Math.random() - 0.5) * 0.4, 1.5, 0.35, 0.3, 0.5, Math.random() < 0.5 ? 0xff8a20 : 0xffd040);
     }
   }
 
@@ -1422,7 +1456,12 @@ export class Game {
       const p = this.world.rivalScreenPos(i, this.camera, HUD_W, HUD_H);
       if (!p || p.dist > 140) return;
       const size = p.dist < 45 ? 16 : 8;
-      h.text(r.name, p.x, p.y - size, size, r.finished >= 0 ? YELLOW : WHITE, 'center');
+      h.text(r.wrecked ? `${r.name} WRECKED` : r.name, p.x, p.y - size, size, r.wrecked ? RED : r.finished >= 0 ? YELLOW : WHITE, 'center');
+      // their damage bar under the name
+      const bw = size === 16 ? 64 : 36, bh = size === 16 ? 6 : 4, f = Math.max(0, r.hp / 100);
+      const bx = p.x - bw / 2, by = p.y + (size === 16 ? 4 : 2);
+      h.rect(bx - 1, by - 1, bw + 2, bh + 2, 0x000000);
+      h.rect(bx, by, bw * f, bh, f > 0.6 ? 0x40e040 : f > 0.3 ? YELLOW : RED);
     });
   }
 
@@ -1509,6 +1548,13 @@ export class Game {
           for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
             h.rect(p.x + sx * r - (sx > 0 ? 10 : 0), cy + sy * r - (sy > 0 ? 3 : 0), 10, 3, c);
             h.rect(p.x + sx * r - (sx > 0 ? 3 : 0), cy + sy * r - (sy > 0 ? 10 : 0), 3, 10, c);
+          }
+          const tr = this.world.rivals[this.gunTarget];
+          if (!tr.remote) {
+            // computer car's condition under the bracket
+            const bw = 44, bx = p.x - bw / 2, by = cy + r + 6, f = tr.hp / 100;
+            h.rect(bx - 1, by - 1, bw + 2, 7, 0x000000);
+            h.rect(bx, by, bw * f, 5, f > 0.6 ? 0x40e040 : f > 0.3 ? YELLOW : RED);
           }
         }
       }

@@ -233,6 +233,11 @@ export class World {
     this.rivalCars[i]?.hit(severity, wh[Math.floor(Math.random() * 4)]);
   }
 
+  /** Smashes a tail lamp on rival i's car. */
+  rivalBreakLamp(i: number) {
+    this.rivalCars[i]?.breakLamp(Math.random() < 0.5 ? -1 : 1);
+  }
+
   /** Where rival i's car sits on the HUD canvas (for name tags), or null if off screen / far. */
   rivalScreenPos(i: number, camera: THREE.Camera, w: number, h: number): { x: number; y: number; dist: number } | null {
     const car = this.rivalCars[i];
