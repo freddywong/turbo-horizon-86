@@ -26,6 +26,7 @@ npm run build    # type-check + production build into dist/
 | R | Restart the current route |
 | Esc | Pause (Q in the pause menu quits to route select) |
 | N | Next music track (car select and while racing) |
+| T / Shift | Turbo boost (3 per race) |
 | M | Mute |
 
 ### Phones and tablets
@@ -35,6 +36,25 @@ Play in landscape. The first touch switches to on-screen arcade buttons:
 AUTO GAS (on by default) keeps the throttle down for you. Tap through the
 menus; the pause button sits at the top right. The game tries to go
 fullscreen and lock to landscape where the browser allows it.
+
+## Turbo
+
+Every race you get three turbo boosts (T or Shift, or the TURBO button on touch screens).
+Each one gives about three seconds of extra acceleration and roughly 18% more top speed,
+with flames from the exhausts; afterwards the car eases back to its normal top speed.
+The HUD lamps show how many you have left. In VS RIVALS every rival also has three and
+fires them on straights when they're fighting you for position.
+
+## Graphics
+
+The title screen switches between two looks (G, or tap the GRAPHICS line):
+
+* **1992** (default): early-90s 3D arcade style: 640×360, texture-mapped road and ground
+  with filtering, smooth sky and sun gradients, shaded mountains, glossy car paint,
+  sky-tinted lighting, light halos and glowing tail lights at night, soft tyre smoke and
+  a lens flare from the Miami sun.
+* **1986**: the original flat-shaded look: 426×240, hard-stepped 15-bit colour sky,
+  untextured ground, sprite-style smoke.
 
 ## Modes
 

@@ -1,5 +1,5 @@
 import { PropDef } from '../props';
-import { addStaticWheels, buildBody } from './build';
+import { addStaticWheels, buildBody, tailHalos } from './build';
 import { boxy, CarSpec, Light, Station } from './spec';
 
 const RED = 0xc01810;
@@ -53,7 +53,7 @@ export const TRAFFIC: Record<string, CarSpec> = {
 };
 
 /** Turns a traffic spec into an instanced prop (body + wheels lit, lights glowing). */
-export function trafficProp(s: CarSpec, opts: { taxi?: boolean } = {}): PropDef {
+export function trafficProp(s: CarSpec, opts: { taxi?: boolean; night?: boolean } = {}): PropDef {
   const cg = buildBody(s, 0xffffff, true);
   addStaticWheels(cg.lit, s);
   const glow = cg.glow;
@@ -65,5 +65,6 @@ export function trafficProp(s: CarSpec, opts: { taxi?: boolean } = {}): PropDef 
   const parts = [{ geo: cg.lit.build(), mat: 'lit' as const }];
   const out: PropDef = { parts, radius: 0, max: 16, len: (st[st.length - 1].z - st[0].z) / 2 + 2.2 };
   if (!glow.empty) out.parts.push({ geo: glow.build(), mat: 'glow' });
+  if (opts.night) out.parts.push({ geo: tailHalos(s, 0.8).build(), mat: 'halo', tint: false });
   return out;
 }

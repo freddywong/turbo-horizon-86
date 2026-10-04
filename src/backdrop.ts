@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GeoBuilder, V3 } from './geom';
+import { GFX } from './gfx';
 import { Rng } from './rng';
 
 /**
@@ -11,6 +12,19 @@ import { Rng } from './rng';
 export class Backdrop {
   group = new THREE.Group();
   layers: { obj: THREE.Object3D; factor: number }[] = [];
+  /** the sun disc and its centre in that layer's local space (for the lens flare) */
+  sun: { obj: THREE.Object3D; local: THREE.Vector3 } | null = null;
+  private tmp = new THREE.Vector3();
+
+  /** Sun centre in normalised device coords, or null when it's behind the camera. */
+  sunNdc(camera: THREE.Camera): THREE.Vector3 | null {
+    if (!this.sun) return null;
+    this.sun.obj.updateMatrixWorld();
+    const p = this.tmp.copy(this.sun.local);
+    this.sun.obj.localToWorld(p);
+    p.project(camera);
+    return p.z < 1 ? p : null;
+  }
 
   addLayer(obj: THREE.Object3D, factor: number) {
     this.group.add(obj);
@@ -25,6 +39,11 @@ export class Backdrop {
 
 const basic = (opts: THREE.MeshBasicMaterialParameters = {}) =>
   new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide, ...opts });
+
+const shade = (c: number, k: number) => {
+  const ch = (s: number) => Math.min(255, Math.round(((c >> s) & 255) * k));
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+};
 
 /** 15-bit colour (5 bits per channel), like a late-80s arcade palette. */
 const q15 = (c: number) => {
@@ -57,15 +76,18 @@ export function skyDome(stops: [number, number][], below: number, step = 0.45): 
     }
     return stops[stops.length - 1][1];
   };
-  for (let e = 0; e < 90; e += step * (e < 20 ? 1 : 3)) {
-    const hi = Math.min(90, e + step * (e < 20 ? 1 : 3));
+  // '92: a smooth gradient; '86: palette-limited hard steps
+  const smooth = GFX.modern;
+  const st = smooth ? 0.09 : step;
+  for (let e = 0; e < 90; e += st * (e < 20 || smooth ? 1 : 3)) {
+    const hi = Math.min(90, e + st * (e < 20 || smooth ? 1 : 3));
     const y0 = (H * (90 - hi)) / 180, y1 = (H * (90 - e)) / 180;
-    g.fillStyle = hex(q15(colorAt(e)));
+    g.fillStyle = hex(smooth ? colorAt(e) : q15(colorAt(e)));
     g.fillRect(0, Math.floor(y0), 2, Math.ceil(y1 - y0) + 1);
   }
   const tex = new THREE.CanvasTexture(cv);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter;
+  tex.minFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter;
   tex.generateMipmaps = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   const geo = new THREE.SphereGeometry(2800, 24, 90);
@@ -98,7 +120,12 @@ export function mountainRing(rng: Rng, R: number, color: number, maxH: number, m
     const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
     const h0 = h[i] * mask(a0), h1 = h[i + 1] * mask(a1);
     if (h0 < 1 && h1 < 1) continue;
-    g.quad(ring(R, a0, 0, -60), ring(R, a1, 0, -60), ring(R, a1, 0, h1), ring(R, a0, 0, h0), color);
+    if (GFX.modern) {
+      // shaded slopes: lighter towards the peaks, hazier at the foot
+      const top = (hh: number) => shade(color, 0.86 + 0.26 * Math.min(1, hh / maxH));
+      const foot = shade(color, 0.78);
+      g.quadC(ring(R, a0, 0, -60), ring(R, a1, 0, -60), ring(R, a1, 0, h1), ring(R, a0, 0, h0), [foot, foot, top(h1), top(h0)]);
+    } else g.quad(ring(R, a0, 0, -60), ring(R, a1, 0, -60), ring(R, a1, 0, h1), ring(R, a0, 0, h0), color);
     if (cap !== undefined) {
       // snow / light caps on the tallest peaks
       const t = maxH * 0.72;
@@ -117,10 +144,32 @@ export function horizonBand(R: number, color: number, depth = 500): THREE.Mesh {
   return m;
 }
 
+/** Centre of a disc() placed at azimuth a, elevation elev (degrees) on radius R. */
+export function discCentre(R: number, a: number, elev: number): THREE.Vector3 {
+  const cy = Math.tan((elev * Math.PI) / 180) * R;
+  const [x, y, z] = ring(R, a, 0, cy);
+  return new THREE.Vector3(x, y, z);
+}
+
 /** Flat n-gon disc facing the viewer (sun, moon). */
 export function disc(R: number, a: number, elev: number, radius: number, colors: [number, number][], sides = 20): THREE.Mesh {
   const g = new GeoBuilder();
   const cy = Math.tan((elev * Math.PI) / 180) * R;
+  if (GFX.modern) {
+    // one smooth radial gradient through the given rings, finer polygon
+    const n = Math.max(sides, 40);
+    const rings = [...colors].sort((x, y) => y[0] - x[0]);
+    const pt = (rr: number, t: number): V3 => ring(R, a, Math.cos(t) * radius * rr, cy + Math.sin(t) * radius * rr);
+    for (let k = 0; k < rings.length; k++) {
+      const [r0, c0] = rings[k];
+      const [r1, c1] = k + 1 < rings.length ? rings[k + 1] : [0, rings[k][1]];
+      for (let i = 0; i < n; i++) {
+        const t0 = (i / n) * Math.PI * 2, t1 = ((i + 1) / n) * Math.PI * 2;
+        g.quadC(pt(r0, t0), pt(r0, t1), pt(r1, t1), pt(r1, t0), [c0, c0, c1, c1]);
+      }
+    }
+    return new THREE.Mesh(g.build(), basic());
+  }
   for (const [r, c] of colors) {
     const pts: V3[] = [];
     for (let i = 0; i < sides; i++) {
@@ -140,7 +189,7 @@ export function clouds(rng: Rng, R: number, count: number, tones: [number, numbe
   const [hi, mid, shade] = tones;
   const ellipse = (rr: number, a: number, cx: number, cy: number, rx: number, ry: number, c: number, from = 0, to = Math.PI * 2) => {
     const pts: V3[] = [];
-    const n = 12;
+    const n = GFX.modern ? 24 : 12;
     for (let i = 0; i <= n; i++) {
       const t = from + ((to - from) * i) / n;
       pts.push(ring(rr, a, cx + Math.cos(t) * rx, cy + Math.sin(t) * ry));

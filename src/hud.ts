@@ -73,6 +73,45 @@ export class Hud {
     g.restore();
   }
 
+  /** Early-90s style lens flare: a bloom on the sun and coloured ghosts mirrored through the centre. */
+  flare(sx: number, sy: number, strength: number) {
+    const g = this.g;
+    const cx = HUD_W / 2, cy = HUD_H / 2;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    const bloom = g.createRadialGradient(sx, sy, 0, sx, sy, 150);
+    bloom.addColorStop(0, `rgba(255,240,200,${0.55 * strength})`);
+    bloom.addColorStop(0.3, `rgba(255,190,120,${0.22 * strength})`);
+    bloom.addColorStop(1, 'rgba(255,160,100,0)');
+    g.fillStyle = bloom;
+    g.fillRect(sx - 150, sy - 150, 300, 300);
+    // horizontal streak
+    const st = g.createLinearGradient(sx - 260, sy, sx + 260, sy);
+    st.addColorStop(0, 'rgba(255,220,180,0)');
+    st.addColorStop(0.5, `rgba(255,230,190,${0.35 * strength})`);
+    st.addColorStop(1, 'rgba(255,220,180,0)');
+    g.fillStyle = st;
+    g.fillRect(sx - 260, sy - 2, 520, 4);
+    const ghosts: [number, number, string, number][] = [
+      [0.35, 18, '255,200,90', 0.22], [0.62, 10, '140,255,170', 0.2], [0.9, 34, '120,160,255', 0.12],
+      [1.25, 14, '255,120,200', 0.18], [1.6, 52, '255,190,110', 0.09], [1.95, 22, '120,230,255', 0.14],
+    ];
+    for (const [t, r, rgb, a] of ghosts) {
+      const x = sx + (cx - sx) * t, y = sy + (cy - sy) * t;
+      g.fillStyle = `rgba(${rgb},${a * strength})`;
+      g.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const ang = (k / 6) * Math.PI * 2 + Math.PI / 6;
+        const px = x + Math.cos(ang) * r, py = y + Math.sin(ang) * r;
+        if (k === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+      g.closePath();
+      g.fill();
+    }
+    g.restore();
+  }
+
   tach(x: number, y: number, frac: number) {
     const n = 24;
     const lit = Math.round(frac * n);

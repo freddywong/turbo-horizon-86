@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GeoBuilder, V3 } from './geom';
+import { GFX } from './gfx';
 import { View } from './track';
 
 interface P {
@@ -34,9 +35,28 @@ export class Particles {
       }
       g.poly(pts, c);
     };
-    oct(0.5, 0, 0, 0, 0xb8b8b8);
-    oct(0.34, -0.1, 0.1, 0.01, 0xffffff);
-    this.mesh = new THREE.InstancedMesh(g.build(), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }), MAX);
+    let mat: THREE.Material;
+    if (GFX.modern) {
+      // soft translucent puff (early-90s alpha-blended sprite)
+      const N = 64, cv = document.createElement('canvas');
+      cv.width = cv.height = N;
+      const c2 = cv.getContext('2d')!;
+      const grd = c2.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+      grd.addColorStop(0, 'rgba(255,255,255,0.85)');
+      grd.addColorStop(0.55, 'rgba(235,235,235,0.45)');
+      grd.addColorStop(1, 'rgba(220,220,220,0)');
+      c2.fillStyle = grd;
+      c2.fillRect(0, 0, N, N);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      g.quad([-0.6, -0.6, 0], [0.6, -0.6, 0], [0.6, 0.6, 0], [-0.6, 0.6, 0], 0xffffff, [0, 0, 1, 1]);
+      mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    } else {
+      oct(0.5, 0, 0, 0, 0xb8b8b8);
+      oct(0.34, -0.1, 0.1, 0.01, 0xffffff);
+      mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    }
+    this.mesh = new THREE.InstancedMesh(g.build(), mat, MAX);
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
     this.mesh.setColorAt(0, new THREE.Color(1, 1, 1));

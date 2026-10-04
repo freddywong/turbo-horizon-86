@@ -16,6 +16,7 @@ export class TouchControls {
   private held = new Set<string>();
   enabled = false;
   private autoBtn: HTMLDivElement;
+  private turboBtn!: HTMLDivElement;
 
   constructor(private input: Input, private stage: HTMLElement, private onEnable: () => void) {
     this.root = document.createElement('div');
@@ -36,6 +37,7 @@ export class TouchControls {
     mk('drift', 'DRIFT', 'Space');
     mk('pause', 'II', 'Escape');
     mk('radio', 'MUSIC', 'KeyN');
+    this.turboBtn = mk('turbo', 'TURBO\n3', 'KeyT');
     this.autoBtn = mk('auto', 'AUTO\nGAS', '');
     this.rotate = document.createElement('div');
     this.rotate.id = 'rotate';
@@ -111,7 +113,7 @@ export class TouchControls {
     e.preventDefault();
     const code = this.codeAt(e.clientX, e.clientY);
     // only steering/pedal buttons follow a sliding thumb; pause stays a tap
-    if (code !== 'Escape' && code !== 'KeyN') this.pointers.set(e.pointerId, code);
+    if (code !== 'Escape' && code !== 'KeyN' && code !== 'KeyT') this.pointers.set(e.pointerId, code);
     this.sync();
   }
 
@@ -119,6 +121,13 @@ export class TouchControls {
     if (!this.pointers.has(e.pointerId)) return;
     this.pointers.delete(e.pointerId);
     this.sync();
+  }
+
+  /** Shows how many boosts are left on the TURBO button. */
+  setTurbo(left: number, active: boolean) {
+    const txt = `TURBO\n${left}`;
+    if (this.turboBtn.textContent !== txt) this.turboBtn.textContent = txt;
+    this.turboBtn.classList.toggle('empty', left === 0 && !active);
   }
 
   /** Show the driving buttons only while driving; handle portrait. Returns true if the game should pause. */

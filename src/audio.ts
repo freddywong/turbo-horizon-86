@@ -327,6 +327,28 @@ export class Audio {
     this.burst(0.09, 0.5, 900);
     this.tone(70, 0.08, 'square', 0.25, 0, 40);
   }
+  /** Turbo kick: a rising whoosh with a growl under it. */
+  turbo() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 3;
+    f.frequency.setValueAtTime(400, t);
+    f.frequency.exponentialRampToValueAtTime(5000, t + 0.7);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+    s.connect(f).connect(g).connect(this.sfx);
+    s.start(t);
+    s.stop(t + 1.2);
+    this.tone(90, 0.6, 'sawtooth', 0.25, 0, 240);
+    this.tone(660, 0.25, 'square', 0.1, 0.05, 1320);
+  }
   countBeep(go: boolean) {
     if (!this.ctx) return;
     if (go) this.tone(880, 0.7, 'square', 0.22);

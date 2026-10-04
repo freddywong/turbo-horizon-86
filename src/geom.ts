@@ -54,6 +54,13 @@ export class GeoBuilder {
     return this;
   }
 
+  /** Quad with a colour per corner (smooth Gouraud blend between them). */
+  quadC(a: V3, b: V3, c: V3, d: V3, cols: [number, number, number, number]): this {
+    this.push(a, cols[0]); this.push(b, cols[1]); this.push(c, cols[2]);
+    this.push(a, cols[0]); this.push(c, cols[2]); this.push(d, cols[3]);
+    return this;
+  }
+
   /** Convex polygon as a triangle fan. */
   poly(pts: V3[], color: number): this {
     for (let i = 1; i < pts.length - 1; i++) this.tri(pts[0], pts[i], pts[i + 1], color);

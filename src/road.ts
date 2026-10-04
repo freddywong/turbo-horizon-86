@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { LANES, LANE_W, ROAD_HALF, STRIPE, View } from './track';
+import { GFX, groundTexture } from './gfx';
+import { LANES, LANE_W, ROAD_HALF, SEG, STRIPE, View } from './track';
 
 /** One strip of the road cross-section between two lateral points. */
 export interface Span {
@@ -77,12 +78,22 @@ export class RoadMesh {
   mesh: THREE.Mesh;
   private pos: Float32Array;
   private colr: Float32Array;
+  private uv: Float32Array;
   private geo: THREE.BufferGeometry;
 
   constructor(private profiles: Profile[]) {
     const maxQuads = MAX_SEGS * MAX_SPANS;
     this.pos = new Float32Array(maxQuads * 4 * 3);
     this.colr = new Float32Array(maxQuads * 4 * 3);
+    this.uv = new Float32Array(maxQuads * 4 * 2);
+    if (GFX.modern) {
+      // texture-mapped ground does the speed cue, so the big light/dark bands get
+      // softer; strong two-colour stripes (kerbs, lane dashes) stay as they are
+      for (const p of profiles) for (const sp of p.spans) {
+        const d = Math.abs(sp.c0.r - sp.c1.r) + Math.abs(sp.c0.g - sp.c1.g) + Math.abs(sp.c0.b - sp.c1.b);
+        if (d < 0.25) sp.c1 = sp.c0.clone().lerp(sp.c1, 0.45);
+      }
+    }
     const idx = new Uint32Array(maxQuads * 6);
     for (let q = 0; q < maxQuads; q++) {
       idx.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
@@ -90,8 +101,9 @@ export class RoadMesh {
     this.geo = new THREE.BufferGeometry();
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     this.geo.setAttribute('color', new THREE.BufferAttribute(this.colr, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geo.setAttribute('uv', new THREE.BufferAttribute(this.uv, 2).setUsage(THREE.DynamicDrawUsage));
     this.geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, map: GFX.modern ? groundTexture() : null });
     this.mesh = new THREE.Mesh(this.geo, mat);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 0;
@@ -99,7 +111,7 @@ export class RoadMesh {
 
   update(view: View) {
     const { bx, by, bz, bh, yRef } = view;
-    const P = this.pos, C = this.colr;
+    const P = this.pos, C = this.colr, U = this.uv;
     let q = 0;
     const segs = Math.min(view.count, MAX_SEGS);
     for (let k = 0; k < segs; k++) {
@@ -123,6 +135,12 @@ export class RoadMesh {
         for (let v = 0; v < 4; v++) {
           C[o + v * 3] = c.r; C[o + v * 3 + 1] = c.g; C[o + v * 3 + 2] = c.b;
         }
+        // texture coords: across = lateral offset (+ height, so walls tile too), along = track distance
+        const ua = (sp.xa + sp.ya) / 7, ub = (sp.xb + sp.yb) / 7;
+        const va = (i * SEG) / 14, vb = ((i + 1) * SEG) / 14;
+        const u = q * 8;
+        U[u] = ua; U[u + 1] = va; U[u + 2] = ub; U[u + 3] = va;
+        U[u + 4] = ub; U[u + 5] = vb; U[u + 6] = ua; U[u + 7] = vb;
         q++;
       }
     }
@@ -131,5 +149,9 @@ export class RoadMesh {
     (this.geo.attributes.color as THREE.BufferAttribute).addUpdateRange(0, q * 12);
     this.geo.attributes.position.needsUpdate = true;
     this.geo.attributes.color.needsUpdate = true;
+    if (GFX.modern) {
+      (this.geo.attributes.uv as THREE.BufferAttribute).addUpdateRange(0, q * 8);
+      this.geo.attributes.uv.needsUpdate = true;
+    }
   }
 }

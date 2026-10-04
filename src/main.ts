@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { SignAtlas } from './atlas';
 import { Audio } from './audio';
 import { Game } from './game';
+import { GFX } from './gfx';
 import { Hud } from './hud';
 import { Input } from './input';
 import { miami } from './routes/miami';
@@ -11,8 +12,8 @@ import { TouchControls } from './touch';
 import { World } from './world';
 
 /** Internal framebuffer: roughly the resolution of a mid-80s arcade board, 16:9. */
-const W = 426;
-const H = 240;
+const W = GFX.width;
+const H = GFX.height;
 
 async function boot() {
   try {
@@ -61,6 +62,7 @@ async function boot() {
     last = now;
     const driving = (game.state === 'race' || game.state === 'countdown') && !game.paused;
     if (touch.update(driving) && driving) game.paused = true;
+    if (touch.enabled) touch.setTurbo(game.turbos, game.turboT > 0);
     game.update(dt);
     game.draw();
     input.endFrame();

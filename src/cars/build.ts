@@ -225,6 +225,20 @@ export function wheelGeo(r: number, hw: number, outward: number, rim: number, sp
   return wg.build();
 }
 
+/** Soft glow quads behind every tail lamp (night driving). */
+export function tailHalos(spec: CarSpec, size = 1, bright = 0.8): GeoBuilder {
+  const h = new GeoBuilder();
+  const z = spec.stations[spec.stations.length - 1].z + 0.08;
+  for (const li of spec.lights) {
+    for (const x of li.mirror === false || li.x === 0 ? [li.x] : [li.x, -li.x]) {
+      const r = Math.max(li.w, li.h) * 1.6 * size + 0.25;
+      h.quad([x - r, li.y - r, z], [x + r, li.y - r, z], [x + r, li.y + r, z], [x - r, li.y + r, z],
+        new THREE.Color(li.c).multiplyScalar(bright).getHex(), [0, 0, 1, 1]);
+    }
+  }
+  return h;
+}
+
 /** Static wheels baked into a traffic car's geometry. */
 export function addStaticWheels(g: GeoBuilder, spec: CarSpec) {
   const w = spec.wheels;
@@ -235,7 +249,7 @@ export function addStaticWheels(g: GeoBuilder, spec: CarSpec) {
   }
 }
 
-export interface CarMats { lit: THREE.Material; glow: THREE.Material; sign: THREE.Material }
+export interface CarMats { lit: THREE.Material; glow: THREE.Material; sign: THREE.Material; paint?: THREE.Material; halo?: THREE.Material }
 
 /** The player's car: body + spinning wheels + brake lights + backfire. */
 export class PlayerCar {
@@ -246,7 +260,7 @@ export class PlayerCar {
   private flames: THREE.Mesh;
   private geos: THREE.BufferGeometry[] = [];
 
-  constructor(public spec: CarSpec, paint: number, mats: CarMats, plateUv: [number, number, number, number], shadow = 0x3c3c46) {
+  constructor(public spec: CarSpec, paint: number, mats: CarMats, plateUv: [number, number, number, number], shadow = 0x3c3c46, night = false) {
     const cg = buildBody(spec, paint);
     const s = new GeoBuilder();
     const { y, z } = cg.plate;
@@ -257,9 +271,10 @@ export class PlayerCar {
       parent.add(mesh);
       return mesh;
     };
-    add(cg.lit.build(), mats.lit, this.body);
+    add(cg.lit.build(), mats.paint ?? mats.lit, this.body);
     if (!cg.glow.empty) add(cg.glow.build(), mats.glow, this.body);
     add(s.build(), mats.sign, this.body);
+    if (night && mats.halo) add(tailHalos(spec, 0.45, 0.45).build(), mats.halo, this.body);
     this.brake = add(cg.brake.empty ? new GeoBuilder().tri([0, 0, 0], [0, 0, 0], [0, 0, 0], 0).build() : cg.brake.build(), mats.glow, this.body);
 
     const f = new GeoBuilder();

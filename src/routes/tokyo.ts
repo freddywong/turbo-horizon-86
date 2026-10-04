@@ -163,7 +163,7 @@ export const tokyo: RouteDef = {
       const w = rng.range(18, 34), d = rng.range(18, 30), h = rng.range(40, 130);
       towers.push({ t: reg.add(tower(rng, w, d, h)), h, w: Math.max(w, d) });
     }
-    const lamp = reg.add(P.streetLight(10, 0xffc060, 0x8a8a98, 4));
+    const lamp = reg.add(P.streetLight(10, 0xffc060, 0x8a8a98, 4, true));
     const neonCols = [0xff3a8a, 0x40f0ff, 0xffe040, 0xff5030, 0x80ff60, 0xc060ff];
     const tateWords = ['ホテル', 'カラオケ', 'ラーメン', '喫茶店', '電気街', '寿司', 'ゲーム', '居酒屋'];
     const tate = tateWords.map((t, i) => {
@@ -192,8 +192,8 @@ export const tokyo: RouteDef = {
     const gCheck = reg.add(P.gate(atlas.add({ bg: 0xffe040, fg: 0x1a1a1a, text: 'CHECKPOINT' }, 4, 1), 0x9a9aa8, 0x1a5ae0, 0xffe040));
     const gGoal = reg.add(P.gate(atlas.add({ bg: 0xffffff, fg: 0x000000, text: 'GOAL', stripes: -1 }, 4, 1), 0x9a9aa8, 0x1a1a1a, 0xff3a8a));
     const T = TRAFFIC;
-    const trafficTypes = [T.cedric, T.every, T.civic, T.ae86, T.crown].map((s) => reg.add(trafficProp(s)))
-      .concat([reg.add(trafficProp(T.crown, { taxi: true })), reg.add(trafficProp(T.crown, { taxi: true })),
+    const trafficTypes = [T.cedric, T.every, T.civic, T.ae86, T.crown].map((s) => reg.add(trafficProp(s, { night: true })))
+      .concat([reg.add(trafficProp(T.crown, { taxi: true, night: true })), reg.add(trafficProp(T.crown, { taxi: true, night: true })),
         reg.add(P.truck(0xe02a2a)), reg.add(P.truck(0x1a8a3a)), reg.add(P.bus(0x2a8a5a))]);
     const chevR = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'R' }, 2, 1), 0.3));
     const chevL = reg.add(P.chevron(atlas.add({ bg: 0xffd020, fg: 0x101010, text: '', arrows: 'L' }, 2, 1), 0.3));

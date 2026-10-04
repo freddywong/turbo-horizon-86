@@ -1,5 +1,5 @@
 import { SignAtlas } from '../atlas';
-import { Backdrop, clouds, disc, horizonBand, mountainRing, skyDome, skylineRing } from '../backdrop';
+import { Backdrop, clouds, disc, discCentre, horizonBand, mountainRing, skyDome, skylineRing } from '../backdrop';
 import { TRAFFIC, trafficProp } from '../cars/traffic';
 import * as P from '../props';
 import { makeProfile, RoadStyle } from '../road';
@@ -194,7 +194,9 @@ export const miami: RouteDef = {
       return d;
     };
     // big low sun over the sea, slightly right of the opening straight
-    bd.addLayer(disc(2500, 0.25, 2.6, 300, [[1.45, 0xffc4a4], [1.22, 0xffa884], [1, 0xff8a3a], [0.84, 0xffaa44], [0.68, 0xffcc58], [0.5, 0xffe880], [0.3, 0xfff8c8]], 24), 1);
+    const sunDisc = disc(2500, 0.25, 2.6, 300, [[1.45, 0xffc4a4], [1.22, 0xffa884], [1, 0xff8a3a], [0.84, 0xffaa44], [0.68, 0xffcc58], [0.5, 0xffe880], [0.3, 0xfff8c8]], 24);
+    bd.addLayer(sunDisc, 1);
+    bd.sun = { obj: sunDisc, local: discCentre(2500, 0.25, 2.6) };
     // long low strato bands across the sun, then puffy cumulus higher up
     bd.addLayer(clouds(rng, 2320, 7, [0xffe0c0, 0xffb8a0, 0xe888a8], -0.5, 1.2, [1.2, 3.2]), 0.9);
     bd.addLayer(clouds(rng, 2350, 14, [0xffffff, 0xffe8f0, 0xf4a8c8]), 0.8);

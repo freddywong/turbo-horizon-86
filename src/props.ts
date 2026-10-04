@@ -2,19 +2,29 @@ import * as THREE from 'three';
 import { GeoBuilder, V3, at, rotY } from './geom';
 import { ROAD_HALF, SEG } from './track';
 import { Rng } from './rng';
+import { GFX, haloTexture } from './gfx';
 
-export type MatKind = 'lit' | 'glow' | 'sign';
+export type MatKind = 'lit' | 'glow' | 'sign' | 'halo';
 export interface PropPart { geo: THREE.BufferGeometry; mat: MatKind; tint?: boolean }
 export interface PropDef { parts: PropPart[]; radius: number; max: number; len?: number }
 export type UV = [number, number, number, number];
 
-export interface Materials { lit: THREE.Material; glow: THREE.Material; sign: THREE.Material }
+export interface Materials { lit: THREE.Material; glow: THREE.Material; sign: THREE.Material; halo: THREE.Material; paint: THREE.Material }
 
 export function makeMaterials(signTex: THREE.Texture): Materials {
   return {
     lit: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
     sign: new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }),
+    // additive light halos: only drawn in the '92 look
+    halo: new THREE.MeshBasicMaterial({
+      map: haloTexture(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, fog: false, side: THREE.DoubleSide, visible: GFX.modern,
+    }),
+    // glossy car paint with a specular glint in the '92 look
+    paint: GFX.modern
+      ? new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, shininess: 45, specular: 0x9a9a9a })
+      : new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),
   };
 }
 
@@ -81,6 +91,8 @@ export class PropRenderer {
 // Prop library. Everything is deliberately built from a handful of polygons.
 // Local axes: -Z points down the road (away from the player), +X to the right.
 // ---------------------------------------------------------------------------
+
+const scaleHex = (c: number, k: number) => new THREE.Color(c).multiplyScalar(k).getHex();
 
 const parts = (lit: GeoBuilder, glow?: GeoBuilder, sign?: GeoBuilder): PropPart[] => {
   const out: PropPart[] = [{ geo: lit.build(), mat: 'lit' }];
@@ -253,13 +265,24 @@ export function roadSign(uv: UV, w = 4, h = 2): PropDef {
 }
 
 /** Streetlight. Arm reaches toward -X (place on the right side, rotate PI for the left). */
-export function streetLight(height: number, lamp: number, pole = 0x9aa0a8, arm = 3): PropDef {
+export function streetLight(height: number, lamp: number, pole = 0x9aa0a8, arm = 3, halo = false): PropDef {
   const g = new GeoBuilder();
   const l = new GeoBuilder();
   g.prism(0, 0, 0, height, 0.2, 0.14, 6, pole);
   g.box(-arm / 2, height, 0, arm, 0.22, 0.22, pole);
   l.box(-arm, height - 0.2, 0, 1.4, 0.3, 0.6, lamp);
-  return { parts: parts(g, l), radius: 0.5, max: 120 };
+  const out = parts(g, l);
+  if (halo) {
+    // big soft glow round the lamp, crossed so it reads from any angle
+    const h = new GeoBuilder();
+    const r = 4.2, y = height - 0.5;
+    h.quad([-arm - r, y - r, 0], [-arm + r, y - r, 0], [-arm + r, y + r, 0], [-arm - r, y + r, 0], lamp, [0, 0, 1, 1]);
+    h.quad([-arm, y - r, -r], [-arm, y - r, r], [-arm, y + r, r], [-arm, y + r, -r], lamp, [0, 0, 1, 1]);
+    // pool of light on the road below
+    h.quad([-arm - 3.5, 0.05, -3.5], [-arm + 3.5, 0.05, -3.5], [-arm + 3.5, 0.05, 3.5], [-arm - 3.5, 0.05, 3.5], scaleHex(lamp, 0.35), [0, 0, 1, 1]);
+    out.push({ geo: h.build(), mat: 'halo', tint: false });
+  }
+  return { parts: out, radius: 0.5, max: 120 };
 }
 
 /** Guardrail section, one segment long. */

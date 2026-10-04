@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Audio, TRACKS } from './audio';
+import { GFX, setGfx } from './gfx';
 import { CYAN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
 import { Input } from './input';
 import { ROAD_HALF, SEG } from './track';
@@ -15,6 +16,9 @@ const KMH = 3.6;
 const GEARS = [0, 18, 34, 50, 66, 84];
 const STEER_RATE = 25;
 const CF = 0.82; // centrifugal push in curves
+export const TURBOS = 3; // boosts per race, for every driver
+const TURBO_TIME = 3; // seconds
+const TURBO_SPEED = 1.18; // top speed multiplier while boosting
 
 const loadHi = (): number => {
   try {
@@ -102,6 +106,9 @@ export class Game {
   /** ARCADE: classic time attack. RIVALS: an 8-car race against computer drivers. */
   mode: 'arcade' | 'rivals' = 'arcade';
   raceTime = 0;
+  /** turbo boosts left this race, and time left on the active one */
+  turbos = 3;
+  turboT = 0;
   finishTime = -1;
   place = 8;
   private table: ResultRow[] = [];
@@ -137,6 +144,7 @@ export class Game {
     this.pos = 3 * SEG;
     this.px = demo ? this.world.laneX(1) : 0;
     this.speed = demo ? 50 : 0;
+    this.turboT = 0;
     this.steer = 0;
     this.driftYaw = 0;
     this.crashT = 0;
@@ -173,6 +181,8 @@ export class Game {
   startRace() {
     this.paused = false;
     this.resetPlayer(false);
+    this.turbos = TURBOS;
+    this.turboT = 0;
     this.raceTime = 0;
     this.finishTime = -1;
     this.table = [];
@@ -225,7 +235,12 @@ export class Game {
           this.resetPlayer(true);
         }
         this.drive(dt, this.autopilot(), true);
-        if (inp.confirm || inp.taps.length) {
+        const gfxTap = inp.taps.some((tp) => tp.y > 400 && tp.y < 440 && Math.abs(tp.x - HUD_W / 2) < 200);
+        if (inp.hit('KeyG') || gfxTap) {
+          // switching the look rebuilds every texture and material, so restart the page
+          setGfx(GFX.modern ? '86' : '92');
+          location.reload();
+        } else if (inp.confirm || inp.taps.length) {
           this.audio.coin();
           this.toSelect();
         }
@@ -317,7 +332,13 @@ export class Game {
         break;
       }
       case 'race': {
-        this.drive(dt, { accel: inp.accel, brake: inp.brake, steer: inp.steer, drift: inp.drift }, false);
+        if (inp.hit('KeyT', 'ShiftLeft', 'ShiftRight') && this.turbos > 0 && this.turboT <= 0 && this.crashT <= 0) {
+          this.turbos--;
+          this.turboT = TURBO_TIME;
+          this.audio.turbo();
+          this.flash('TURBO!', '', 1.0);
+        }
+        this.drive(dt, { accel: inp.accel || this.turboT > 0, brake: inp.brake, steer: inp.steer, drift: inp.drift }, false);
         this.timeLeft -= dt;
         this.score += Math.floor(this.speed * KMH * dt * 9);
         if (this.drifting && this.speed > 45) this.score += Math.floor(dt * 3000);
@@ -451,7 +472,9 @@ export class Game {
     } else {
       const v = this.speed;
       const st = this.spec.stats;
-      if (c.accel) this.speed += 30 * st.accel * (1 - Math.pow(v / this.vmax, 1.8)) * dt + 2 * dt;
+      const boost = this.turboT > 0;
+      const vlim = this.vmax * (boost ? TURBO_SPEED : 1);
+      if (c.accel) this.speed += 30 * st.accel * (boost ? 1.9 : 1) * (1 - Math.pow(Math.min(1, v / vlim), 1.8)) * dt + 2 * dt;
       else if (c.brake) this.speed -= 58 * dt;
       else this.speed -= (3 + v * 0.035) * dt;
 
@@ -522,7 +545,15 @@ export class Game {
         if (!demo) this.audio.crash(false);
       }
     }
-    this.speed = Math.max(0, Math.min(this.vmax, this.speed));
+    // after a boost the car bleeds back down to its normal top speed instead of snapping
+    const cap = this.vmax * (this.turboT > 0 ? TURBO_SPEED : 1);
+    if (this.speed > cap) this.speed = Math.max(cap, this.speed - 14 * dt);
+    this.speed = Math.max(0, this.speed);
+    if (this.turboT > 0) {
+      this.turboT = Math.max(0, this.turboT - dt);
+      this.flameT = Math.max(this.flameT, 0.08);
+      this.shakeKick = Math.max(this.shakeKick, 0.1);
+    }
     this.pos += this.speed * dt;
     this.wheelSpin -= this.speed * dt / 0.37;
     if ((this.state === 'attract' || this.state === 'select') && this.pos > track.goalDist - 200) this.resetPlayer(true);
@@ -591,9 +622,9 @@ export class Game {
   private updateWorld(dt: number, pose: { steer: number; yaw: number; spin: number; bounce: number; brake?: boolean; flame?: number }) {
     const f = this.speed / VMAX;
     const cam = this.camera;
-    const fov = 54 + 14 * f * f;
+    const fov = 54 + 14 * Math.min(1.3, f) * Math.min(1.3, f) + (this.turboT > 0 ? 6 : 0);
     if (Math.abs(cam.fov - fov) > 0.01) {
-      cam.fov = fov;
+      cam.fov += (fov - cam.fov) * Math.min(1, dt * 5);
       cam.updateProjectionMatrix();
     }
     this.shakeKick = Math.max(0, this.shakeKick - dt * 1.5);
@@ -605,6 +636,14 @@ export class Game {
   draw() {
     const h = this.hud;
     h.clear();
+    if (GFX.modern && this.state !== 'carselect') {
+      const s = this.world.sunOnHud(this.camera, HUD_W, HUD_H);
+      if (s) {
+        // fade as the sun nears the screen edge
+        const edge = Math.max(Math.abs(s.x / HUD_W - 0.5), Math.abs(s.y / HUD_H - 0.5)) * 2;
+        h.flare(s.x, s.y, Math.max(0, Math.min(1, 1.25 - edge)));
+      }
+    }
     const blink = Math.floor(this.clock * 2.5) % 2 === 0;
     const route = this.world.route;
     switch (this.state) {
@@ -616,6 +655,7 @@ export class Game {
         if (blink) h.text(this.touch ? 'TAP TO START' : 'PRESS ENTER', HUD_W / 2, 320, 24, YELLOW, 'center');
         h.text(`HI-SCORE ${String(this.hi).padStart(8, '0')}`, HUD_W / 2, 20, 16, CYAN, 'center');
         h.text('FREE PLAY', HUD_W - 20, HUD_H - 30, 16, WHITE, 'right');
+        h.text(`${this.touch ? 'TAP' : 'G'}  GRAPHICS  ${GFX.modern ? '1992' : '1986'}`, HUD_W / 2, 412, 16, CYAN, 'center');
         h.text('©1986 HORIZON SOFT', 20, HUD_H - 30, 16, WHITE, 'left');
         break;
       }
@@ -752,7 +792,7 @@ export class Game {
       // live race position, in the gap under the timer
       // on phones the course bar sits under the timer, so the position goes under the speed gauge
       const p = ordinal(this.place);
-      const px = this.touch ? 84 : HUD_W / 2 - 52, py = this.touch ? 190 : 90;
+      const px = this.touch ? 84 : HUD_W / 2 - 52, py = this.touch ? 222 : 90;
       h.text('POS', px - 12, py + 8, 16, YELLOW, 'right');
       h.text(p, px, py, 32, this.place === 1 ? YELLOW : WHITE);
       h.text('/8', px + p.length * 32 + 4, py + 16, 16, WHITE);
@@ -768,6 +808,11 @@ export class Game {
     h.text('KM/H', 130, sy + 42, 16, CYAN);
     if (t) h.tach(20, sy + 100, this.speed / this.vmax);
     else h.tach(220, HUD_H - 24, this.speed / this.vmax);
+    // turbo stock: one lamp per boost left, and a draining bar while one is firing
+    const tx = t ? 20 : 220, ty = t ? sy + 112 : HUD_H - 80;
+    h.text('TURBO', tx, ty, 16, this.turboT > 0 && blink ? WHITE : ORANGE);
+    for (let i = 0; i < TURBOS; i++) h.box(tx + 92 + i * 26, ty - 2, 20, 20, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, 3);
+    if (this.turboT > 0) h.rect(tx + 92, ty + 22, (this.turboT / TURBO_TIME) * (TURBOS * 26 - 6), 5, YELLOW);
 
     // course progress bar
     const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 24, y = t ? 118 : HUD_H - 34;

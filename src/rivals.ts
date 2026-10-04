@@ -31,6 +31,8 @@ export interface Rival {
   braking: boolean;
   finished: number; // race time when crossing the goal, -1 until then
   bumpT: number;
+  turbos: number; // boosts left
+  turboT: number; // time left on the active boost
 }
 
 const KMH = 3.6;
@@ -53,6 +55,7 @@ export function makeGrid(playerCar: CarSpec, startPos: number, seed: number): Ri
       d: startPos + 9 + row * 9, x: side * LANE_W * 0.55, v: 0,
       vmax: (spec.stats.vmax / KMH) * dr.skill, corner: dr.corner, aggro: dr.aggro,
       lane: side * rng.range(1, 4), steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0,
+      turbos: 3, turboT: 0,
     };
   });
 }
@@ -81,6 +84,15 @@ export function updateRivals(rivals: Rival[], dt: number, track: Track, traffic:
     else if (gap > 250) vt *= 0.96;
     else if (gap < -300) vt *= 1.15;
     else if (gap < -120) vt *= 1.08;
+    // turbo: fired on a straight while dicing with the player, or when falling behind
+    if (r.turboT > 0) {
+      r.turboT -= dt;
+      vt *= 1.18;
+    } else if (r.turbos > 0 && c2 < 0.0009 && r.d < goal - 300 && gap > -200 && gap < 120
+      && Math.random() < dt * (0.05 + r.aggro * 0.1)) {
+      r.turbos--;
+      r.turboT = 3;
+    }
     if (r.d > goal + 250) vt = 0; // parked in the run-out after the finish
     if (r.bumpT > 0) {
       r.bumpT -= dt;
@@ -113,7 +125,7 @@ export function updateRivals(rivals: Rival[], dt: number, track: Track, traffic:
     r.steer += ((lat / Math.max(dt, 1e-3)) / 10 - r.steer) * Math.min(1, dt * 8);
 
     r.braking = vt < r.v - 3;
-    r.v += Math.sign(vt - r.v) * Math.min(Math.abs(vt - r.v), (r.braking ? 40 : 22) * dt);
+    r.v += Math.sign(vt - r.v) * Math.min(Math.abs(vt - r.v), (r.braking ? 40 : r.turboT > 0 ? 40 : 22) * dt);
 
     // contact with traffic: the AI brakes rather than spins
     for (const c of traffic) {
