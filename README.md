@@ -195,7 +195,8 @@ Cherokee, Chevrolet Caprice, Mercedes W124 and Ford F-150. Tokyo has a Toyota Cr
 * **MONACO RIVIERA** (afternoon): the harbour front full of yachts, casino square, the harbour tunnel,
   the clifftop Corniche high above the sea, and Cap Martin.
 
-Pick a route on the route-select grid (arrow keys or tap). Online, whoever presses START picks it.
+Pick a route from the postcards on the route-select screen (arrow keys, or tap a card and tap it again to go). Under the cards you see
+whether it is a day or night run, its song and a map of its five stages. Online, whoever presses START picks it.
 
 Each route has five stages. Reaching a checkpoint adds time (EXTENDED PLAY).
 Reach the GOAL before the timer runs out. Score comes from speed, drifting,

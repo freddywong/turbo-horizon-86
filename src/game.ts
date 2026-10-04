@@ -17,7 +17,9 @@ type State = 'attract' | 'select' | 'carselect' | 'name' | 'lobby' | 'countdown'
 type Mode = 'arcade' | 'rivals' | 'online';
 const MODES: Mode[] = ['arcade', 'rivals', 'online'];
 // route-select grid
-const CARD_X = 39, CARD_Y = 80, CARD_STEP_X = 262, CARD_STEP_Y = 100;
+const CARD_X = 39, CARD_Y = 52, CARD_STEP_X = 262, CARD_STEP_Y = 106;
+/** Route select: mode tabs and the GO button under the course map. */
+const MODE_X = 39, MODE_STEP = 262, MODE_W = 250, MODE_Y = 330, MODE_H = 46, GO_Y = 396;
 /** Online lobby left panel: positions shared by the drawing and the tap zones. */
 const LOBBY = { x0: 28, x1: 378, mid: 203, carY: 72, carH: 46, paintY: 122, turbY: 142, weapY: 166, ammoY: 190, chipH: 20, minusX: 190, plusX: 284 };
 const GREY = 0x8a8aa8;
@@ -348,17 +350,17 @@ export class Game {
         if (inp.hit('ArrowRight', 'KeyD')) pick = (this.routeIdx + 1) % nr;
         let toggle = inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS');
         for (const tp of inp.taps) {
-          if (tp.y > CARD_Y && tp.y < CARD_Y + 2 * CARD_STEP_Y - 12 && tp.x > CARD_X && tp.x < CARD_X + 3 * CARD_STEP_X - 12) {
-            const i = Math.floor((tp.y - CARD_Y) / CARD_STEP_Y) * 3 + Math.floor((tp.x - CARD_X) / CARD_STEP_X);
+          if (tp.y > CARD_Y - 4 && tp.y < CARD_Y + 2 * CARD_STEP_Y - 8 && tp.x > CARD_X && tp.x < CARD_X + 3 * CARD_STEP_X - 12) {
+            const i = Math.floor((tp.y - CARD_Y + 4) / CARD_STEP_Y) * 3 + Math.floor((tp.x - CARD_X) / CARD_STEP_X);
             if (i === this.routeIdx) go = true;
             else if (i < nr) pick = i;
-          } else if (tp.y >= 320 && tp.y < 380) {
-            const m = MODES[Math.max(0, Math.min(2, Math.floor((tp.x - (HUD_W / 2 - 375)) / 250)))];
+          } else if (tp.y >= MODE_Y - 4 && tp.y < MODE_Y + MODE_H + 6) {
+            const m = MODES[Math.max(0, Math.min(2, Math.floor((tp.x - MODE_X) / MODE_STEP)))];
             if (m !== this.mode) {
               this.mode = m;
               this.audio.blip();
             }
-          } else if (tp.y >= 380) go = true;
+          } else if (tp.y >= GO_Y - 6) go = true;
         }
         if (toggle) {
           const dn = inp.hit('ArrowDown', 'KeyS') ? 1 : 2;
@@ -1308,27 +1310,67 @@ export class Game {
         break;
       }
       case 'select': {
-        h.text('SELECT  YOUR  ROUTE', HUD_W / 2, 44, 24, YELLOW, 'center');
-        // a card per route, three across
+        h.text('SELECT  YOUR  ROUTE', HUD_W / 2, 12, 24, YELLOW, 'center');
+        h.text(`${Math.max(0, Math.ceil(20 - this.t))}`, HUD_W - 30, 12, 24, ORANGE, 'right');
+        // postcards, three across
+        const cw = CARD_STEP_X - 12, ch = CARD_STEP_Y - 8, art = 68;
         this.routes.forEach((rt, i) => {
-          const x = CARD_X + (i % 3) * CARD_STEP_X, y = CARD_Y + Math.floor(i / 3) * CARD_STEP_Y;
-          const bw = CARD_STEP_X - 12, bh = CARD_STEP_Y - 12;
           const sel = i === this.routeIdx;
-          h.box(x, y, bw, bh, rt.card[0], sel ? (blink ? YELLOW : WHITE) : 0x3a3a5a, sel ? 6 : 3);
-          h.text(rt.lines[0], x + bw / 2, y + 18, 16, rt.card[1], 'center');
-          h.text(rt.lines[1], x + bw / 2, y + 44, 16, rt.card[1], 'center');
+          const x = CARD_X + (i % 3) * CARD_STEP_X, y = CARD_Y + Math.floor(i / 3) * CARD_STEP_Y - (sel ? 3 : 0);
+          if (sel) h.rect(x + 5, y + 6, cw, ch, 0x000000);
+          h.postcard(rt.id, x, y, cw, art, this.clock);
+          h.rect(x, y + art, cw, ch - art, sel ? 0x2a1a50 : 0x101028);
+          const name = `${rt.lines[0]} ${rt.lines[1]}`;
+          const fs = name.length <= 15 ? 16 : 12;
+          h.text(name, x + cw / 2, y + art + (ch - art - fs) / 2 + 1, fs, sel ? YELLOW : rt.card[1], 'center');
+          if (!sel) h.shade(x, y, cw, ch, 0.35);
+          const fc = sel ? (blink ? YELLOW : WHITE) : 0x3a3a5a, bw = sel ? 4 : 2;
+          h.rect(x - bw, y - bw, cw + bw * 2, bw, fc);
+          h.rect(x - bw, y + ch, cw + bw * 2, bw, fc);
+          h.rect(x - bw, y, bw, ch, fc);
+          h.rect(x + cw, y, bw, ch, fc);
         });
-        h.text(this.touch ? 'TAP A ROUTE, TAP AGAIN TO GO' : '< >  ROUTE   ^ v  MODE   ENTER  NEXT', HUD_W / 2, 290, 16, WHITE, 'center');
-        // mode boxes
-        const modes: [Mode, string, string][] = [['arcade', 'ARCADE', 'BEAT THE CLOCK'], ['rivals', 'VS RIVALS', '8-CAR RACE'], ['online', 'ONLINE', 'RACE REAL PLAYERS']];
-        modes.forEach(([m, label, sub], i) => {
-          const mw = 236, x = HUD_W / 2 - 375 + i * 250 + 7;
-          const sel = m === this.mode;
-          h.box(x, 324, mw, 54, sel ? 0x2a1a50 : 0x141428, sel ? (blink ? PINK : WHITE) : 0x3a3a5a, sel ? 5 : 3);
-          h.text(label, x + mw / 2, 334, 16, sel ? YELLOW : 0x8a8aa8, 'center');
-          h.text(sub, x + mw / 2, 356, 8, sel ? WHITE : 0x8a8aa8, 'center');
+        // the chosen route: day/night, its song, and the five stages as a course map
+        const rt = this.world.route, iy = 262;
+        h.shade(CARD_X - 4, iy, 3 * CARD_STEP_X - 4, 58, 0.72);
+        h.sky(rt.night, CARD_X + 12, iy + 13);
+        h.text(`${rt.lines[0]} ${rt.lines[1]}`, CARD_X + 30, iy + 6, 16, WHITE);
+        const song = TRACKS.find((tr) => tr.id === rt.music)?.name ?? '';
+        h.note(HUD_W - CARD_X - 8 - song.length * 8 - 14, iy + 12, PINK);
+        h.text(song, HUD_W - CARD_X - 8, iy + 9, 8, PINK, 'right');
+        const sx0 = CARD_X + 70, sx1 = HUD_W - CARD_X - 70, dy = iy + 34;
+        h.rect(sx0, dy - 1, sx1 - sx0, 2, 0x5a5a8a);
+        rt.stageNames.forEach((nm, k) => {
+          const sx = sx0 + ((sx1 - sx0) * k) / (rt.stageNames.length - 1);
+          h.rect(sx - 4, dy - 4, 8, 8, k === 0 ? GREEN : k === rt.stageNames.length - 1 ? YELLOW : CYAN);
+          h.text(nm, sx, dy + 9, 8, k === 0 ? GREEN : WHITE, 'center');
         });
-        h.text(`${Math.max(0, Math.ceil(20 - this.t))}`, HUD_W - 30, 20, 24, ORANGE, 'right');
+        // modes
+        const modes: [Mode, string, string, 'clock' | 'flag' | 'globe'][] = [
+          ['arcade', 'ARCADE', 'BEAT THE CLOCK', 'clock'], ['rivals', 'VS RIVALS', '8-CAR RACE', 'flag'], ['online', 'ONLINE', 'RACE REAL PLAYERS', 'globe']];
+        modes.forEach(([m, label, sub, ic], i) => {
+          const x = MODE_X + i * MODE_STEP, sel = m === this.mode;
+          h.box(x, MODE_Y, MODE_W, MODE_H, sel ? 0x2a1a50 : 0x141428, sel ? (blink ? PINK : WHITE) : 0x3a3a5a, sel ? 4 : 2);
+          h.icon(ic, x + 26, MODE_Y + MODE_H / 2, sel ? YELLOW : GREY);
+          h.text(label, x + 48, MODE_Y + 9, 16, sel ? YELLOW : GREY);
+          h.text(sub, x + 48, MODE_Y + 29, 8, sel ? WHITE : GREY);
+        });
+        // GO, with the keys either side
+        h.box(HUD_W / 2 - 120, GO_Y, 240, 46, 0x1a8a3a, blink ? YELLOW : WHITE);
+        h.text(this.touch ? 'TAP TO GO' : 'ENTER  GO', HUD_W / 2, GO_Y + 15, 16, WHITE, 'center');
+        if (this.touch) {
+          h.text('TAP A ROUTE', CARD_X, GO_Y + 12, 8, GREY);
+          h.text('TAP IT AGAIN TO GO', CARD_X, GO_Y + 26, 8, GREY);
+        } else {
+          let kx = CARD_X;
+          kx += h.keycap(kx, GO_Y + 13, '←', 18) + 3;
+          kx += h.keycap(kx, GO_Y + 13, '→', 18) + 3;
+          h.text('ROUTE', kx + 5, GO_Y + 18, 8, WHITE);
+          h.text('MODE', HUD_W - CARD_X, GO_Y + 18, 8, WHITE, 'right');
+          kx = HUD_W - CARD_X - 38 - 5 * 8 - 6;
+          kx += h.keycap(kx, GO_Y + 13, '↑', 18) + 3;
+          h.keycap(kx, GO_Y + 13, '↓', 18);
+        }
         break;
       }
       case 'carselect': {

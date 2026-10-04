@@ -455,8 +455,18 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
   for (const f of spec.side ?? []) {
     for (const s of [-1, 1]) {
       if (f.kind === 'intake') {
-        sideQuad(body, s, f.z0 - 0.03, f.z1 + 0.03, f.y0 + (f.y1 - f.y0) * 0.5 - 0.03, f.y1 + 0.03, f.y0 - 0.03, f.y1 + 0.03, BLACK, 0.005);
-        body.layer(CARTEX.MESH, () => sideQuad(body, s, f.z0, f.z1, f.y0 + (f.y1 - f.y0) * 0.5, f.y1, f.y0, f.y1, MESH_COL, 0.008, [0, 0, (f.z1 - f.z0) * 7, (f.y1 - f.y0) * 7]));
+        // wedge-shaped recess, sliced along z so it hugs the flank and stays below the window line
+        const n = 10, bot = (z: number) => Math.max(f.y0 + (f.y1 - f.y0) * 0.5 * (1 - (z - f.z0) / (f.z1 - f.z0)), archAt(z) + 0.1);
+        const top = (z: number, pad: number) => Math.max(bot(Math.min(f.z1, Math.max(f.z0, z))) + 0.04, Math.min(f.y1 + pad, BELT(z) - 0.03));
+        for (let j = 0; j < n; j++) {
+          const za = f.z0 + ((f.z1 - f.z0) * j) / n, zb = f.z0 + ((f.z1 - f.z0) * (j + 1)) / n;
+          const ea = j === 0 ? za - 0.03 : za, eb = j === n - 1 ? zb + 0.03 : zb;
+          // stand further off where the fender bulges over the wheel, so the paint never pokes through
+          const off = 0.006 + Math.min(0.02, (flareAt(za) + flareAt(zb)) * 0.25);
+          sideQuad(body, s, ea, eb, bot(za) - 0.03, top(ea, 0.03), bot(zb) - 0.03, top(eb, 0.03), BLACK, off);
+          const u0 = (za - f.z0) * 7, u1 = (zb - f.z0) * 7;
+          body.layer(CARTEX.MESH, () => sideQuad(body, s, za, zb, bot(za), top(za, 0), bot(zb), top(zb, 0), MESH_COL, off + 0.003, [u0, 0, u1 - u0, (f.y1 - f.y0) * 7]));
+        }
       } else if (f.kind === 'naca') {
         sideQuad(body, s, f.z0, f.z1, f.y1 - 0.02, f.y1, f.y0, f.y1, BLACK, 0.007);
         sideQuad(body, s, f.z0 + (f.z1 - f.z0) * 0.6, f.z1, f.y1 - (f.y1 - f.y0) * 0.6, f.y1, f.y0 + 0.02, f.y1 - 0.02, 0x222226, 0.009);
@@ -512,8 +522,11 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
       body.box(s * (xmr + 0.13), ymr, zmr, 0.18, 0.11, 0.1, [paint, paint, shade, BLACK]);
       body.quad([s * (xmr + 0.05), ymr - 0.045, zmr + 0.052], [s * (xmr + 0.21), ymr - 0.045, zmr + 0.052], [s * (xmr + 0.21), ymr + 0.045, zmr + 0.052], [s * (xmr + 0.05), ymr + 0.045, zmr + 0.052], 0x9aa8b8);
     } else body.box(s * (xmr + 0.08), ymr, zmr, 0.14, 0.12, 0.1, [0x1a1a1a, 0x222222, 0x1a1a1a, 0x333333]);
-    // door shut lines following the body section, handle at the back of the door
-    const zd0 = wsSt.z + 0.06, zd1 = rwSt ? rwSt.z + 0.05 : wsSt.z + 1.15;
+    // door shut lines following the body section; the door ends ahead of any side intake
+    const intake = (spec.side ?? []).find((f) => f.kind === 'intake');
+    const zd0 = wsSt.z + 0.06;
+    let zd1 = rwSt ? rwSt.z + 0.05 : wsSt.z + 1.15;
+    if (intake) zd1 = Math.min(zd1, intake.z0 - 0.06);
     for (const zz of [zd0, zd1]) {
       const sc = section(zz);
       for (let k = 0; k < 4; k++) {
@@ -522,20 +535,34 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
         body.quad([s * (p[0] + 0.006), p[1], zz], [s * (p[0] + 0.006), p[1], zz + 0.016], [s * (q[0] + 0.006), q[1], zz + 0.016], [s * (q[0] + 0.006), q[1], zz], DARK);
       }
     }
-    if (spec.id === 'countach' || spec.id === 'diablo') {
-      // scissor-door seam swept up over the front arch
-      const za2 = wheels[0].z + wheels[0].R + 0.02, yA = BELT(za2) - 0.04;
-      body.quad([s * (sideAt(za2, yA) + 0.007), yA, za2], [s * (sideAt(zd0 + 0.3, BELT(zd0 + 0.3) - 0.02) + 0.007), BELT(zd0 + 0.3) - 0.02, zd0 + 0.3],
-        [s * (sideAt(zd0 + 0.3, BELT(zd0 + 0.3) - 0.04) + 0.007), BELT(zd0 + 0.3) - 0.04, zd0 + 0.3], [s * (sideAt(za2, yA - 0.02) + 0.007), yA - 0.02, za2], DARK);
-    }
-    const zh = zd1 - 0.3, yh = BELT(zh) - 0.1;
-    if (!traffic) {
+    if (traffic) continue;
+    // handle at the back of the door, unless a duct or intake is there (F40 / Countach open from inside the duct)
+    const zh = zd1 - 0.22, yh = BELT(zh) - 0.1;
+    const blocked = (spec.side ?? []).some((f) => (f.kind === 'naca' || f.kind === 'intake') && zh + 0.14 > f.z0 && zh - 0.14 < f.z1 && yh + 0.05 > f.y0 && yh - 0.05 < f.y1);
+    if (!blocked) {
       body.quad([s * (sideAt(zh - 0.1, yh) + 0.009), yh - 0.018, zh - 0.1], [s * (sideAt(zh + 0.1, yh) + 0.009), yh - 0.018, zh + 0.1],
         [s * (sideAt(zh + 0.1, yh) + 0.009), yh + 0.018, zh + 0.1], [s * (sideAt(zh - 0.1, yh) + 0.009), yh + 0.018, zh - 0.1], CHROME);
-      // fuel filler on the right rear haunch
-      if (s > 0 && rfI >= 0) {
-        const zf = wheels[1].z - wheels[1].R - 0.22, yf = BELT(zf) - 0.12, xf = sideAt(zf, yf) + 0.007;
-        body.with(new THREE.Matrix4().makeTranslation(xf, yf, zf).multiply(new THREE.Matrix4().makeRotationY(Math.PI / 2)), () => ring(body, 0.06, 0.072, 10, DARK));
+    }
+    // fuel flap on the right rear quarter: behind the door (and intake), ahead of the arch, else up on the haunch
+    if (s > 0 && rfI >= 0) {
+      const back = Math.max(zd1, intake ? intake.z1 : zd1) + 0.04, arch = wheels[1].z - wheels[1].R - 0.04;
+      let zf = 0, yf = 0, room = false;
+      if (arch - back >= 0.2) {
+        zf = (back + arch) / 2;
+        yf = YB(zf) + (BELT(zf) - YB(zf)) * 0.62;
+        room = true;
+      } else {
+        const r = wheels[1], archTop = r.r + r.R + 0.06;
+        zf = r.z;
+        yf = (archTop + BELT(zf) - 0.05) / 2;
+        room = BELT(zf) - 0.05 - archTop >= 0.14;
+      }
+      if (room) {
+        const xf = sideAt(zf, yf) + 0.008;
+        body.with(new THREE.Matrix4().makeTranslation(xf, yf, zf).multiply(new THREE.Matrix4().makeRotationY(Math.PI / 2)), () => {
+          ring(body, 0.0, 0.058, 12, shade);
+          ring(body, 0.058, 0.07, 12, DARK);
+        });
       }
     }
   }
