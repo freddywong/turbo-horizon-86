@@ -64,6 +64,8 @@ The title screen switches between two looks (G, or tap the GRAPHICS line):
     six-spoke, multi-spoke, mesh, "telephone dial") with the brake disc and caliper behind,
     pillars, wipers, mirrors, shut lines, handles, fuel filler, side markers, rear fog lamp,
     multi-part exhausts and diffusers
+  * soft contact shadows under every car (darkest under the tyres) that darken the road
+    beneath instead of a flat grey slab
   * traffic with the same smooth bodies, glass with drivers inside, hubcapped wheels,
     bumpers and textured lamps
   * ships, a lighthouse and sun glitter on the horizon; aircraft lights over Tokyo

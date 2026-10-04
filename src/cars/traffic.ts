@@ -3,6 +3,7 @@ import { GFX } from '../gfx';
 import * as THREE from 'three';
 import { addStaticWheels, buildBody, tailHalos } from './build';
 import { buildBodyHD, wheelInto } from './hd';
+import { shadowGeo } from './shadow';
 import { boxy, CarSpec, Light, Station } from './spec';
 
 const RED = 0xc01810;
@@ -90,6 +91,7 @@ function trafficPropHD(s: CarSpec, opts: { taxi?: boolean; night?: boolean }): P
   const st = s.stations;
   const out: PropDef = {
     parts: [
+      { geo: shadowGeo(s), mat: 'shadow', tint: false, order: -1 },
       { geo: cg.skin.build(true), mat: 'car', tint: true },
       { geo: cg.body.build(), mat: 'car', tint: true },
       { geo: inner.build(), mat: 'car', tint: false },

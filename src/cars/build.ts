@@ -4,6 +4,7 @@ import { GFX } from '../gfx';
 import { CarSpec, Light, Station } from './spec';
 import { brakeGeoHD, buildBodyHD, wheelGeoHD } from './hd';
 import { carMaterials } from './mats';
+import { shadowGeo, shadowMaterial } from './shadow';
 
 const GLASS = 0x18283c, GLASS_SIDE = 0x22364c, DARK = 0x141416, BLACK = 0x0a0a0c, CHROME = 0xc8ccd4;
 
@@ -375,18 +376,24 @@ export class PlayerCar {
     this.flames.position.set(0, 0, tailZ + (hd ? 0.12 : 0.05));
     this.flames.visible = false;
 
-    // sprite-style shadow: kept inside the car's footprint so it only peeks out under the sills
-    const st = spec.stations;
-    const len = st[st.length - 1].z - st[0].z;
-    const wid = Math.max(...st.map((x) => x.w));
-    const sh = new GeoBuilder();
-    const pts: V3[] = [];
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      pts.push([Math.cos(a) * wid * 0.92, 0.02, (st[0].z + len / 2) + Math.sin(a) * (len / 2 - 0.05)]);
+    if (hd) {
+      // soft contact shadow that darkens the road beneath
+      const m = add(shadowGeo(spec), shadowMaterial(night ? 0.85 : 0.7), this.root);
+      m.renderOrder = -1;
+    } else {
+      // sprite-style shadow: kept inside the car's footprint so it only peeks out under the sills
+      const st = spec.stations;
+      const len = st[st.length - 1].z - st[0].z;
+      const wid = Math.max(...st.map((x) => x.w));
+      const sh = new GeoBuilder();
+      const pts: V3[] = [];
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+        pts.push([Math.cos(a) * wid * 0.92, 0.02, (st[0].z + len / 2) + Math.sin(a) * (len / 2 - 0.05)]);
+      }
+      sh.poly(pts, 0xffffff);
+      add(sh.build(), new THREE.MeshBasicMaterial({ color: shadow, side: THREE.DoubleSide }), this.root);
     }
-    sh.poly(pts, 0xffffff);
-    add(sh.build(), new THREE.MeshBasicMaterial({ color: shadow, side: THREE.DoubleSide }), this.root);
 
     const w = spec.wheels;
     const style = spec.rimStyle ?? 'star';

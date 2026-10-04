@@ -5,16 +5,17 @@ import { Rng } from './rng';
 import { GFX, haloTexture } from './gfx';
 import { atlasPatch, FACADE, facadeAtlas, tileOffset } from './textures';
 import { carMaterials } from './cars/mats';
+import { shadowMaterial } from './cars/shadow';
 
-export type MatKind = 'lit' | 'glow' | 'sign' | 'halo' | 'facade' | 'facadeLit' | 'car' | 'carGlow' | 'glass';
-export interface PropPart { geo: THREE.BufferGeometry; mat: MatKind; tint?: boolean }
+export type MatKind = 'lit' | 'glow' | 'sign' | 'halo' | 'facade' | 'facadeLit' | 'car' | 'carGlow' | 'glass' | 'shadow';
+export interface PropPart { geo: THREE.BufferGeometry; mat: MatKind; tint?: boolean; order?: number }
 export interface PropDef { parts: PropPart[]; radius: number; max: number; len?: number }
 export type UV = [number, number, number, number];
 
 export interface Materials {
   lit: THREE.Material; glow: THREE.Material; sign: THREE.Material; halo: THREE.Material; paint: THREE.Material;
   facade: THREE.Material; facadeLit: THREE.Material;
-  car: THREE.Material; carGlow: THREE.Material; glass: THREE.Material;
+  car: THREE.Material; carGlow: THREE.Material; glass: THREE.Material; shadow: THREE.Material;
 }
 
 let facadeTex: THREE.Texture | null = null;
@@ -34,6 +35,7 @@ export function makeMaterials(signTex: THREE.Texture): Materials {
     car: cm?.lit ?? facade,
     carGlow: cm?.glow ?? facadeLit,
     glass: cm?.glass ?? facadeLit,
+    shadow: shadowMaterial(0.75),
     lit: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
     sign: new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }),
@@ -69,6 +71,7 @@ export class PropRenderer {
         mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         mesh.setColorAt(0, this.white);
         mesh.count = 0;
+        if (part.order) mesh.renderOrder = part.order;
         parent.add(mesh);
         return { mesh, tint: part.tint ?? part.mat === 'lit' };
       });
