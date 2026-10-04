@@ -218,7 +218,7 @@ export class Net {
       car: Math.round(num(p?.car, 0, 63)), paint: Math.round(num(p?.paint, 0, 15)),
     })).filter((p) => p.id);
     const go: GoMsg = {
-      raceId: str(m.raceId, 24), route: Math.round(num(m.route, 0, 1)), seed: Math.round(num(m.seed, 0, 1e9)),
+      raceId: str(m.raceId, 24), route: Math.round(num(m.route, 0, 5)), seed: Math.round(num(m.seed, 0, 1e9)),
       turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)), players,
     };
     if (go.raceId) this.onGo?.(go, from);

@@ -1,6 +1,5 @@
 import '@fontsource/press-start-2p/400.css';
 import * as THREE from 'three';
-import { SignAtlas } from './atlas';
 import { Audio } from './audio';
 import { Game } from './game';
 import { GFX } from './gfx';
@@ -9,8 +8,11 @@ import { Input } from './input';
 import { NameBox } from './nameui';
 import { miami } from './routes/miami';
 import { tokyo } from './routes/tokyo';
+import { canyon } from './routes/canyon';
+import { alps } from './routes/alps';
+import { vegas } from './routes/vegas';
+import { monaco } from './routes/monaco';
 import { TouchControls } from './touch';
-import { World } from './world';
 
 /** Internal framebuffer: roughly the resolution of a mid-80s arcade board, 16:9. */
 const W = GFX.width;
@@ -29,12 +31,11 @@ async function boot() {
   renderer.setSize(W, H, false);
 
   const camera = new THREE.PerspectiveCamera(54, W / H, 0.5, 4000);
-  const atlas = new SignAtlas();
-  const worlds = [new World(miami, atlas), new World(tokyo, atlas)];
+  const routes = [miami, tokyo, canyon, alps, vegas, monaco];
   const input = new Input();
   const audio = new Audio();
   const hud = new Hud(document.getElementById('hud') as HTMLCanvasElement);
-  const game = new Game(worlds, camera, input, audio, hud);
+  const game = new Game(routes, camera, input, audio, hud);
   input.onFirstInput(() => {
     audio.init();
     audio.music('title');

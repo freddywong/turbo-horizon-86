@@ -1,8 +1,8 @@
 # TURBO HORIZON '86
 
-A browser arcade road racer built as if it were a 1986 arcade board: low-poly
-flat-shaded scenery, a banded sky, a strong horizon, and a 426×240 framebuffer
-scaled up with hard pixels. It's built with Three.js, Vite and TypeScript. There is no backend
+A browser arcade road racer in the style of the late-80s / early-90s arcade boards: six routes
+round the world, real period cars, rivals, online races and a 640×360 framebuffer scaled up with
+hard pixels. It's built with Three.js, Vite and TypeScript. There is no backend
 and nothing is downloaded at runtime. All audio is synthesised with Web Audio.
 
 ## Run
@@ -96,23 +96,21 @@ For testing several tabs in one browser without the internet, add `?net=local`
 
 ## Damage
 
-The DAMAGE bar shows how much punishment your car can still take. It starts full every race and
-goes from green to yellow to red as it drains:
+The DAMAGE bar shows how much damage your car has taken. It starts empty every race and fills up,
+green, then yellow, then red; when it's full the car is wrecked:
 
 * hard crashes into traffic, scenery or the back of a rival take a big chunk (more the faster you hit);
 * side-swipes and rival bumps take a little; scraping along a wall wears it down steadily.
 
 You can see the damage on the car: panels crumple in where it was hit, paint is scraped to bare
 metal and soot, the glass cracks, a tail lamp gets smashed, and the engine starts to smoke, grey
-at first and black when it's critical (the bar blinks and the car loses some top speed). At zero
+at first and black when it's critical (the bar blinks and the car loses some top speed). When it's full
 the engine blows: the car rolls to a stop under black smoke and flames, and it's game over
 (WRECKED). A new race gives you a fresh car.
 
 ## Graphics
 
-The title screen switches between two looks (G, or tap the GRAPHICS line):
-
-* **1992** (default): early-90s 3D arcade style at 640×360:
+Early-90s 3D arcade style at 640×360 (the original flat 1986 look has been retired):
   * hand-painted surface textures: cracked and patched asphalt, worn paint, kerbs, grass tufts,
     sand ripples and footprints, moving sea, concrete panels, tunnel tiles, lit night streets
   * textured buildings: hotel balconies, Art-Deco fronts, shop windows full of goods, motels,
@@ -134,8 +132,6 @@ The title screen switches between two looks (G, or tap the GRAPHICS line):
   * ships, a lighthouse and sun glitter on the horizon; aircraft lights over Tokyo
   * smooth sky and sun gradients, glossy car paint, sky-tinted lighting, light halos and
     glowing tail lights at night, soft tyre smoke, a lens flare from the Miami sun
-* **1986**: the original flat-shaded look: 426×240, hard-stepped 15-bit colour sky,
-  untextured ground, sprite-style smoke.
 
 ## Modes
 
@@ -151,12 +147,16 @@ Choose the mode on the route-select screen (↑ / ↓, or tap a mode box):
 
 ## Music
 
-Six original synth tracks plus a title theme, all generated live in the browser:
+Ten original synth tracks plus a title theme, all generated live in the browser:
 
 | Track | Feel |
 | --- | --- |
 | COASTLINE RUSH | Miami's theme: bright major-key cruise |
 | NEON EXPRESSWAY | Tokyo's theme: minor key, Japanese-pop chord progression |
+| MESA HIGHWAY | Grand Canyon's theme: twangy FM lead over an A-minor desert groove |
+| GLACIER RUN | Swiss Alps' theme: bright bells and a fast four-on-the-floor |
+| JACKPOT BOULEVARD | Las Vegas's theme: funky D-minor strut with gated snares |
+| COTE D'AZUR | Monaco's theme: smooth jazz-fusion |
 | PALM DRIVE | Laid-back synthwave with a rolling arpeggio and pads |
 | NIGHT SIGNAL | Minor-key drive with an FM bell lead |
 | TURBO RIVAL | Fast, galloping chase theme |
@@ -184,6 +184,16 @@ Cherokee, Chevrolet Caprice, Mercedes W124 and Ford F-150. Tokyo has a Toyota Cr
   hill country with a tunnel, and a sunset finish.
 * **TOKYO NIGHT HIGHWAY**: an elevated expressway above a city of lit windows,
   with a neon district, tunnels, a suspension bridge over the bay, and the Wangan line.
+* **GRAND CANYON** (golden hour): a Route 66 diner strip, the painted desert, the canyon rim with
+  rock tunnels and a sheer drop, a dam crossing over the reservoir, and Monument Valley's buttes.
+* **SWISS ALPS** (dawn): a frozen-lake village, snowy pine forest, hairpin mountain pass, avalanche
+  galleries and a glacier summit under snow-capped peaks.
+* **LAS VEGAS STRIP** (night): Fremont Street and the Strip lined with neon casino towers and bulb-lit
+  pylons, then the dark desert under the stars to the lights of the dam.
+* **MONACO RIVIERA** (afternoon): the harbour front full of yachts, casino square, the harbour tunnel,
+  the clifftop Corniche high above the sea, and Cap Martin.
+
+Pick a route on the route-select grid (arrow keys or tap). Online, whoever presses START picks it.
 
 Each route has five stages. Reaching a checkpoint adds time (EXTENDED PLAY).
 Reach the GOAL before the timer runs out. Score comes from speed, drifting,
@@ -198,8 +208,7 @@ overtaking, and the time bonus at the goal.
 * `src/props.ts`, `src/routes/*`: hand-built low-poly props (a few dozen polygons each),
   drawn with one `InstancedMesh` per prop part.
 * `src/cars/`: a spec-driven car builder. Each car is a list of body cross-sections
-  plus its tail lights, wings, intakes and exhausts. `build.ts` makes the 1986 models;
-  `hd.ts` resamples the sections along splines into the 1992 models and adds the cabin,
+  plus its tail lights, wings, intakes and exhausts. `hd.ts` resamples the sections along splines into the 1992 models and adds the cabin,
   glass and wheels, textured from the car-part tiles in `textures.ts`.
 * `src/rivals.ts`: the computer drivers, their AI and the race classification.
 * `src/touch.ts`: the multi-touch on-screen controls.

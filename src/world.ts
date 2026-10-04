@@ -57,7 +57,9 @@ export class World {
   private mats: CarMats;
   private plate: [number, number, number, number];
 
-  constructor(public route: RouteDef, atlas: SignAtlas) {
+  constructor(public route: RouteDef) {
+    // every route has its own sign texture (there are too many signs for one)
+    const atlas = new SignAtlas();
     this.data = route.build(atlas);
     this.track = this.data.track;
     this.view = new View(this.track);
@@ -66,7 +68,7 @@ export class World {
     if (GFX.modern) {
       // sky-tinted fill from above, warm/dark bounce from below
       this.scene.add(new THREE.AmbientLight(route.ambient.color, route.ambient.intensity * 0.55));
-      const [sky, ground] = route.id === 'tokyo' ? [0x8a70e0, 0x2a2040] : [0xa0dcff, 0xd8c090];
+      const [sky, ground] = route.hemi;
       this.scene.add(new THREE.HemisphereLight(sky, ground, route.ambient.intensity * 0.75));
     } else this.scene.add(new THREE.AmbientLight(route.ambient.color, route.ambient.intensity));
     const sun = new THREE.DirectionalLight(route.sun.color, route.sun.intensity);
@@ -79,8 +81,8 @@ export class World {
     this.scene.add(this.road.mesh);
     this.props = new PropRenderer(this.data.props, mats, this.scene);
     this.mats = mats;
-    this.plate = atlas.add({ bg: route.id === 'tokyo' ? 0xf0f0e8 : 0xffe040, fg: 0x102060, text: 'TH-86', border: 0x102060 }, 1, 1);
-    this.car = new PlayerCar(ROSTER[0], ROSTER[0].paints[0], mats, this.plate, this.route.shadow, this.route.id === 'tokyo');
+    this.plate = atlas.add({ bg: route.plate, fg: 0x102060, text: 'TH-86', border: 0x102060 }, 1, 1);
+    this.car = new PlayerCar(ROSTER[0], ROSTER[0].paints[0], mats, this.plate, this.route.shadow, this.route.night);
     this.scene.add(this.car.root);
     this.particles = new Particles(this.scene);
     const tg = new THREE.BufferGeometry();
@@ -97,7 +99,7 @@ export class World {
     if (this.car.spec === spec && this.carPaint === paint && !this.car.damaged) return;
     this.scene.remove(this.car.root);
     this.car.dispose();
-    this.car = new PlayerCar(spec, paint, this.mats, this.plate, this.route.shadow, this.route.id === 'tokyo');
+    this.car = new PlayerCar(spec, paint, this.mats, this.plate, this.route.shadow, this.route.night);
     this.carPaint = paint;
     this.scene.add(this.car.root);
   }
@@ -111,7 +113,7 @@ export class World {
     }
     this.rivals = rivals;
     this.rivalCars = rivals.map((r) => {
-      const car = new PlayerCar(r.spec, r.paint, this.mats, this.plate, this.route.shadow, this.route.id === 'tokyo');
+      const car = new PlayerCar(r.spec, r.paint, this.mats, this.plate, this.route.shadow, this.route.night);
       this.scene.add(car.root);
       return car;
     });

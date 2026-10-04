@@ -25,11 +25,17 @@ export class Hud {
     g.font = `${size}px ${PIXEL_FONT}`;
     g.textAlign = align;
     g.textBaseline = 'top';
-    const o = Math.max(2, size / 8);
+    const o = size < 8 ? 1 : Math.max(2, size / 8);
     g.fillStyle = hex(shadow);
     g.fillText(s, x + o, y + o);
     g.fillStyle = hex(color);
     g.fillText(s, x, y);
+  }
+
+  /** See-through dark panel behind text that sits over the 3D view. */
+  shade(x: number, y: number, w: number, h: number, alpha = 0.6) {
+    this.g.fillStyle = `rgba(10,10,32,${alpha})`;
+    this.g.fillRect(x, y, w, h);
   }
 
   box(x: number, y: number, w: number, h: number, fill: number, border: number, bw = 4) {

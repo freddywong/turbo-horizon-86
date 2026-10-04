@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Audio, TRACKS } from './audio';
-import { GFX, setGfx } from './gfx';
+import { GFX } from './gfx';
 import { CYAN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from './hud';
 import { Input } from './input';
 import { LANE_W, ROAD_HALF, SEG } from './track';
@@ -11,10 +11,13 @@ import { NameBox } from './nameui';
 import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
+import type { RouteDef } from './routes/types';
 
 type State = 'attract' | 'select' | 'carselect' | 'name' | 'lobby' | 'countdown' | 'race' | 'goal' | 'over';
 type Mode = 'arcade' | 'rivals' | 'online';
 const MODES: Mode[] = ['arcade', 'rivals', 'online'];
+// route-select grid
+const CARD_X = 39, CARD_Y = 80, CARD_STEP_X = 262, CARD_STEP_Y = 100;
 
 const VMAX = 82; // reference top speed (~295 km/h) for camera / gearing
 const KMH = 3.6;
@@ -59,6 +62,9 @@ const saveMusic = (v: number) => {
     /* storage unavailable */
   }
 };
+/** Damage bar colour by how full it is (full = wrecked). */
+const damageColour = (f: number) => (f < 0.4 ? 0x40e040 : f < 0.7 ? YELLOW : RED);
+
 const loadNum = (key: string, def: number): number => {
   try {
     const v = localStorage.getItem(key);
@@ -193,16 +199,24 @@ export class Game {
     this.world.setPlayerCar(spec, paint);
   }
 
-  constructor(private worlds: World[], private camera: THREE.PerspectiveCamera, private input: Input,
+  /** routes are built the first time they're needed (building all six up front is slow on phones) */
+  private worlds: (World | null)[];
+
+  constructor(private routes: RouteDef[], private camera: THREE.PerspectiveCamera, private input: Input,
     private audio: Audio, private hud: Hud) {
-    this.world = worlds[0];
+    this.worlds = routes.map(() => null);
+    this.world = this.getWorld(0);
     this.resetPlayer(true);
+  }
+
+  private getWorld(i: number): World {
+    return (this.worlds[i] ??= new World(this.routes[i]));
   }
 
   private setWorld(i: number) {
     if (this.world === this.worlds[i] && this.routeIdx === i) return;
     this.routeIdx = i;
-    this.world = this.worlds[i];
+    this.world = this.getWorld(i);
     if (this.state !== 'attract') this.applyCar();
   }
 
@@ -226,7 +240,7 @@ export class Game {
   }
 
   private trackId(): string {
-    return this.musicIdx < 0 ? this.world.route.id : TRACKS[this.musicIdx].id;
+    return this.musicIdx < 0 ? this.world.route.music : TRACKS[this.musicIdx].id;
   }
   musicLabel(): string {
     return this.musicIdx < 0 ? `ROUTE THEME` : TRACKS[this.musicIdx].name;
@@ -310,19 +324,14 @@ export class Game {
         this.demoClock += dt;
         if (this.demoClock > 24) {
           this.demoClock = 0;
-          this.attractRoute = 1 - this.attractRoute;
+          this.attractRoute = (this.attractRoute + 1) % this.routes.length;
           this.setWorld(this.attractRoute);
           const s = ROSTER[Math.floor(Math.random() * ROSTER.length)];
           this.world.setPlayerCar(s, s.paints[0]);
           this.resetPlayer(true);
         }
         this.drive(dt, this.autopilot(), true);
-        const gfxTap = inp.taps.some((tp) => tp.y > 400 && tp.y < 440 && Math.abs(tp.x - HUD_W / 2) < 200);
-        if (inp.hit('KeyG') || gfxTap) {
-          // switching the look rebuilds every texture and material, so restart the page
-          setGfx(GFX.modern ? '86' : '92');
-          location.reload();
-        } else if (inp.confirm || inp.taps.length) {
+        if (inp.confirm || inp.taps.length) {
           this.audio.coin();
           this.toSelect();
         }
@@ -331,13 +340,15 @@ export class Game {
       case 'select': {
         this.drive(dt, this.autopilot(), true);
         let pick = -1, go = inp.confirm || this.t > 20;
-        if (inp.hit('ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD')) pick = 1 - this.routeIdx;
+        const nr = this.routes.length;
+        if (inp.hit('ArrowLeft', 'KeyA')) pick = (this.routeIdx + nr - 1) % nr;
+        if (inp.hit('ArrowRight', 'KeyD')) pick = (this.routeIdx + 1) % nr;
         let toggle = inp.hit('ArrowUp', 'KeyW', 'ArrowDown', 'KeyS');
         for (const tp of inp.taps) {
-          if (tp.y > 140 && tp.y < 280) {
-            const i = tp.x < HUD_W / 2 ? 0 : 1;
+          if (tp.y > CARD_Y && tp.y < CARD_Y + 2 * CARD_STEP_Y - 12 && tp.x > CARD_X && tp.x < CARD_X + 3 * CARD_STEP_X - 12) {
+            const i = Math.floor((tp.y - CARD_Y) / CARD_STEP_Y) * 3 + Math.floor((tp.x - CARD_X) / CARD_STEP_X);
             if (i === this.routeIdx) go = true;
-            else pick = i;
+            else if (i < nr) pick = i;
           } else if (tp.y >= 320 && tp.y < 380) {
             const m = MODES[Math.max(0, Math.min(2, Math.floor((tp.x - (HUD_W / 2 - 375)) / 250)))];
             if (m !== this.mode) {
@@ -660,7 +671,7 @@ export class Game {
       }
       if (route) {
         this.audio.blip();
-        this.setWorld(1 - this.routeIdx);
+        this.setWorld((this.routeIdx + 1) % this.routes.length);
         this.applyCar();
         this.resetPlayer(false);
         this.px = 0;
@@ -811,7 +822,7 @@ export class Game {
 
   private toSelect() {
     this.go('select');
-    for (const wd of this.worlds) wd.setRivals([]);
+    for (const wd of this.worlds) wd?.setRivals([]);
     this.applyCar();
     this.resetPlayer(true);
     this.audio.music('title');
@@ -1006,7 +1017,7 @@ export class Game {
     const P = w.particles;
     const n = Math.random() < dt * 45 ? 1 : 0;
     if (n && skid > 0 && this.speed > 12) {
-      const col = route.id === 'tokyo' ? 0xb8b8d0 : 0xffffff;
+      const col = route.smoke;
       for (const sx of [-0.9, 0.9]) P.spawn(this.pos - 1.4, this.px + sx, 0.35, this.speed * 0.6, sx, 0.8, 0.8, 0.45, 2.6, col);
     }
     if (n && offroad && this.speed > 15) {
@@ -1276,21 +1287,19 @@ export class Game {
         if (blink) h.text(this.touch ? 'TAP TO START' : 'PRESS ENTER', HUD_W / 2, 320, 24, YELLOW, 'center');
         h.text(`HI-SCORE ${String(this.hi).padStart(8, '0')}`, HUD_W / 2, 20, 16, CYAN, 'center');
         h.text('FREE PLAY', HUD_W - 20, HUD_H - 30, 16, WHITE, 'right');
-        h.text(`${this.touch ? 'TAP' : 'G'}  GRAPHICS  ${GFX.modern ? '1992' : '1986'}`, HUD_W / 2, 412, 16, CYAN, 'center');
         h.text('©1986 HORIZON SOFT', 20, HUD_H - 30, 16, WHITE, 'left');
         break;
       }
       case 'select': {
         h.text('SELECT  YOUR  ROUTE', HUD_W / 2, 44, 24, YELLOW, 'center');
-        const bw = 330, bh = 120, y = 150;
-        this.worlds.forEach((w, i) => {
-          const x = i === 0 ? HUD_W / 2 - bw - 20 : HUD_W / 2 + 20;
+        // a card per route, three across
+        this.routes.forEach((rt, i) => {
+          const x = CARD_X + (i % 3) * CARD_STEP_X, y = CARD_Y + Math.floor(i / 3) * CARD_STEP_Y;
+          const bw = CARD_STEP_X - 12, bh = CARD_STEP_Y - 12;
           const sel = i === this.routeIdx;
-          const border = sel ? (blink ? YELLOW : WHITE) : 0x3a3a5a;
-          h.box(x, y, bw, bh, i === 0 ? 0x1a5ab8 : 0x24104a, border, sel ? 6 : 4);
-          const col = i === 0 ? 0xffe8a0 : 0xff6ab0;
-          h.text(w.route.lines[0], x + bw / 2, y + 30, 24, col, 'center');
-          h.text(w.route.lines[1], x + bw / 2, y + 66, 24, col, 'center');
+          h.box(x, y, bw, bh, rt.card[0], sel ? (blink ? YELLOW : WHITE) : 0x3a3a5a, sel ? 6 : 3);
+          h.text(rt.lines[0], x + bw / 2, y + 18, 16, rt.card[1], 'center');
+          h.text(rt.lines[1], x + bw / 2, y + 44, 16, rt.card[1], 'center');
         });
         h.text(this.touch ? 'TAP A ROUTE, TAP AGAIN TO GO' : '< >  ROUTE   ^ v  MODE   ENTER  NEXT', HUD_W / 2, 290, 16, WHITE, 'center');
         // mode boxes
@@ -1302,7 +1311,7 @@ export class Game {
           h.text(label, x + mw / 2, 334, 16, sel ? YELLOW : 0x8a8aa8, 'center');
           h.text(sub, x + mw / 2, 356, 8, sel ? WHITE : 0x8a8aa8, 'center');
         });
-        h.text(`${Math.max(0, Math.ceil(20 - this.t))}`, HUD_W / 2, 92, 32, ORANGE, 'center');
+        h.text(`${Math.max(0, Math.ceil(20 - this.t))}`, HUD_W - 30, 20, 24, ORANGE, 'right');
         break;
       }
       case 'carselect': {
@@ -1399,7 +1408,8 @@ export class Game {
     const status = !net || net.status === 'connecting' ? 'CONNECTING...'
       : net.status === 'error' ? "COULDN'T CONNECT" : others.length ? `${others.length + 1} PLAYERS HERE` : 'WAITING FOR PLAYERS...';
     h.text(status, HUD_W / 2, 46, 16, net?.status === 'error' ? RED : CYAN, 'center');
-    // your car
+    // your car, settings, stats and controls on a see-through panel
+    h.shade(28, 68, 350, 316);
     h.text(s.make, 40, 76, 16, CYAN);
     h.text(s.name, 40, 98, 24, WHITE);
     h.text(this.touch ? 'TAP NAME: CAR   TAP CAR: COLOUR' : '< > CAR   ^ v COLOUR', 40, 130, 8, 0x8a8aa8);
@@ -1407,6 +1417,23 @@ export class Game {
     h.text(`${this.touch ? 'TAP ' : 'V  '}WEAPONS ${this.weaponsSetting ? 'ON' : 'OFF'}`, 40, 174, 16, this.weaponsSetting ? ORANGE : 0x8a8aa8);
     h.text(`${this.touch ? 'TAP ' : 'B  '}AMMO ${this.ammoCount}`, 40, 200, 16, this.weaponsSetting ? YELLOW : 0x8a8aa8);
     h.text('YOUR SETTINGS APPLY IF YOU PRESS START', 40, 224, 8, 0x8a8aa8);
+    // the car's stats, as on the car-select screen
+    const bars: [string, number, number][] = [
+      ['SPEED', (s.stats.vmax - 260) / 90, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, 0x40e040],
+    ];
+    bars.forEach(([label, v, c], i) => {
+      const y = 244 + i * 16;
+      h.text(label, 40, y + 1, 8, YELLOW);
+      const lit = Math.round(Math.max(0.1, Math.min(1, v)) * 12);
+      for (let k = 0; k < 12; k++) h.rect(96 + k * 11, y, 9, 10, k < lit ? c : 0x202040);
+    });
+    h.text(`${s.stats.vmax} KM/H`, 236, 245, 8, WHITE);
+    // how to drive
+    h.text('CONTROLS', 40, 300, 8, YELLOW);
+    const lines = this.touch
+      ? ['< > STEER   GAS  BRAKE  DRIFT', 'TURBO BUTTON   FIRE BUTTON (WEAPONS)', 'AUTO GAS HOLDS THE THROTTLE', 'II PAUSE   MUSIC CHANGES THE SONG']
+      : ['UP GAS   DOWN BRAKE   < > STEER', 'SPACE DRIFT   T OR SHIFT TURBO', 'F FIRE (WEAPONS ON)   N MUSIC', 'ESC PAUSE   M MUTE'];
+    lines.forEach((t, i) => h.text(t, 40, 316 + i * 14, 8, WHITE));
     // player list
     const lx = HUD_W - 320, ly = 70;
     h.box(lx, ly, 300, 40 + Math.min(8, others.length + 1) * 34 + (others.length > 7 ? 16 : 0), 0x101030, 0x3a3a5a, 3);
@@ -1436,7 +1463,7 @@ export class Game {
       const n = Math.max(1, Math.ceil(this.pending.at - raceClock()));
       h.text('STARTING IN', HUD_W / 2, 170, 24, CYAN, 'center');
       h.text(String(n), HUD_W / 2, 206, 64, YELLOW, 'center');
-      const rt = this.worlds[this.pending.go.route].route;
+      const rt = this.routes[this.pending.go.route] ?? this.world.route;
       h.text(`${rt.lines[0]} ${rt.lines[1]}`, HUD_W / 2, 284, 16, WHITE, 'center');
       const g = this.pending.go;
       h.text(`TURBOS ${g.turbos}   WEAPONS ${g.weapons ? `ON  AMMO ${g.ammo}` : 'OFF'}`, HUD_W / 2, 308, 16, g.weapons ? ORANGE : YELLOW, 'center');
@@ -1455,13 +1482,15 @@ export class Game {
     this.world.rivals.forEach((r, i) => {
       const p = this.world.rivalScreenPos(i, this.camera, HUD_W, HUD_H);
       if (!p || p.dist > 140) return;
-      const size = p.dist < 45 ? 16 : 8;
+      // small and unobtrusive far away, growing as you close in
+      const k = Math.max(0, Math.min(1, (75 - p.dist) / 60));
+      const size = Math.round(5 + 11 * k);
       h.text(r.wrecked ? `${r.name} WRECKED` : r.name, p.x, p.y - size, size, r.wrecked ? RED : r.finished >= 0 ? YELLOW : WHITE, 'center');
       // their damage bar under the name
-      const bw = size === 16 ? 64 : 36, bh = size === 16 ? 6 : 4, f = Math.max(0, r.hp / 100);
-      const bx = p.x - bw / 2, by = p.y + (size === 16 ? 4 : 2);
+      const bw = Math.round(14 + 50 * k), bh = Math.round(2 + 4 * k), f = Math.min(1, 1 - r.hp / 100);
+      const bx = p.x - bw / 2, by = p.y + 1 + Math.round(3 * k);
       h.rect(bx - 1, by - 1, bw + 2, bh + 2, 0x000000);
-      h.rect(bx, by, bw * f, bh, f > 0.6 ? 0x40e040 : f > 0.3 ? YELLOW : RED);
+      h.rect(bx, by, bw * f, bh, damageColour(f));
     });
   }
 
@@ -1507,14 +1536,15 @@ export class Game {
       h.text(`/${this.world.rivals.length + 1}`, px + p.length * 32 + 4, py + 16, 16, WHITE);
     }
 
-    // damage bar: the car's remaining condition, green -> yellow -> red, blinking when critical
+    // damage bar: fills up as the car takes damage (full = wrecked), green -> yellow -> red, blinking when critical
     {
       const n = 10, sw = 15;
       const bx = this.touch ? 20 : HUD_W - 20 - n * (sw + 2), by = this.touch ? (this.mode !== 'arcade' ? 270 : 236) : 64;
-      const col = this.hp > 60 ? 0x40e040 : this.hp > 30 ? YELLOW : RED;
+      const dmg = Math.min(1, 1 - this.hp / 100);
+      const col = damageColour(dmg);
       const crit = this.hp < 25 && this.state === 'race';
       h.text('DAMAGE', bx, by, 16, crit && blink ? RED : YELLOW);
-      const lit = Math.ceil((this.hp / 100) * n);
+      const lit = this.hp >= 100 ? 0 : Math.max(1, Math.ceil(dmg * n));
       for (let i = 0; i < n; i++) h.rect(bx + i * (sw + 2), by + 22, sw, 12, i < lit && (!crit || blink) ? col : 0x202040);
     }
 
@@ -1552,9 +1582,9 @@ export class Game {
           const tr = this.world.rivals[this.gunTarget];
           if (!tr.remote) {
             // computer car's condition under the bracket
-            const bw = 44, bx = p.x - bw / 2, by = cy + r + 6, f = tr.hp / 100;
+            const bw = 44, bx = p.x - bw / 2, by = cy + r + 6, f = Math.min(1, 1 - tr.hp / 100);
             h.rect(bx - 1, by - 1, bw + 2, 7, 0x000000);
-            h.rect(bx, by, bw * f, 5, f > 0.6 ? 0x40e040 : f > 0.3 ? YELLOW : RED);
+            h.rect(bx, by, bw * f, 5, damageColour(f));
           }
         }
       }

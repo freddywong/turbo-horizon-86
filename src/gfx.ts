@@ -7,13 +7,8 @@ import * as THREE from 'three';
  */
 export type GfxMode = '86' | '92';
 
-const read = (): GfxMode => {
-  try {
-    return localStorage.getItem('th86-gfx') === '86' ? '86' : '92';
-  } catch {
-    return '92';
-  }
-};
+/** The 1986 look has been retired: the game always runs in the 1992 look. */
+const read = (): GfxMode => '92';
 
 export const GFX = {
   mode: read(),

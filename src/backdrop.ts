@@ -136,6 +136,40 @@ export function mountainRing(rng: Rng, R: number, color: number, maxH: number, m
   return new THREE.Mesh(g.build(), basic());
 }
 
+/** Flat-topped desert mesas and buttes with banded strata, wrapped round the horizon. */
+export function mesaRing(rng: Rng, R: number, bands: number[], maxH: number, mask: (a: number) => number, count = 22): THREE.Mesh {
+  const g = new GeoBuilder();
+  const N = 360;
+  const h = new Float32Array(N + 1);
+  for (let p = 0; p < count; p++) {
+    const c = rng.next() * N;
+    const height = rng.range(0.35, 1) * maxH;
+    const top = rng.range(2, 9), slope = rng.range(1.2, 2.6); // flat top, steep sides
+    for (let i = 0; i <= N; i++) {
+      let d = Math.abs(i - c);
+      d = Math.min(d, N - d);
+      const v = d < top ? height : height * Math.max(0, 1 - (d - top) / slope);
+      h[i] = Math.max(h[i], v);
+    }
+  }
+  for (let i = 0; i < N; i++) {
+    const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
+    const h0 = h[i] * mask(a0), h1 = h[i + 1] * mask(a1);
+    if (h0 < 1 && h1 < 1) continue;
+    // strata: horizontal colour bands up the cliff face
+    const k = bands.length;
+    let lo0 = -60, lo1 = -60;
+    for (let b = 0; b < k; b++) {
+      const t = (b + 1) / k;
+      const hi0 = b === k - 1 ? h0 : h0 * t, hi1 = b === k - 1 ? h1 : h1 * t;
+      g.quad(ring(R, a0, 0, lo0), ring(R, a1, 0, lo1), ring(R, a1, 0, hi1), ring(R, a0, 0, hi0), bands[b]);
+      lo0 = hi0;
+      lo1 = hi1;
+    }
+  }
+  return new THREE.Mesh(g.build(), basic());
+}
+
 /** Thin band just below the horizon that hides everything beyond the ground's far edge. */
 export function horizonBand(R: number, color: number, depth = 500): THREE.Mesh {
   const geo = new THREE.CylinderGeometry(R, R, depth, 32, 1, true);

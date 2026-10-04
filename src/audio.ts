@@ -168,10 +168,84 @@ const SONGS: Record<string, Song> = {
     gated: true,
     stabs: false,
   },
+  // "Mesa Highway" - twangy FM lead over an A-minor desert groove
+  desert: {
+    name: 'MESA HIGHWAY',
+    bpm: 128,
+    chords: [['A', MIN7], ['D', MAJ], ['G', MAJ], ['E', MIN7], ['A', MIN7], ['F', MAJ7], ['G', MAJ], ['E', DOM7]],
+    lead: [
+      'A4 . . C5 . . E5 . G5 . . . E5 . D5 .', 'F#5 . . . . . A5 . F#5 . E5 . D5 . . .',
+      'G5 . . B5 . . D6 . B5 . . . A5 . G5 .', 'E5 . . . . . . . - - G5 . A5 . B5 .',
+      'C6 . . B5 . . A5 . E5 . . . G5 . A5 .', 'A5 . . . C6 . . . E6 . . . C6 . A5 .',
+      'B5 . . . D6 . . . G5 . . . B5 . D6 .', 'G#5 . . . . . B5 . . . E5 . . . - -',
+    ],
+    bass: [0, null, null, 0, null, 7, null, 0, null, 0, null, 7, 12, null, 7, null],
+    kick: [0, 8, 11],
+    snare: [4, 12],
+    hat: [2, 6, 10, 14],
+    leadWave: 'fm',
+  },
+  // "Glacier Run" - bright E-major bells and a fast four-on-the-floor
+  alps: {
+    name: 'GLACIER RUN',
+    bpm: 150,
+    chords: [['E', MAJ], ['B', MAJ], ['C#', MIN7], ['A', MAJ7], ['E', MAJ], ['G#', MIN7], ['A', MAJ7], ['B', DOM7]],
+    lead: [
+      'B5 . G#5 . E5 . G#5 . B5 . E6 . . . D#6 .', 'F#6 . . . D#6 . . . B5 . . . F#5 . . .',
+      'E6 . . D#6 . . C#6 . . . B5 . G#5 . . .', 'C#6 . . . . . B5 . A5 . . . G#5 . A5 .',
+      'B5 . . E6 . . G#6 . . . F#6 . E6 . . .', 'D#6 . . . B5 . . . F#6 . . . D#6 . . .',
+      'E6 . . C#6 . . A5 . . . G#6 . . . E6 .', 'F#6 . . . . . . . D#6 . . . A5 . . .',
+    ],
+    bass: [0, null, 12, null, 0, null, 12, null, 0, null, 12, null, 7, null, 12, null],
+    kick: [0, 4, 8, 12],
+    snare: [4, 12],
+    hat: [2, 6, 10, 14],
+    leadWave: 'square',
+    pad: true,
+    arp: { pattern: [0, 1, 2, 3, 2, 1, 0, 1], wave: 'triangle', oct: 5 },
+  },
+  // "Jackpot Boulevard" - funky D-minor strut with big gated snares
+  vegas: {
+    name: 'JACKPOT BOULEVARD',
+    bpm: 116,
+    chords: [['D', MIN7], ['G', DOM7], ['D', MIN7], ['G', DOM7], ['A#', MAJ7], ['A', DOM7], ['D', MIN7], ['A', DOM7]],
+    lead: [
+      'D5 . F5 . A5 . C6 . - A5 . . F5 . D5 .', 'B5 . . . . . G5 . F5 . . . D5 . F5 .',
+      'A5 . . C6 . . D6 . . . C6 . A5 . . .', 'G5 . . . . . . . - - F5 . G5 . B5 .',
+      'D6 . . . A5 . . . F5 . . . A5 . D6 .', 'C#6 . . . . . E6 . . . C#6 . A5 . . .',
+      'F6 . . E6 . . D6 . . . C6 . A5 . . .', 'A5 . . . . . . . E5 . G5 . A5 . C#6 .',
+    ],
+    bass: [0, null, 0, 12, null, 0, null, 10, 0, null, 7, null, 12, 10, 7, null],
+    kick: [0, 7, 10],
+    snare: [4, 12],
+    hat: [0, 2, 3, 4, 6, 8, 10, 11, 12, 14],
+    leadWave: 'saw2',
+    gated: true,
+  },
+  // "Cote d'Azur" - smooth jazz-fusion for the corniche
+  riviera: {
+    name: "COTE D'AZUR",
+    bpm: 112,
+    chords: [['F', MAJ7], ['E', MIN7], ['D', MIN7], ['C', MAJ7], ['A#', MAJ7], ['A', MIN7], ['G', MIN7], ['C', DOM7]],
+    lead: [
+      'E6 . . . C6 . A5 . . . G5 . A5 . C6 .', 'B5 . . . . . G5 . E5 . . . D5 . E5 .',
+      'F5 . A5 . C6 . . . E6 . . . D6 . C6 .', 'B5 . . . . . . . G5 . . . - - - -',
+      'D6 . . F6 . . A6 . . . F6 . D6 . . .', 'C6 . . . E6 . . . G6 . . . E6 . C6 .',
+      'A#5 . . . D6 . . . F6 . . . D6 . A#5 .', 'E6 . . . . . . . . . . . - - - -',
+    ],
+    bass: [0, null, null, 7, null, null, 12, null, 0, null, null, 7, null, 10, null, null],
+    kick: [0, 10],
+    snare: [4, 12],
+    hat: [0, 2, 4, 6, 8, 10, 12, 14],
+    leadWave: 'fm',
+    pad: true,
+    arp: { pattern: [0, 2, 1, 3, 2, 1, 0, 2], wave: 'sine', oct: 5 },
+    stabs: false,
+  },
 };
 
 /** Songs the in-game radio can play, in order. */
-export const TRACKS: { id: string; name: string }[] = ['miami', 'tokyo', 'palm', 'signal', 'rival', 'sunset']
+export const TRACKS: { id: string; name: string }[] = ['miami', 'tokyo', 'desert', 'alps', 'vegas', 'riviera', 'palm', 'signal', 'rival', 'sunset']
   .map((id) => ({ id, name: SONGS[id].name }));
 
 const NOTE: Record<string, number> = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };

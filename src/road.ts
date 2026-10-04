@@ -19,6 +19,7 @@ export interface SideStep {
   dy?: number; // relative height change
   abs?: number; // absolute height at the end of the step
   c: [number, number];
+  tex?: number; // surface tile override ('92 look)
 }
 
 export interface RoadStyle {
@@ -63,7 +64,7 @@ export function makeProfile(style: RoadStyle, left: SideStep[], right: SideStep[
       let ny: number = py, nabs: boolean = pabs;
       if (st.abs !== undefined) { ny = st.abs; nabs = true; }
       else if (st.dy !== undefined) { ny = py + st.dy; }
-      add(side * px, py, pabs, side * nx, ny, nabs, st.c);
+      add(side * px, py, pabs, side * nx, ny, nabs, st.c, st.tex);
       px = nx; py = ny; pabs = nabs;
     }
     tops.push({ x: side * px, y: py, abs: pabs });

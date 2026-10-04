@@ -14,8 +14,20 @@ export interface RouteWorld {
 }
 
 export interface RouteDef {
-  id: 'miami' | 'tokyo';
+  id: string;
   name: string;
+  /** night route: tail-light halos, darker shadows */
+  night: boolean;
+  /** hemisphere light ('92): sky and ground tints */
+  hemi: [number, number];
+  /** number-plate background */
+  plate: number;
+  /** tyre-smoke colour */
+  smoke: number;
+  /** route-select card: background and title colours */
+  card: [number, number];
+  /** theme song id (audio SONGS) */
+  music: string;
   lines: [string, string];
   stageNames: string[];
   fog: { color: number; near: number; far: number };
