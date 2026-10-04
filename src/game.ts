@@ -28,6 +28,8 @@ const CSEL = { arrowX: 14, arrowY: 170, arrowW: 46, arrowH: 84, lx: 20, py: 296,
 
 const VMAX = 82; // reference top speed (~295 km/h) for camera / gearing
 const KMH = 3.6;
+/** m/s² lost at full steering lock at top speed (scales with speed²). */
+const CORNER_SCRUB = 8;
 const GEARS = [0, 18, 34, 50, 66, 84];
 const STEER_RATE = 25;
 const CF = 0.82; // centrifugal push in curves
@@ -932,6 +934,9 @@ export class Game {
       } else if (Math.abs(this.steer) > 0.8 && v > 62 && Math.abs(seg.curve) > 0.0014) {
         skid = 0.6; // tyres squeal when pushing hard through a bend
       }
+      // tyre scrub: turning bleeds off speed, gently at low speed and hard flat out; grippy cars lose less
+      const vr = v / this.vmax;
+      this.speed -= CORNER_SCRUB * Math.abs(this.steer) * vr * vr / st.grip * dt;
       const yawTarget = this.drifting ? this.steer * -0.5 : this.steer * -0.12;
       this.driftYaw += (yawTarget - this.driftYaw) * Math.min(1, dt * 6);
       this.px += (lat - cf) * dt;

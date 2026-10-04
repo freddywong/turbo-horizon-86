@@ -442,7 +442,28 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
   // rear bumper below the plate, diffuser under it
   const ybR = SL.pts[0][1], wR = SL.pts[2][0];
   const bTop = Math.min(ybR + 0.15, spec.plateY - 0.12);
-  if (bTop - (ybR - 0.04) > 0.06) body.box(0, (bTop + ybR - 0.04) / 2, zT + 0.03, wR * 1.96, bTop - ybR + 0.04, 0.09, eighties || traffic ? [0x2a2a2e, 0x38383c] : [shade, paint]);
+  if (bTop - (ybR - 0.04) > 0.06) {
+    // wrap-around bumper: straight across the back, corners rounded to follow how much the tail tucks in
+    const y0 = ybR - 0.04, y1 = bTop, zb = zT + 0.075, d = 0.09;
+    const tuck = Math.max(0, W(zT - 0.4) - wR);
+    const r = Math.min(0.32, 0.07 + tuck * 2.2), cx = wR * 0.98 - r, cz = zb - r;
+    const face = eighties || traffic ? 0x2a2a2e : shade, top = eighties || traffic ? 0x38383c : paint;
+    const plan: [number, number][] = [[0, zb]];
+    for (let k = 0; k <= 5; k++) {
+      const a = (k / 5) * (Math.PI / 2);
+      plan.push([cx + r * Math.sin(a), cz + r * Math.cos(a)]);
+    }
+    for (const sx of [-1, 1]) {
+      for (let k = 0; k < plan.length - 1; k++) {
+        const [xa, za] = plan[k], [xb, zb2] = plan[k + 1];
+        // inner edge: pulled in towards the body by the bumper depth
+        const ia: [number, number] = k === 0 ? [xa, za - d] : [xa - Math.sin(((k - 1) / 5) * (Math.PI / 2)) * d, za - Math.cos(((k - 1) / 5) * (Math.PI / 2)) * d];
+        const ib: [number, number] = [xb - Math.sin((k / 5) * (Math.PI / 2)) * d, zb2 - Math.cos((k / 5) * (Math.PI / 2)) * d];
+        body.quad([sx * xa, y0, za], [sx * xb, y0, zb2], [sx * xb, y1, zb2], [sx * xa, y1, za], face);
+        body.quad([sx * xa, y1, za], [sx * xb, y1, zb2], [sx * ib[0], y1, ib[1]], [sx * ia[0], y1, ia[1]], top);
+      }
+    }
+  }
   if (!traffic) {
     for (const e of spec.exhaust) {
       body.with(new THREE.Matrix4().makeTranslation(e.x, e.y, zT - 0.1).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)), () => {

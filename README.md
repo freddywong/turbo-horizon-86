@@ -202,6 +202,9 @@ Each route has five stages. Reaching a checkpoint adds time (EXTENDED PLAY).
 Reach the GOAL before the timer runs out. Score comes from speed, drifting,
 overtaking, and the time bonus at the goal.
 
+Turning scrubs off speed, as in other racers: the harder you steer and the faster you go, the more you lose
+(cars with more GRIP lose less). Take bends with a light touch, or drift through them.
+
 ## How it's put together
 
 * `src/track.ts`: OutRun-style segment track (eased curves and hills). Each frame,
