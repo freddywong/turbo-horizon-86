@@ -8,7 +8,7 @@ import { ROSTER } from './cars/roster';
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
-import { AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
+import { AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 
@@ -1046,7 +1046,13 @@ export class Game {
   private takeGunHit(from: string, n: number) {
     if (this.state !== 'race' || this.wrecked) return;
     const taken = this.gunFrom.get(from) ?? 0;
-    const dmg = Math.min(n * PER_HIT, GUN_CAP - taken);
+    let dmg = Math.min(n * PER_HIT, GUN_CAP - taken);
+    if (from.startsWith('ai:')) {
+      // the computer drivers together can only take a fifth of the bar
+      let ai = 0;
+      for (const [k, v] of this.gunFrom) if (k.startsWith('ai:')) ai += v;
+      dmg = Math.min(dmg, AI_GUN_CAP - ai);
+    }
     if (dmg <= 0) return;
     this.gunFrom.set(from, taken + dmg);
     this.hp = Math.max(0, this.hp - dmg);

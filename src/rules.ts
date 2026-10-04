@@ -10,6 +10,8 @@ export const AMMO_DEFAULT = 300;
 export const FIRE_RATE = 5; // rounds per second while FIRE is held
 /** Most one shooter's gunfire can take off a car: three quarters of the damage bar. */
 export const GUN_CAP = 75;
+/** All the computer drivers' gunfire together can take at most this much of your bar. */
+export const AI_GUN_CAP = 20;
 /** Damage per round that hits (45 hits reach the cap; more ammo doesn't make a shooter stronger, it just lasts longer). */
 export const PER_HIT = 50 / 30;
 export const RANGE_AHEAD = 90; // metres

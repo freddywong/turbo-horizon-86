@@ -60,8 +60,8 @@ screen or in the online lobby. It's on by default. In online races the settings 
   switch. A hit does a small dent and takes about 1.7% of the damage bar. That's much less than a
   crash, and **one car's guns can take at most three quarters of your bar**. Several shooters
   together, or gunfire on top of crash damage, can still wreck you.
-* In VS RIVALS the computer drivers shoot back in short bursts. Your hits dent them and make them lift
-  for a moment.
+* In VS RIVALS the computer drivers shoot back in short bursts, but **all of them together can take
+  at most 20% of your bar** with gunfire. Your hits dent them and make them lift for a moment.
 * Online, the shooter's game decides what hits and tells the victim's game, which applies the damage
   (and the cap).
 
