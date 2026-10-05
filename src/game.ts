@@ -9,7 +9,7 @@ import { CATCHUP_FROM, CATCHUP_FULL, CATCHUP_MAX, SLIP_BUILD, SLIP_SPEED, SLIP_T
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, RaceSettings, RkMsg, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
-import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, AI_PER_HIT, pvpPerHit, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
+import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_DEFAULT_ONLINE, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, AI_PER_HIT, pvpPerHit, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 import type { RouteDef } from './routes/types';
@@ -636,7 +636,7 @@ export class Game {
   private cycleAmmo(dir = 1) {
     const n = AMMO_STEPS.length;
     this.ammoCount = AMMO_STEPS[(Math.max(0, AMMO_STEPS.indexOf(this.ammoCount)) + dir + n) % n];
-    saveNum('th86-ammo', this.ammoCount);
+    saveNum(this.mode === 'online' || this.testPvp ? 'th86-ammo-online' : 'th86-ammo', this.ammoCount);
     this.audio.blip();
   }
   /** Car parked on the start straight, camera circling it (car select, lobby). */
@@ -653,7 +653,11 @@ export class Game {
   // ------------------------------------------------------------------ online
   /** Deep link (#join): straight to the name box. */
   boot() {
-    if (this.testPvp) this.mode = 'rivals';
+    if (this.testPvp) {
+      this.mode = 'rivals';
+      const oa = loadNum('th86-ammo-online', AMMO_DEFAULT_ONLINE); // test mode plays with the online ammo setting
+      this.ammoCount = AMMO_STEPS.includes(oa) ? oa : AMMO_DEFAULT_ONLINE;
+    }
     if (roomFromHash() !== null) {
       this.mode = 'online';
       this.toName();
@@ -676,6 +680,9 @@ export class Game {
   }
 
   private joinLobby(name: string) {
+    // online keeps its own ammo setting (default 100)
+    const oa = loadNum('th86-ammo-online', AMMO_DEFAULT_ONLINE);
+    this.ammoCount = AMMO_STEPS.includes(oa) ? oa : AMMO_DEFAULT_ONLINE;
     if (!this.net || this.net.status === 'error') {
       this.net?.leave();
       const local = new URLSearchParams(location.search).get('net') === 'local';
@@ -780,7 +787,7 @@ export class Game {
   }
 
   private leaveOnline() {
-    if (this.net && !this.net.isHost()) this.loadSettings();
+    this.loadSettings(); // your own (offline) settings again
     this.net?.leave();
     this.net = null;
     this.pending = null;

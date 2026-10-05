@@ -17,6 +17,8 @@ export const SLIP_SPEED = 0.08;
 // ---- weapons ----------------------------------------------------------------
 export const AMMO_STEPS = [100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
 export const AMMO_DEFAULT = 200;
+/** Online races have their own ammo setting, with a smaller default. */
+export const AMMO_DEFAULT_ONLINE = 100;
 export const FIRE_RATE = 5; // rounds per second while FIRE is held
 /** Most one shooter's gunfire can take off a car: three quarters of the damage bar. */
 export const GUN_CAP = 75;
