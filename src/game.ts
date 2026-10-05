@@ -2239,10 +2239,14 @@ export class Game {
       }
     }
 
+    // on a computer the car's condition sits in the bottom-right corner, stacked from the bottom:
+    // rockets, ammo, damage, then turbo on top; the course bar goes top right under the stage
+    const colX = HUD_W - 20 - 170;
+    const ammoY = HUD_H - 66, dmgY = this.weapons ? ammoY - 46 : HUD_H - 44, turboY = dmgY - 54;
     // damage bar: fills up as the car takes damage (full = wrecked), green -> yellow -> red, blinking when critical
     {
       const n = 10, sw = 15;
-      const bx = this.touch ? 20 : HUD_W - 20 - n * (sw + 2), by = this.touch ? (this.mode !== 'arcade' ? 270 : 236) : 64;
+      const bx = this.touch ? 20 : colX, by = this.touch ? (this.mode !== 'arcade' ? 270 : 236) : dmgY;
       const dmg = Math.min(1, 1 - this.hp / 100);
       const col = damageColour(dmg);
       const crit = this.hp < 25 && this.state === 'race';
@@ -2253,8 +2257,8 @@ export class Game {
 
     // speed + tach
     const kmh = Math.round(this.speed * KMH);
-    // on phones the thumbs cover the bottom corners, so the gauges move up; on a computer they sit
-    // together in the bottom-left corner (turbo, speed, revs), leaving the middle clear for the car
+    // on phones the thumbs cover the bottom corners, so the gauges move up; on a computer speed and
+    // revs sit in the bottom-left corner, leaving the middle clear for the car
     const t = this.touch;
     const sy = t ? 70 : HUD_H - 100;
     h.text('SPEED', 20, sy, 16, YELLOW);
@@ -2263,16 +2267,18 @@ export class Game {
     if (t) h.tach(20, sy + 100, this.speed / this.vmax);
     else h.tach(20, HUD_H - 10, this.speed / this.vmax, 9);
     // turbo stock: one lamp per boost left, and a draining bar while one is firing
-    const tx = 20, ty = t ? sy + 112 : sy - 40;
-    h.text('TURBO', tx, ty, 16, this.turboT > 0 && blink ? WHITE : ORANGE);
     const tn = this.raceTurbos, ts = tn > 5 ? 13 : 20, tstep = ts + (tn > 5 ? 4 : 6);
+    // phones: label and lamps on one row; computers: label over the lamps, in the bottom-right column
+    const tx = t ? 20 : colX, ty = t ? sy + 112 : turboY;
+    const lx = t ? tx + 92 : tx, ly = t ? ty : ty + 20; // where the lamps start
+    h.text('TURBO', tx, ty, 16, this.turboT > 0 && blink ? WHITE : ORANGE);
     // stacked turbos: x2, x3... after the lamps
-    if (this.turboLayers.length > 1) h.text(`x${this.turboLayers.length}`, tx + 96 + tn * tstep, ty, 16, blink ? YELLOW : RED);
-    for (let i = 0; i < tn; i++) h.box(tx + 92 + i * tstep, ty - 2 + (20 - ts) / 2, ts, ts, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, tn > 5 ? 2 : 3);
-    if (this.turboT > 0) h.rect(tx + 92, ty + 22, (this.turboT / TURBO_TIME) * (tn * tstep - 6), 5, YELLOW);
+    if (this.turboLayers.length > 1) h.text(`x${this.turboLayers.length}`, t ? lx + 4 + tn * tstep : tx + 92, ty, 16, blink ? YELLOW : RED);
+    for (let i = 0; i < tn; i++) h.box(lx + i * tstep, ly - 2 + (20 - ts) / 2, ts, ts, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, tn > 5 ? 2 : 3);
+    if (this.turboT > 0) h.rect(lx, ly + 22, (this.turboT / TURBO_TIME) * (tn * tstep - 6), 5, YELLOW);
     if (this.weapons) {
       // ammo strip, lock-on bracket over the target, NO TARGET, red flash when we're hit
-      const ax = t ? 20 : HUD_W - 190, ay = t ? 314 : 106;
+      const ax = t ? 20 : colX, ay = t ? 314 : ammoY;
       h.text('AMMO', ax, ay, 16, this.ammo ? CYAN : RED);
       h.text(String(this.ammo).padStart(3, '0'), ax + 120, ay, 16, WHITE);
       const lit = Math.ceil((this.ammo / Math.max(1, this.raceAmmo)) * 30);
@@ -2308,7 +2314,7 @@ export class Game {
     }
 
     // course progress bar
-    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 24, y = t ? 118 : HUD_H - 34;
+    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 20, y = t ? 118 : 90;
     h.text('COURSE', x0, y - 26, 16, YELLOW);
     h.rect(x0, y, x1 - x0, 8, 0x202040);
     const goal = this.world.track.goalDist;
