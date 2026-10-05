@@ -6,13 +6,11 @@ export const TURBO_DEFAULT = 5; // boosts per race unless changed in the menu
 
 // ---- help for whoever's behind ----------------------------------------------
 /** Catch-up: extra top speed when well behind the leading car (0 at CATCHUP_FROM metres, full at CATCHUP_FULL). */
-export const CATCHUP_MAX = 0.3;
-/** Catch-up's extra acceleration stays modest whatever the top-speed boost (x3 of up to 6%). */
+export const CATCHUP_MAX = 0.06;
+/** Catch-up's extra acceleration (x3 of up to 6%). */
 export const CATCHUP_ACCEL_MAX = 0.06;
-/** Free turbos for crossing a checkpoint in the back half of the field. */
-export const CHECKPOINT_TURBOS = 3;
-export const CATCHUP_FROM = 300;
-export const CATCHUP_FULL = 700;
+export const CATCHUP_FROM = 150;
+export const CATCHUP_FULL = 400;
 /** Slipstream: seconds of towing close behind a car to fill the meter, then the burst. */
 export const SLIP_BUILD = 1.5;
 export const SLIP_TIME = 2.5;

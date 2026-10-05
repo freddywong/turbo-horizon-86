@@ -9,7 +9,7 @@ import { CATCHUP_FROM, CATCHUP_FULL, CATCHUP_MAX, SLIP_BUILD, SLIP_SPEED, SLIP_T
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, RaceSettings, RkMsg, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
-import { CATCHUP_ACCEL_MAX, CHECKPOINT_TURBOS, VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_DEFAULT_ONLINE, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, AI_PER_HIT, PVP_PER_HIT, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
+import { CATCHUP_ACCEL_MAX, VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_DEFAULT_ONLINE, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, AI_PER_HIT, PVP_PER_HIT, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 import type { RouteDef } from './routes/types';
@@ -587,15 +587,14 @@ export class Game {
           const field = this.world.rivals.length + 1;
           const place = field > 1 ? playerPosition(this.world.rivals, this.pos, -1) : 1;
           if (this.mode !== 'arcade' && field > 1 && place > Math.ceil(field / 2)) {
-            // back half of the field: free turbos (and a rocket when weapons are on)
-            this.turbos += CHECKPOINT_TURBOS;
-            this.raceTurbos = Math.max(this.raceTurbos, this.turbos); // enough lamps to show them
+            // back half of the field: the turbo bar fills right back up (and a rocket when weapons are on)
+            this.turbos = Math.max(this.turbos, this.raceTurbos);
             const gotRocket = this.weapons && this.rockets < ROCKETS_MAX; // never more than 5 rockets
             if (gotRocket) {
               this.rockets++;
               this.raceRockets = Math.max(this.raceRockets, this.rockets);
             }
-            this.flash('CHECKPOINT!', `+${CHECKPOINT_TURBOS} TURBOS${gotRocket ? ' + ROCKET' : ''}`, 2.5, 2);
+            this.flash('CHECKPOINT!', `TURBOS REFILLED${gotRocket ? ' + ROCKET' : ''}`, 2.5, 2);
           } else this.flash('CHECKPOINT!', 'EXTENDED PLAY', 2.5, 2);
           this.audio.jingle();
         }
@@ -1545,7 +1544,7 @@ export class Game {
     const w = this.world;
     this.slipT = Math.max(0, this.slipT - dt);
     if (this.mode === 'arcade' && !w.traffic.length) return;
-    // catch-up: only for players hopelessly behind: from 300 m behind the leading car, full boost at 700 m
+    // catch-up: from 150 m behind the leading car, rising to the full boost at 400 m
     let lead = -Infinity;
     for (const r of w.rivals) if (!r.wrecked) lead = Math.max(lead, r.d);
     const gap = lead - this.pos;

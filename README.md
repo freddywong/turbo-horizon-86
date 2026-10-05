@@ -311,10 +311,10 @@ overtaking, and the time bonus at the goal.
 * **Slipstream:** drive close behind any car (a racer or traffic, within about 30 m, in its lane,
   above 100 km/h) and the SLIPSTREAM meter fills in about 1.5 s. When it's full you get a burst of
   +8% top speed and extra acceleration for 2.5 s. Works in ARCADE behind traffic too.
-* **Catch-up:** a rescue for players who are hopelessly behind. More than 300 m behind the leading
-  car, your top speed goes up, rising to **+30%** at 700 m behind (acceleration up to +18%). Close
-  racing is left alone. A CATCH-UP badge under your position shows how much.
-* **Checkpoint bonus:** cross a checkpoint in the back half of the field and you get **3 free turbos**
+* **Catch-up:** more than 150 m behind the leading car, your top speed and acceleration go up,
+  rising to +6% top speed (+18% acceleration) at 400 m behind. A CATCH-UP badge under your
+  position shows how much.
+* **Checkpoint bonus:** cross a checkpoint in the back half of the field and your **turbo bar fills right back up**
   (and a rocket when weapons are on, up to the maximum of 5).
 
 Turning scrubs off speed, as in other racers: the harder you steer and the faster you go, the more you lose
