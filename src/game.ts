@@ -472,7 +472,7 @@ export class Game {
         break;
       }
       case 'race': {
-        if (inp.hit('KeyT', 'ShiftLeft', 'ShiftRight') && this.turbos > 0 && this.turboT <= 0 && this.crashT <= 0) {
+        if (inp.hit('ShiftLeft', 'ShiftRight') && this.turbos > 0 && this.turboT <= 0 && this.crashT <= 0) {
           this.turbos--;
           this.turboT = TURBO_TIME;
           this.audio.turbo();
@@ -1636,7 +1636,7 @@ export class Game {
     const h = this.hud, fire = this.weaponsSetting;
     const rows: [string[], string, number][][] = [
       [[['↑'], 'GAS', GREEN], [['SPACE'], 'DRIFT', CYAN]],
-      [[['↓'], 'BRAKE', RED], [['T'], 'TURBO', ORANGE]],
+      [[['↓'], 'BRAKE', RED], [['SHIFT'], 'TURBO', ORANGE]],
       [[['←', '→'], 'STEER', WHITE], [['F'], fire ? 'FIRE' : 'FIRE (OFF)', fire ? RED : GREY]],
       [[['ESC'], 'PAUSE', GREY], [['N'], 'MUSIC', PINK]],
     ];
@@ -1685,7 +1685,7 @@ export class Game {
       });
       return;
     }
-    const items: [string[], string, number][] = [[['↑'], 'GAS', GREEN], [['↓'], 'BRAKE', RED], [['←', '→'], 'STEER', WHITE], [['SPACE'], 'DRIFT', CYAN], [['T'], 'TURBO', ORANGE]];
+    const items: [string[], string, number][] = [[['↑'], 'GAS', GREEN], [['↓'], 'BRAKE', RED], [['←', '→'], 'STEER', WHITE], [['SPACE'], 'DRIFT', CYAN], [['SHIFT'], 'TURBO', ORANGE]];
     if (fire) items.push([['F'], 'FIRE', RED]);
     const width = (it: [string[], string, number]) => it[0].reduce((a, k) => a + h.keyW(k, 18) + 3, 0) + 5 + it[1].length * 8;
     const tot = items.reduce((a, it) => a + width(it), 0) + (items.length - 1) * 18;
