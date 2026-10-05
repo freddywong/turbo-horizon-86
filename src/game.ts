@@ -2245,18 +2245,6 @@ export class Game {
     const sy = t ? 70 : HUD_H - 100; // speed
     const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 20, cy = t ? 118 : 44; // course bar
 
-    // faint panels behind each group, so the numbers read over bright scenery
-    const PA = 0.38;
-    h.shade(12, 10, 148, 50, PA); // score
-    if (t) {
-      h.shade(12, sy - 6, 278, 172 + (this.mode !== 'arcade' && this.world.rivals.length ? 44 : 0), PA);
-      if (W) h.shade(colX - 8, ammoY - 6, 186, rockY + 34 - ammoY, PA);
-    } else {
-      h.shade(12, sy - 6, 236, HUD_H - sy, PA);
-      h.shade(colX - 8, turboY - 6, 186, HUD_H - turboY, PA);
-    }
-    h.shade(x0 - 8, cy - 32, x1 - x0 + 16, 58, PA);
-
     h.text('SCORE', 20, 16, 16, YELLOW);
     h.text(String(this.score).padStart(8, '0'), 20, 38, 16, WHITE);
     h.text('TIME', HUD_W / 2, 12, 16, YELLOW, 'center');
@@ -2282,7 +2270,6 @@ export class Game {
       const left = Math.max(0, Math.min(1, this.hp / 100));
       const col = damageColour(1 - left);
       const crit = this.hp < 25 && this.state === 'race';
-      h.shade(bx - 10, by - 28, bw + 20, 46, PA);
       h.text('HP', bx, by - 22, 16, crit && blink ? RED : YELLOW);
       h.text(`${Math.ceil(left * max)}/${max}`, bx + bw, by - 22, 16, crit ? RED : WHITE, 'right');
       const lit = this.hp <= 0 ? 0 : Math.max(1, Math.ceil(left * n));
@@ -2371,7 +2358,6 @@ export class Game {
     else if (this.slipT > 0) pill('SLIPSTREAM', flick ? WHITE : CYAN, 0x0a2a3a);
     else if (this.tow > 0.05) {
       // the tow building behind a car
-      h.shade(HUD_W / 2 - 112, y - 3, 224, 18, 0.5);
       h.text('SLIPSTREAM', HUD_W / 2 - 4, y + 1, 8, CYAN, 'right');
       h.rect(HUD_W / 2 + 2, y + 1, 100, 10, 0x000000);
       h.rect(HUD_W / 2 + 3, y + 2, 98 * this.tow, 8, CYAN);

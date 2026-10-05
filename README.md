@@ -146,7 +146,6 @@ the engine blows: the car rolls to a stop under black smoke and flames, and it's
 * **Middle:** one status line under the timer (SLIPSTREAM, OUT OF AMMO, NO ROCKETS LEFT, with
   CATCH-UP above it) and one big message at a time under that. Urgent ones (GO!, ROCKET HIT,
   WARNING) take over; the rest wait their turn.
-* Each group sits on a faint dark panel so it reads over bright scenery.
 * On phones the thumbs cover the bottom corners, so speed, revs and turbo go top left, ammo and
   rockets top right, and the course bar under the timer.
 
