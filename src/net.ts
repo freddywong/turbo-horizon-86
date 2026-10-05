@@ -396,7 +396,8 @@ export class Net {
       turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)),
       rockets: Math.round(num(m.rockets, 0, 5, 1)), players,
     };
-    if (go.raceId) this.onGo?.(go, from);
+    // only the host may start a race (ignores starts from out-of-date copies of the game)
+    if (go.raceId && this.host().id === from) this.onGo?.(go, from);
   }
 
   private gotSt(d: unknown, from: string) {

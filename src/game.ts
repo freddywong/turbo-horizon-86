@@ -879,7 +879,7 @@ export class Game {
         if (host) net.setMe({ set: { route: this.routeIdx, turbos: this.turboCount, weapons: this.weaponsSetting, ammo: this.ammoCount, rockets: this.rocketCount } });
         else this.adoptSettings(net.host().set);
       }
-      if (start && net?.status === 'online') this.startOnline();
+      if (start && net?.status === 'online' && host) this.startOnline(); // only the host starts the race
     }
     if (this.pending && raceClock() >= this.pending.at) this.beginOnlineRace(this.pending.go);
     this.showroom(dt);
@@ -1962,8 +1962,12 @@ export class Game {
     if (others.some((p) => p.status === 'race')) h.text('RACE IN PROGRESS - JOIN THE NEXT ONE', HUD_W / 2, 395, 8, ORANGE, 'center');
     else if (!others.length) h.text('SHARE THIS PAGE LINK TO INVITE PLAYERS', HUD_W / 2, 395, 8, WHITE, 'center');
     const ready = net?.status === 'online';
-    h.box(HUD_W / 2 - 150, 410, 300, 50, ready ? 0x1a8a3a : 0x202030, ready && blink ? YELLOW : WHITE);
-    h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, 427, 16, ready ? WHITE : 0x8a8aa8, 'center');
+    const canStart = ready && amHost;
+    h.box(HUD_W / 2 - 150, 410, 300, 50, canStart ? 0x1a8a3a : 0x202030, canStart && blink ? YELLOW : 0x5a5a7a);
+    if (ready && !amHost) {
+      h.text('WAITING FOR HOST', HUD_W / 2, 420, 16, 0x8a8aa8, 'center');
+      h.text(`${host?.name ?? 'THE HOST'} STARTS THE RACE`, HUD_W / 2, 442, 8, 0x8a8aa8, 'center');
+    } else h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, 427, 16, canStart ? WHITE : 0x8a8aa8, 'center');
   }
 
   /** A race-setting row: label, then < value > chips (or one ON/OFF chip), then the key that changes it. */

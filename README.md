@@ -94,7 +94,7 @@ Up to **8 players** race at once (the lobby can hold more; they wait for the nex
    On a computer, if you're in another window or app when someone joins, you get a desktop
    notification (the browser asks once), the tab title flashes and a chime plays. The lobby shows the driving keys as keycaps, or on a
    phone a picture of where each on-screen button is. The keys you need also show under the 3-2-1 countdown.
-3. **Anyone** can press START; the race uses the host's settings. Everyone in the lobby (up to 8) gets a short countdown and lines up on
+3. **The host** presses START (everyone else sees WAITING FOR HOST). Everyone in the lobby (up to 8) gets a short countdown and lines up on
    the same grid with the same traffic. Players who arrive while a race is running wait in the lobby
    for the next one.
 4. Name tags show who's who, POS shows your place, and the results fill in as people finish. After
