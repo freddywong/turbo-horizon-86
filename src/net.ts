@@ -23,7 +23,12 @@ export interface PeerInfo {
   raceId: string;
   joined: number; // local clock when first heard (join order)
   seen: number; // local clock when last heard
+  since: number; // their wall clock when they entered the room: the earliest is the host
+  set: RaceSettings | null; // the race settings they're advertising
 }
+
+/** The race settings the host picks for everyone in the lobby. */
+export interface RaceSettings { route: number; turbos: number; weapons: boolean; ammo: number }
 
 export interface GoMsg {
   raceId: string;
@@ -118,7 +123,7 @@ export class Net {
   private tr: Transport | null = null;
   private timer = 0;
   /** what we tell everyone about ourselves */
-  me = { name: 'PLAYER', car: 0, paint: 0, status: 'lobby' as Status, raceId: '' };
+  me = { name: 'PLAYER', car: 0, paint: 0, status: 'lobby' as Status, raceId: '', since: Date.now(), set: null as RaceSettings | null };
   onGo: ((m: GoMsg, from: string) => void) | null = null;
   onSt: ((m: StMsg, from: string) => void) | null = null;
   onHit: ((m: HitMsg, from: string) => void) | null = null;
@@ -183,6 +188,19 @@ export class Net {
     this.peers.clear();
   }
 
+  /** The host: whoever has been in the room longest (ties broken by id), us included. Everyone agrees on it. */
+  host(): { id: string; name: string; set: RaceSettings | null } {
+    let best = { id: this.selfId, name: this.me.name, set: this.me.set, since: this.me.since };
+    for (const p of this.peers.values()) {
+      if (p.since < best.since || (p.since === best.since && p.id < best.id)) best = { id: p.id, name: p.name, set: p.set, since: p.since };
+    }
+    return best;
+  }
+
+  isHost(): boolean {
+    return this.host().id === this.selfId;
+  }
+
   /** Lobby players in join order (not including us). */
   list(): PeerInfo[] {
     return [...this.peers.values()].sort((a, b) => a.joined - b.joined);
@@ -207,6 +225,8 @@ export class Net {
       raceId: str(m.raceId, 24),
       joined: old?.joined ?? now,
       seen: now,
+      since: num(m.since, 0, 1e14, Date.now()),
+      set: readSettings(m.set),
     });
   }
 
@@ -232,6 +252,12 @@ export class Net {
       br: m.br === true, tb: m.tb === true, hp: num(m.hp, 0, 100, 100), fin: num(m.fin, -1, 1e5, -1), gun: str(m.gun, 64),
     }, from);
   }
+}
+
+function readSettings(v: unknown): RaceSettings | null {
+  const m = v as Record<string, unknown>;
+  if (!m || typeof m !== 'object') return null;
+  return { route: Math.round(num(m.route, 0, 5)), turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)) };
 }
 
 /** Room name from the URL: `#join` is the public lobby, `#join=code` a private one. */

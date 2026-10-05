@@ -6,7 +6,7 @@ import { Input } from './input';
 import { LANE_W, ROAD_HALF, SEG } from './track';
 import { ROSTER } from './cars/roster';
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
-import { GoMsg, HitMsg, Net, roomFromHash, StMsg } from './net';
+import { GoMsg, HitMsg, Net, RaceSettings, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
 import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, hitChance, inRange, PER_HIT, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
@@ -635,7 +635,31 @@ export class Game {
     this.audio.music(this.trackId());
   }
 
+  /** Take the host's race settings (not saved: your own come back when you leave online). */
+  private adoptSettings(set: RaceSettings | null) {
+    if (!set) return;
+    if (set.route !== this.routeIdx && set.route < this.routes.length) {
+      this.setWorld(set.route);
+      this.applyCar();
+      this.resetPlayer(false);
+      this.px = 0;
+      this.audio.music(this.trackId());
+    }
+    this.turboCount = set.turbos;
+    this.weaponsSetting = set.weapons;
+    this.ammoCount = set.ammo;
+  }
+
+  /** Your own saved race settings. */
+  private loadSettings() {
+    this.turboCount = Math.max(1, Math.min(9, loadNum('th86-turbos', TURBO_DEFAULT) || TURBO_DEFAULT));
+    this.weaponsSetting = loadNum('th86-weapons', 1) === 1;
+    const a = loadNum('th86-ammo', AMMO_DEFAULT);
+    this.ammoCount = AMMO_STEPS.includes(a) ? a : AMMO_DEFAULT;
+  }
+
   private leaveOnline() {
+    if (this.net && !this.net.isHost()) this.loadSettings();
     this.net?.leave();
     this.net = null;
     this.pending = null;
@@ -680,6 +704,13 @@ export class Game {
       else if (tp.y >= 135 && tp.y < 400 && tp.x > L.x1 && tp.x < HUD_W - 330) dp = 1;
     }
     if (exit) return this.leaveOnline();
+    const host = !net || net.status !== 'online' || net.isHost();
+    if (!host) {
+      route = false;
+      turb = 0;
+      weap = false;
+      ammo = 0;
+    }
     if (net?.status === 'error') {
       if (start) this.joinLobby(this.playerName || 'PLAYER');
       this.showroom(dt);
@@ -713,6 +744,11 @@ export class Game {
       if (turb) this.cycleTurbos(turb);
       if (weap) this.toggleWeapons();
       if (ammo) this.cycleAmmo(ammo);
+      // the host advertises the race settings; everyone else takes them
+      if (net?.status === 'online') {
+        if (host) net.setMe({ set: { route: this.routeIdx, turbos: this.turboCount, weapons: this.weaponsSetting, ammo: this.ammoCount } });
+        else this.adoptSettings(net.host().set);
+      }
       if (start && net?.status === 'online') this.startOnline();
     }
     if (this.pending && raceClock() >= this.pending.at) this.beginOnlineRace(this.pending.go);
@@ -1554,12 +1590,14 @@ export class Game {
       h.keycap(L.x1 - 26, L.paintY - 2, '↓');
     }
     // race settings: < value > chips, with the key that changes each
+    const host = net?.status === 'online' ? net.host() : null, amHost = !host || host.id === net?.selfId;
     const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) =>
-      this.settingRow(L.x0 + 12, y, L.minusX, L.plusX, kb ? L.x1 - 34 : -1, label, val, on, key, toggle);
+      this.settingRow(L.x0 + 12, y, L.minusX, L.plusX, kb && amHost ? L.x1 - 34 : -1, label, val, on, key, toggle, !amHost);
     setting(L.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
     setting(L.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
     setting(L.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
-    h.text('YOUR SETTINGS APPLY IF YOU START THE RACE', L.mid, 216, 8, GREY, 'center');
+    if (amHost) h.text(others.length ? 'YOU ARE THE HOST: YOU SET THE RACE' : 'FIRST IN IS THE HOST: YOU SET THE RACE', L.mid, 216, 8, ORANGE, 'center');
+    else h.text(`SET BY THE HOST, ${host?.name ?? ''}`, L.mid, 216, 8, ORANGE, 'center');
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
       ['SPEED', (s.stats.vmax - 260) / 90, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
@@ -1580,11 +1618,15 @@ export class Game {
     const lx = HUD_W - 320, ly = 70;
     h.box(lx, ly, 300, 40 + Math.min(8, others.length + 1) * 34 + (others.length > 7 ? 16 : 0), 0x101030, 0x3a3a5a, 3);
     h.text('PLAYERS', lx + 14, ly + 12, 16, YELLOW);
-    const rows = [{ name: this.playerName || 'PLAYER', car: s.name, st: 'YOU', me: true },
-      ...others.map((p) => ({ name: p.name, car: ROSTER[p.car % ROSTER.length].name, st: p.status === 'race' ? 'RACING' : 'READY', me: false }))];
+    const rows = [{ name: this.playerName || 'PLAYER', car: s.name, st: 'YOU', me: true, host: amHost },
+      ...others.map((p) => ({ name: p.name, car: ROSTER[p.car % ROSTER.length].name, st: p.status === 'race' ? 'RACING' : 'READY', me: false, host: p.id === host?.id }))];
     rows.slice(0, 8).forEach((r, i) => {
       const y = ly + 40 + i * 34;
       h.text(r.name, lx + 14, y, 16, r.me ? YELLOW : WHITE);
+      if (r.host) {
+        h.box(lx + 190, y + 1, 44, 14, 0x3a2410, ORANGE, 1);
+        h.text('HOST', lx + 212, y + 4, 8, ORANGE, 'center');
+      }
       h.text(r.st, lx + 286, y + 4, 8, r.st === 'RACING' ? ORANGE : r.me ? YELLOW : 0x40e040, 'right');
       h.text(r.car, lx + 14, y + 19, 8, 0x8a8aa8);
     });
@@ -1592,7 +1634,7 @@ export class Game {
     // route + start
     const route = this.world.route;
     h.box(20, 410, 250, 50, 0x141428, WHITE, 3);
-    h.text(`${this.touch ? 'TAP' : 'R'}  ROUTE`, 145, 418, 8, 0x8a8aa8, 'center');
+    h.text(amHost ? `${this.touch ? 'TAP' : 'R'}  ROUTE` : "HOST'S ROUTE", 145, 418, 8, 0x8a8aa8, 'center');
     h.text(`${route.lines[0]} ${route.lines[1]}`.slice(0, 15), 145, 434, 16, YELLOW, 'center');
     if (net?.status === 'error') {
       h.text('CHECK YOUR CONNECTION, OR PLAY ONLINE AT', HUD_W / 2, 320, 8, WHITE, 'center');
@@ -1619,9 +1661,14 @@ export class Game {
   }
 
   /** A race-setting row: label, then < value > chips (or one ON/OFF chip), then the key that changes it. */
-  private settingRow(x: number, y: number, minusX: number, plusX: number, keyX: number, label: string, val: string, on: boolean, key: string, toggle: boolean) {
+  private settingRow(x: number, y: number, minusX: number, plusX: number, keyX: number, label: string, val: string, on: boolean, key: string, toggle: boolean, locked = false) {
     const h = this.hud, H = LOBBY.chipH;
     h.text(label, x, y + 3, 16, on ? YELLOW : GREY);
+    if (locked) {
+      // set by the host: show the value, no buttons
+      h.text(val, (minusX + plusX + 28) / 2, y + 3, 16, toggle ? (on ? ORANGE : GREY) : on ? WHITE : GREY, 'center');
+      return;
+    }
     if (toggle) h.chip(minusX, y, plusX + 28 - minusX, H, val, on ? ORANGE : GREY, 16, on ? 0x5a2a10 : 0x1a1a3a);
     else {
       h.chip(minusX, y, 28, H, '←', on ? CYAN : GREY);

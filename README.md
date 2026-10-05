@@ -40,8 +40,8 @@ fullscreen and lock to landscape where the browser allows it.
 ## Turbo
 
 Every race you get a set number of turbo boosts: 5 by default. Change it from 1 to 9 with T (or tap
-"TURBOS") on the car-select screen or in the online lobby. In an online race the settings of whoever
-presses START apply to everyone. Fire one with Shift, or the TURBO button on phones. Each boost
+"TURBOS") on the car-select screen or in the online lobby. Online, the host (the first player in
+the lobby) sets it for everyone. Fire one with Shift, or the TURBO button on phones. Each boost
 gives five seconds of extra acceleration and roughly 18% more top speed, with flames from the exhausts.
 Afterwards the car eases back to its normal top speed. The HUD lamps show how many you have left. In
 VS RIVALS every computer driver gets the same number and fires them on straights when they're fighting
@@ -50,7 +50,7 @@ you for position.
 ## Weapons
 
 VS RIVALS and online races can be played with guns: WEAPONS ON/OFF (V, or tap) on the car-select
-screen or in the online lobby. It's on by default. In online races the settings of whoever presses START apply.
+screen or in the online lobby. It's on by default. Online, the host sets it for everyone.
 
 * Hold **F** (or the red **FIRE** button on phones) and your driver leans out of the window and shoots.
 * **Aiming is automatic.** It locks onto the nearest racer up to 90 m ahead or 35 m behind (a bracket
@@ -75,10 +75,12 @@ Race real people from the link **https://freddywong.github.io/turbo-horizon-86/#
 phones and computers, with no account and no sign-in.
 
 1. Open the link and type your name. You go straight into the **online lobby**.
-2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the ◀ ▶ arrows and the colour swatches), and a route (R, or tap ROUTE).
-   TURBOS, WEAPONS and AMMO have their own ◀ ▶ / ON-OFF buttons. The lobby shows the driving keys as keycaps, or on a
+2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the ◀ ▶ arrows and the colour swatches).
+   The **host**, the first player in the lobby (marked HOST), sets the race for everyone: the route (R, or tap
+   ROUTE) and TURBOS, WEAPONS and AMMO with their ◀ ▶ / ON-OFF buttons. Everyone else sees the host's settings.
+   If the host leaves, the next player in takes over. The lobby shows the driving keys as keycaps, or on a
    phone a picture of where each on-screen button is. The keys you need also show under the 3-2-1 countdown.
-3. **Anyone** can press START. Everyone in the lobby (up to 8) gets a short countdown and lines up on
+3. **Anyone** can press START; the race uses the host's settings. Everyone in the lobby (up to 8) gets a short countdown and lines up on
    the same grid with the same traffic. Players who arrive while a race is running wait in the lobby
    for the next one.
 4. Name tags show who's who, POS shows your place, and the results fill in as people finish. After
@@ -196,7 +198,7 @@ Cherokee, Chevrolet Caprice, Mercedes W124 and Ford F-150. Tokyo has a Toyota Cr
   the clifftop Corniche high above the sea, and Cap Martin.
 
 Pick a route from the postcards on the route-select screen (arrow keys, or tap a card and tap it again to go). Under the cards you see
-whether it is a day or night run, its song and a map of its five stages. Online, whoever presses START picks it.
+whether it is a day or night run, its song and a map of its five stages. Online, the host picks it.
 
 Each route has five stages. Reaching a checkpoint adds time (EXTENDED PLAY).
 Reach the GOAL before the timer runs out. Score comes from speed, drifting,
