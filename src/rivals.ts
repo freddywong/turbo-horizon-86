@@ -47,6 +47,7 @@ export interface Rival {
   gunT: number; // >0 while shooting (gunner leaning out)
   gunTo: number; // -2 = straight ahead (guns have no auto-aim)
   rocketT: number; // >0 while shouldering the bazooka (1 = just fired)
+  rockets?: number; // test mode: computer cars carry rockets like players
   /** online: another human player, driven by their network updates instead of the AI */
   remote?: { id: string; d: number; x: number; v: number; at: number; hp: number };
 }

@@ -157,6 +157,24 @@ export class Game {
   musicIdx = loadMusic();
   /** ARCADE: classic time attack. RIVALS: an 8-car race against computer drivers. */
   mode: Mode = 'arcade';
+  /**
+   * Hidden test mode (?test=pvp): a VS RIVALS race where the computer cars play by human-player rules,
+   * both ways, with a damage log on screen. For checking online damage feels right.
+   */
+  readonly testPvp = new URLSearchParams(location.search).get('test') === 'pvp';
+  private testLog: { text: string; col: number; n: number }[] = [];
+  private testDealt = new Map<string, number>();
+  private testScrape = 0;
+  private testTaken = new Map<string, number>();
+  private testNote(text: string, col: number) {
+    const last = this.testLog[this.testLog.length - 1];
+    if (last && last.text === text) {
+      last.n++;
+      return;
+    }
+    this.testLog.push({ text, col, n: 1 });
+    if (this.testLog.length > 8) this.testLog.shift();
+  }
   // online play
   net: Net | null = null;
   nameBox: NameBox | null = null;
@@ -288,9 +306,14 @@ export class Game {
     this.weapons = go ? go.weapons : this.mode === 'rivals' && this.weaponsSetting;
     this.raceAmmo = go ? go.ammo : this.ammoCount;
     this.ammo = this.weapons ? this.raceAmmo : 0;
+    if (this.testPvp && this.mode === 'rivals') this.weapons = true;
     this.raceRockets = go ? go.rockets : this.rocketCount;
     this.rockets = this.weapons ? this.raceRockets : 0;
     this.world.clearRockets();
+    this.testLog = [];
+    this.testDealt.clear();
+    this.testScrape = 0;
+    this.testTaken.clear();
     this.fireCool = 0;
     this.firingT = 0;
     this.lastGunTarget = null;
@@ -305,6 +328,7 @@ export class Game {
     if (this.mode === 'rivals') {
       // start from the back of the grid; lighter traffic, pushed further up the road
       this.world.setRivals(makeGrid(this.spec, this.pos, Date.now() & 0xffff, this.raceTurbos, this.weapons ? this.raceAmmo : 0));
+      if (this.testPvp) for (const r of this.world.rivals) r.rockets = this.raceRockets;
       this.world.resetTraffic(this.pos, 10, 520);
       this.place = 8;
     } else this.world.setRivals([]);
@@ -606,6 +630,7 @@ export class Game {
   // ------------------------------------------------------------------ online
   /** Deep link (#join): straight to the name box. */
   boot() {
+    if (this.testPvp) this.mode = 'rivals';
     if (roomFromHash() !== null) {
       this.mode = 'online';
       this.toName();
@@ -960,6 +985,11 @@ export class Game {
     this.world.car.hit(0.6, Math.random() < 0.5 ? 'left' : 'rear');
     this.audio.boom();
     this.flash('ROCKET HIT!', '', 1.2);
+    if (this.testPvp && from.startsWith('p:')) {
+      const who = from.slice(2);
+      this.testTaken.set(who, (this.testTaken.get(who) ?? 0) + Math.max(0, dmg));
+      this.testNote(`${who} > YOU ROCKET ${Math.max(0, dmg).toFixed(1)}${dmg <= 0 ? ' (CAPPED)' : ''}`, ORANGE);
+    }
     if (dmg <= 0) return;
     this.gunFrom.set(from, taken + dmg);
     this.hp = Math.max(0, this.hp - dmg);
@@ -1100,6 +1130,7 @@ export class Game {
           if (Math.random() < dt * 12) this.audio.scrape();
           if (!demo && this.state === 'race') {
             this.hp -= 3 * dt;
+            if (this.testPvp) this.testScrape += 3 * dt;
             this.scrapeDmg += dt;
             if (this.scrapeDmg > 0.6) {
               this.scrapeDmg = 0;
@@ -1229,6 +1260,7 @@ export class Game {
   /** Takes condition off the car and dents the model where it was hit. */
   private damage(amount: number, severity: number, where: 'front' | 'rear' | 'left' | 'right') {
     if (this.state !== 'race' || this.wrecked) return;
+    if (this.testPvp) this.testNote(`CRASH ${where.toUpperCase()} ${amount.toFixed(1)}`, CYAN);
     this.hp = Math.max(0, this.hp - amount);
     this.dmgCool = 0.5;
     this.world.car.hit(severity, where);
@@ -1253,6 +1285,11 @@ export class Game {
       for (const [k, v] of this.gunFrom) if (k.startsWith('ai:')) ai += v;
       dmg = Math.min(dmg, AI_GUN_CAP - ai);
     }
+    if (this.testPvp && from.startsWith('p:')) {
+      const who = from.slice(2);
+      this.testTaken.set(who, (this.testTaken.get(who) ?? 0) + Math.max(0, dmg));
+      this.testNote(`${who} > YOU GUN ${Math.max(0, dmg).toFixed(1)}${dmg <= 0 ? ' (CAPPED)' : ''}`, dmg <= 0 ? GREY : RED);
+    }
     if (dmg <= 0) return;
     this.gunFrom.set(from, taken + dmg);
     this.hp = Math.max(0, this.hp - dmg);
@@ -1274,7 +1311,15 @@ export class Game {
     }
     if (r.wrecked) return;
     // computer cars: your bullets do triple damage and can finish them off; a rocket finishes them outright
-    const dmg = (rocket ? ROCKET_DAMAGE : PER_HIT) * VS_AI_DAMAGE, before = r.hp;
+    let dmg = (rocket ? ROCKET_DAMAGE : PER_HIT) * VS_AI_DAMAGE;
+    if (this.testPvp) {
+      // test mode: exactly what a real player would take from you, capped per shooter
+      dmg = Math.max(0, Math.min(rocket ? ROCKET_DAMAGE : PER_HIT, GUN_CAP - r.gunTaken));
+      this.testDealt.set(r.name, (this.testDealt.get(r.name) ?? 0) + dmg);
+      this.testNote(`YOU > ${r.name} ${rocket ? 'ROCKET' : 'GUN'} ${dmg.toFixed(1)}${dmg === 0 ? ' (CAPPED)' : ''}`, dmg === 0 ? GREY : YELLOW);
+      if (dmg <= 0) return;
+    }
+    const before = r.hp;
     r.hp = Math.max(0, r.hp - dmg);
     r.gunTaken += dmg;
     r.bumpT = Math.max(r.bumpT, rocket ? 1.2 : 0.25 + (1 - r.hp / 100) * 0.35);
@@ -1366,6 +1411,17 @@ export class Game {
         r.burst = 0;
         return;
       }
+      if (this.testPvp) {
+        // test mode: they fire like a player would, holding the trigger while you're in their sights,
+        // and use their rockets when you're well lined up
+        if ((r.rockets ?? 0) > 0 && lf.d - r.d < 120 && Math.random() < dt * 0.6) {
+          r.rockets = (r.rockets ?? 0) - 1;
+          r.rocketT = 1.1;
+          w.launchRocket(r.d, r.x, Math.max(r.v, 15) + ROCKET_SPEED, false, `p:${r.name}`);
+          this.audio.rocket(0.5);
+        }
+        r.burst = Math.max(r.burst, 1);
+      }
       if (r.burst <= 0) {
         if (Math.random() < dt * (0.06 + r.aggro * 0.14)) r.burst = 3 + Math.floor(Math.random() * 4);
         return;
@@ -1374,11 +1430,11 @@ export class Game {
       r.fireCool -= dt;
       if (r.fireCool > 0) return;
       r.fireCool = 1 / FIRE_RATE;
-      r.burst--;
+      if (!this.testPvp) r.burst--;
       r.ammo--;
       w.shoot(r.d, r.x, this.pos, this.px, true);
       this.audio.gun(0.5);
-      this.takeGunHit(`ai:${r.name}`, 1);
+      this.takeGunHit(this.testPvp ? `p:${r.name}` : `ai:${r.name}`, 1);
     });
     this.rocketsTick(dt);
     w.tickTracers(dt);
@@ -1405,7 +1461,7 @@ export class Game {
       const inPath = (d: number, x: number) => d >= d0 && d <= d1 && Math.abs(x - rk.x) < ROCKET_WIDTH;
       let hit = -2; // -2 nothing, -1 the player, >= 0 a rival
       w.rivals.forEach((r, i) => {
-        if (hit !== -2 || r.wrecked || r.remote?.id === rk.from) return;
+        if (hit !== -2 || r.wrecked || r.remote?.id === rk.from || `p:${r.name}` === rk.from) return;
         if (inPath(r.d, r.x)) hit = i;
       });
       if (hit === -2 && !rk.mine && inPath(this.pos, this.px)) hit = -1;
@@ -1417,6 +1473,7 @@ export class Game {
         this.hitRival(hit, true);
         this.score += 5000;
       }
+      if (this.testPvp && hit === -1 && rk.from.startsWith('p:')) this.takeRocketHit(rk.from);
     }
   }
 
@@ -1910,6 +1967,29 @@ export class Game {
     h.text('TO TURN OFF', x + 140, y + 70, 8, GREY, 'center');
   }
 
+  /** Test mode (?test=pvp): every car's condition, what you dealt it and took from it, and the last hits. */
+  private testPanel() {
+    const h = this.hud, x = 14, y0 = 118, w = 270;
+    const rows = this.world.rivals;
+    h.shade(x - 6, y0 - 6, w, 36 + (rows.length + 1) * 10 + this.testLog.length * 10 + 16, 0.7);
+    h.text('TEST: PLAYER RULES', x, y0, 8, ORANGE);
+    h.text(`YOU ${(100 - this.hp).toFixed(1)}% DAMAGE`, x, y0 + 11, 8, damageColour(1 - this.hp / 100));
+    if (this.testScrape > 0.05) h.text(`WALLS ${this.testScrape.toFixed(1)}`, x + w - 12, y0 + 11, 8, CYAN, 'right');
+    h.text('CAR       DMG   YOU>  >YOU', x, y0 + 25, 8, GREY);
+    rows.forEach((r, i) => {
+      const y = y0 + 35 + i * 10;
+      const dmg = 100 - r.hp, dealt = this.testDealt.get(r.name) ?? 0, taken = this.testTaken.get(r.name) ?? 0;
+      const c = r.wrecked ? RED : WHITE;
+      h.text(r.name.slice(0, 8), x, y, 8, c);
+      h.text(r.wrecked ? 'WRECK' : `${dmg.toFixed(0)}%`, x + 112, y, 8, c, 'right');
+      h.text(dealt.toFixed(1), x + 168, y, 8, YELLOW, 'right');
+      h.text(taken.toFixed(1), x + 224, y, 8, RED, 'right');
+      h.text(`R${r.rockets ?? 0}`, x + 252, y, 8, ORANGE, 'right');
+    });
+    const ly = y0 + 41 + rows.length * 10;
+    this.testLog.forEach((l, i) => h.text(l.n > 1 ? `${l.text} x${l.n}` : l.text, x, ly + i * 10, 8, l.col));
+  }
+
   /** Under the 3-2-1: the few controls you need to get going. */
   private countdownHelp() {
     const h = this.hud, fire = this.weapons, y = 318;
@@ -2054,6 +2134,7 @@ export class Game {
         }
       }
       if (this.noTargetT > 0) h.text('OUT OF AMMO', HUD_W / 2, 124, 16, RED, 'center');
+      if (this.testPvp) this.testPanel();
       if (this.hitFlash > 0) {
         h.rect(0, 0, HUD_W, 6, RED);
         h.rect(0, HUD_H - 6, HUD_W, 6, RED);
