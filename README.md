@@ -87,6 +87,12 @@ phones and computers, with no account and no sign-in.
    the race everyone goes back to the lobby.
 
 Use `#join=yourcode` (e.g. `.../#join=friday`) for a private lobby that only people with that link find.
+
+**Can't see each other?** The top right of the lobby shows the room and how many matchmaking servers you
+reached (`ROOM LOBBY  SERVERS 4/5`). Both players need the same room, so open the same link. Use the GitHub
+Pages link above: the claude.ai preview can't go online. If you see SERVERS 0/5, that network is blocking
+the servers. Once two players have found each other they connect directly, and if a network (mobile data,
+office or school wi-fi) blocks that, the game falls back to a free public relay server (Open Relay).
 You can also pick ONLINE on the mode screen.
 
 How it works: there's no game server. Browsers find each other through free public Nostr relays

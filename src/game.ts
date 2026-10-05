@@ -1565,7 +1565,11 @@ export class Game {
     const others = net?.list() ?? [];
     const status = !net || net.status === 'connecting' ? 'CONNECTING...'
       : net.status === 'error' ? "COULDN'T CONNECT" : others.length ? `${others.length + 1} PLAYERS HERE` : 'WAITING FOR PLAYERS...';
-    h.text(status, HUD_W / 2, 46, 16, net?.status === 'error' ? RED : CYAN, 'center');
+    // matchmaking servers and room name, so two players can check they're looking in the same place
+    const sv = net?.status === 'online' ? net.servers() : null;
+    const down = net?.status === 'online' && net.serversDown();
+    h.text(down ? "CAN'T REACH THE MATCHMAKING SERVERS" : status, HUD_W / 2, 46, 16, net?.status === 'error' || down ? RED : CYAN, 'center');
+    if (net?.status === 'online') h.text(`ROOM ${net.room.toUpperCase()}${sv ? `  SERVERS ${sv[0]}/${sv[1]}` : ''}`, HUD_W - 20, 18, 8, GREY, 'right');
     // your car, settings, stats and controls on a see-through panel
     const L = LOBBY, kb = !this.touch;
     h.shade(L.x0, 68, L.x1 - L.x0, 316);

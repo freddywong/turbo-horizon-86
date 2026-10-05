@@ -63,6 +63,8 @@ interface Transport {
   onLeave(fn: (id: string) => void): void;
   onJoin(fn: (id: string) => void): void;
   leave(): void;
+  /** matchmaking servers connected / tried */
+  servers?(): [number, number];
 }
 
 /** Same-browser transport for tests: tabs share a BroadcastChannel. */
@@ -85,9 +87,32 @@ function localTransport(room: string): Transport {
   };
 }
 
+/**
+ * A TURN relay for when two browsers can't connect directly (mobile data, office and school
+ * networks, some home routers). The Open Relay Project's public static-auth server takes
+ * time-limited credentials made from its published shared secret (the TURN REST scheme).
+ */
+const TURN_HOST = 'staticauth.openrelay.metered.ca';
+const TURN_SECRET = 'openrelayprojectsecret';
+export async function turnServers(): Promise<RTCIceServer[]> {
+  try {
+    const username = `${Math.floor(Date.now() / 1000) + 24 * 3600}:th86`;
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(TURN_SECRET), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+    const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(username)));
+    const credential = btoa(String.fromCharCode(...sig));
+    return [{
+      urls: [`turn:${TURN_HOST}:80`, `turn:${TURN_HOST}:80?transport=tcp`, `turn:${TURN_HOST}:443`, `turns:${TURN_HOST}:443?transport=tcp`],
+      username, credential,
+    }];
+  } catch {
+    return []; // no WebCrypto (insecure page): direct connections only
+  }
+}
+
 async function trysteroTransport(room: string): Promise<Transport> {
-  const t = await import('trystero');
-  const r = t.joinRoom({ appId: APP_ID }, room);
+  const [t, turnConfig] = await Promise.all([import('trystero'), turnServers()]);
+  const r = t.joinRoom({ appId: APP_ID, turnConfig }, room);
   const actions = new Map<string, { send: (d: unknown, o?: { target?: string }) => Promise<void> }>();
   const act = (name: string) => {
     let a = actions.get(name);
@@ -104,6 +129,10 @@ async function trysteroTransport(room: string): Promise<Transport> {
     onLeave: (fn) => { r.onPeerLeave = fn; },
     onJoin: (fn) => { r.onPeerJoin = fn; },
     leave: () => { r.leave().catch(() => {}); },
+    servers: () => {
+      const socks = Object.values((t.getRelaySockets as () => Record<string, WebSocket>)() ?? {});
+      return [socks.filter((w) => w.readyState === 1).length, socks.length];
+    },
   };
 }
 
@@ -121,6 +150,7 @@ export class Net {
   error = '';
   selfId = '';
   private tr: Transport | null = null;
+  private created = performance.now();
   private timer = 0;
   /** what we tell everyone about ourselves */
   me = { name: 'PLAYER', car: 0, paint: 0, status: 'lobby' as Status, raceId: '', since: Date.now(), set: null as RaceSettings | null };
@@ -199,6 +229,17 @@ export class Net {
 
   isHost(): boolean {
     return this.host().id === this.selfId;
+  }
+
+  /** Matchmaking (Nostr relay) servers connected / tried; null for the same-browser test transport. */
+  servers(): [number, number] | null {
+    return this.tr?.servers?.() ?? null;
+  }
+
+  /** True once we've waited 8 seconds and still reach none of the matchmaking servers. */
+  serversDown(): boolean {
+    const sv = this.servers();
+    return !!sv && sv[1] > 0 && sv[0] === 0 && performance.now() - this.created > 8000;
   }
 
   /** Lobby players in join order (not including us). */
