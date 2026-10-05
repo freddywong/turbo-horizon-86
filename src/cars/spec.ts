@@ -76,7 +76,11 @@ export interface CarSpec {
   drive?: 'L' | 'R' | 'C';
   trim?: number;
   stats: { vmax: number; accel: number; grip: number }; // vmax km/h; others ~1.0
+  /** the engine, for its sound (see ENGINES in audio.ts) */
+  engine?: EngineType;
 }
+
+export type EngineType = 'flat12' | 'v12' | 'v8flat' | 'v8tt' | 'flat6tt' | 'i6tt' | 'rotary' | 'v6vtec' | 'v8big' | 'v8small';
 
 /**
  * Shorthand for conventional three-box / hatch shapes used by most traffic.

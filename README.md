@@ -208,6 +208,24 @@ acceleration and grip, plus three paint colours.
 
 The car-select screen and the lobby show each maker's national flag.
 
+### Engine sounds
+
+Each car sounds like its real engine. The pitch follows the real firing rate (revs x cylinders), so a
+V12 at 7,000 rpm sits well above a big-block V8 at 5,000. The engine type also sets the character:
+
+| Engine | Cars | Sound |
+|---|---|---|
+| Flat-12 | Testarossa | smooth, silky wail |
+| V12 | Countach, Diablo, McLaren F1 | dense, rising scream |
+| Flat-plane V8 | F355 | shriek to 8,500 rpm |
+| Twin-turbo V8 | F40 | raw rasp, turbo whistle, blow-off *pssh* |
+| Twin-turbo flat-6 | 959 | gruff growl, turbos |
+| Turbo straight-6 | Skyline R32, Supra | smooth, whistle and blow-off |
+| Twin-rotor rotary | RX-7 | high, buzzy brap to 9,000 rpm |
+| VTEC V6 | NSX | turns harder and louder past 5,800 rpm |
+| Big-block V8 | Boss 429, Charger, 'Cuda, Trans Am | deep, lumpy cross-plane rumble |
+| Small-block V8 | Camaro Z/28, Corvette | the same burble, revs higher |
+
 Traffic is period-correct too. Miami has a VW Golf Mk2, Volvo 240 estate, AE86, Jeep
 Cherokee, Chevrolet Caprice, Mercedes W124 and Ford F-150. Tokyo has a Toyota Crown
 (including taxis), Nissan Cedric, Suzuki Every kei van and Honda Civic, plus trucks and buses.

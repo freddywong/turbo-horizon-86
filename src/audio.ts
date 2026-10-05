@@ -1,3 +1,5 @@
+import type { EngineType } from './cars/spec';
+
 /**
  * All sound is synthesised live with Web Audio: an FM-chip-ish soundtrack
  * (original compositions), engine drone, tyre squeal, crashes and jingles.
@@ -256,6 +258,37 @@ const midi = (name: string): number => {
 };
 const hz = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
+/**
+ * How each kind of engine sounds. The pitch follows the real firing rate (rpm / 60 x firing pulses per
+ * crank turn), so a V12 at 7,000 rpm sits well above a big-block V8 at 5,000. The rest is the character:
+ * sub = the half-order rumble (the burble of a cross-plane V8), harm = the 2nd harmonic (the scream of a
+ * V12 or flat-plane V8), lope = the lumpy cam at low revs, rasp = distortion, bright = how open the filter
+ * is, turbo = whistle and blow-off valve.
+ */
+interface EngineVoice { redline: number; pulses: number; wave: OscillatorType; sub: number; harm: number; lope: number; rasp: number; bright: number; turbo: number; vol: number; vtec?: boolean }
+export const ENGINES: Record<EngineType, EngineVoice> = {
+  // Ferrari Testarossa: flat-12, smooth and silky, a high wail
+  flat12: { redline: 6800, pulses: 6, wave: 'sawtooth', sub: 0.15, harm: 0.4, lope: 0, rasp: 0.1, bright: 1.05, turbo: 0, vol: 0.95 },
+  // Lamborghini V12s and the McLaren F1's BMW V12: a dense, rising scream
+  v12: { redline: 7400, pulses: 6, wave: 'sawtooth', sub: 0.1, harm: 0.55, lope: 0, rasp: 0.15, bright: 1.25, turbo: 0, vol: 1 },
+  // Ferrari F355: flat-plane V8, shrieking at 8,500 rpm
+  v8flat: { redline: 8500, pulses: 4, wave: 'sawtooth', sub: 0.12, harm: 0.6, lope: 0, rasp: 0.35, bright: 1.35, turbo: 0, vol: 0.95 },
+  // Ferrari F40: twin-turbo flat-plane V8, raw and raspy with whistling turbos
+  v8tt: { redline: 7750, pulses: 4, wave: 'sawtooth', sub: 0.3, harm: 0.35, lope: 0, rasp: 0.6, bright: 1.0, turbo: 1.2, vol: 1 },
+  // Porsche 959: twin-turbo flat-6, a gruff growl
+  flat6tt: { redline: 7600, pulses: 3, wave: 'sawtooth', sub: 0.4, harm: 0.25, lope: 0, rasp: 0.5, bright: 0.95, turbo: 1, vol: 1 },
+  // Nissan RB26 / Toyota 2JZ: turbo straight-six, smooth, with whistle and pssh
+  i6tt: { redline: 8000, pulses: 3, wave: 'sawtooth', sub: 0.2, harm: 0.35, lope: 0, rasp: 0.25, bright: 1.05, turbo: 1, vol: 0.95 },
+  // Mazda 13B twin-rotor: a high, buzzy brap
+  rotary: { redline: 9000, pulses: 3, wave: 'square', sub: 0.05, harm: 0.45, lope: 0, rasp: 0.7, bright: 1.2, turbo: 0.8, vol: 0.85 },
+  // Honda NSX: V6 with VTEC, which turns harder and louder past 5,800 rpm
+  v6vtec: { redline: 8000, pulses: 3, wave: 'sawtooth', sub: 0.25, harm: 0.2, lope: 0, rasp: 0.2, bright: 0.95, turbo: 0, vol: 0.95, vtec: true },
+  // big-block V8s (Boss 429, 440 Magnum, Pontiac 400): deep, lazy, lumpy cross-plane rumble
+  v8big: { redline: 5500, pulses: 4, wave: 'sawtooth', sub: 0.9, harm: 0.1, lope: 0.55, rasp: 0.55, bright: 0.6, turbo: 0, vol: 1.2 },
+  // small-block V8s (Camaro 302, Corvette 327): the same burble, revs higher and barks harder
+  v8small: { redline: 6800, pulses: 4, wave: 'sawtooth', sub: 0.65, harm: 0.2, lope: 0.4, rasp: 0.5, bright: 0.85, turbo: 0, vol: 1.1 },
+};
+
 export class Audio {
   ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -264,8 +297,21 @@ export class Audio {
   private noise!: AudioBuffer;
   private engA!: OscillatorNode;
   private engB!: OscillatorNode;
+  private engC!: OscillatorNode;
+  private engBG!: GainNode;
+  private engCG!: GainNode;
+  private engShape!: WaveShaperNode;
   private engF!: BiquadFilterNode;
+  private engAM!: GainNode;
+  private engLfo!: OscillatorNode;
+  private engLfoG!: GainNode;
   private engG!: GainNode;
+  private turboO!: OscillatorNode;
+  private turboG!: GainNode;
+  private engVoice: EngineVoice = ENGINES.flat12;
+  private lastLoad = 0;
+  private lastRpm = 0;
+  private spool = 0;
   private skidG!: GainNode;
   private delay!: DelayNode;
   muted = (() => {
@@ -308,23 +354,39 @@ export class Audio {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
-    // engine
+    // engine: firing note + half-order rumble + 2nd harmonic -> distortion -> filter -> cam lope -> volume
     this.engA = ctx.createOscillator();
-    this.engA.type = 'sawtooth';
     this.engB = ctx.createOscillator();
     this.engB.type = 'square';
+    this.engC = ctx.createOscillator();
+    this.engC.type = 'sawtooth';
+    this.engBG = ctx.createGain();
+    this.engCG = ctx.createGain();
+    this.engShape = ctx.createWaveShaper();
+    this.engShape.oversample = '2x';
     this.engF = ctx.createBiquadFilter();
     this.engF.type = 'lowpass';
     this.engF.Q.value = 4;
+    this.engAM = ctx.createGain();
+    this.engLfo = ctx.createOscillator();
+    this.engLfoG = ctx.createGain();
+    this.engLfo.connect(this.engLfoG).connect(this.engAM.gain);
     this.engG = ctx.createGain();
     this.engG.gain.value = 0;
-    const bG = ctx.createGain();
-    bG.gain.value = 0.6;
-    this.engA.connect(this.engF);
-    this.engB.connect(bG).connect(this.engF);
-    this.engF.connect(this.engG).connect(this.sfx);
-    this.engA.start();
-    this.engB.start();
+    const mix = ctx.createGain();
+    mix.gain.value = 0.7;
+    this.engA.connect(mix);
+    this.engB.connect(this.engBG).connect(mix);
+    this.engC.connect(this.engCG).connect(mix);
+    mix.connect(this.engShape).connect(this.engF).connect(this.engAM).connect(this.engG).connect(this.sfx);
+    // turbo whistle
+    this.turboO = ctx.createOscillator();
+    this.turboO.type = 'sine';
+    this.turboG = ctx.createGain();
+    this.turboG.gain.value = 0;
+    this.turboO.connect(this.turboG).connect(this.sfx);
+    for (const o of [this.engA, this.engB, this.engC, this.engLfo, this.turboO]) o.start();
+    this.applyVoice();
 
     // tyre squeal: looping band-passed noise
     const sk = ctx.createBufferSource();
@@ -350,15 +412,62 @@ export class Audio {
     if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.55, this.ctx.currentTime, 0.02);
   }
 
+  /** Pick the engine sound for the player's car. */
+  setEngine(type: EngineType | undefined) {
+    const v = ENGINES[type ?? 'flat12'];
+    if (v === this.engVoice) return;
+    this.engVoice = v;
+    if (this.ctx) this.applyVoice();
+  }
+
+  private applyVoice() {
+    const v = this.engVoice;
+    this.engA.type = v.wave;
+    this.engBG.gain.value = v.sub;
+    this.engCG.gain.value = v.harm;
+    // soft clipping: more drive = more rasp
+    const k = 1 + v.rasp * 8, n = 512, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(k * x) / Math.tanh(k);
+    }
+    this.engShape.curve = curve;
+  }
+
   /** rpm 0..1 within the current gear, load 0..1 throttle. */
   engine(on: boolean, rpm: number, load: number) {
     if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const f = 38 + rpm * 120;
+    const t = this.ctx.currentTime, v = this.engVoice;
+    // the real crank speed, and the firing rate it gives (scaled down into a game-friendly range)
+    const crank = v.redline * (0.12 + 0.88 * rpm);
+    const f = (crank / 60) * v.pulses * 0.45;
+    const vtec = v.vtec && crank > 5800 ? 1 : 0;
     this.engA.frequency.setTargetAtTime(f, t, 0.03);
     this.engB.frequency.setTargetAtTime(f * 0.5 + 1.5, t, 0.03);
-    this.engF.frequency.setTargetAtTime(300 + rpm * 1400 + load * 600, t, 0.05);
-    this.engG.gain.setTargetAtTime(on ? 0.1 + load * 0.08 : 0, t, 0.08);
+    this.engC.frequency.setTargetAtTime(f * 2 + 0.7, t, 0.03);
+    if (v.vtec) this.engCG.gain.setTargetAtTime(v.harm + vtec * 0.45, t, 0.04);
+    this.engF.frequency.setTargetAtTime((300 + rpm * 1400 + load * 600 + vtec * 900) * v.bright, t, 0.05);
+    // a lumpy cam: the volume wobbles at low revs, smoothing out as they climb
+    const lope = v.lope * Math.max(0, 1 - rpm * 1.3);
+    this.engAM.gain.setTargetAtTime(1 - lope * 0.5, t, 0.05);
+    this.engLfoG.gain.setTargetAtTime(lope * 0.5, t, 0.05);
+    this.engLfo.frequency.setTargetAtTime(Math.max(4, f * 0.11), t, 0.05);
+    this.engG.gain.setTargetAtTime(on ? (0.1 + load * 0.08 + vtec * 0.03) * v.vol : 0, t, 0.08);
+    // turbos: spool up under load, whistle, and blow off when you lift at high boost
+    if (v.turbo) {
+      this.spool += ((on ? load * rpm : 0) - this.spool) * (load ? 0.04 : 0.25);
+      this.turboO.frequency.setTargetAtTime(1800 + this.spool * 3200, t, 0.05);
+      this.turboG.gain.setTargetAtTime(on ? this.spool * 0.018 * v.turbo : 0, t, 0.05);
+      if (on && this.lastLoad > 0.5 && load < 0.5 && this.lastRpm > 0.55 && this.spool > 0.3) this.blowOff(v.turbo);
+    } else this.turboG.gain.setTargetAtTime(0, t, 0.05);
+    this.lastLoad = load;
+    this.lastRpm = rpm;
+  }
+
+  /** The pssh of a turbo's blow-off valve. */
+  private blowOff(vol: number) {
+    this.burst(0.35, 0.12 * vol, 2500, 0, 'highpass');
+    this.burst(0.2, 0.08 * vol, 5000, 0.02, 'bandpass');
   }
 
   skid(amount: number) {

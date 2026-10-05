@@ -9,7 +9,7 @@ const pair = (x: number, y: number, r: number) => [{ x, y, r }, { x: -x, y, r }]
 export const ROSTER: CarSpec[] = [
   {
     id: 'testarossa',
-    rimStyle: 'star', trim: 0xb89068, arch: 0.04, front: 'popup', make: 'FERRARI', country: 'IT', name: 'TESTAROSSA', nose: 'bar', year: 1984, group: '80s EXOTIC',
+    rimStyle: 'star', trim: 0xb89068, arch: 0.04, front: 'popup', make: 'FERRARI', country: 'IT', name: 'TESTAROSSA', engine: 'flat12', nose: 'bar', year: 1984, group: '80s EXOTIC',
     paints: [0xd8141c, 0xf2f2ee, 0xffd418],
     stations: [
       S(-2.24, 0.88, 0.3, 0.5, 0.56, 0.8, 'p'), S(-1.7, 0.93, 0.24, 0.62, 0.68, 0.86, 'p'), S(-0.85, 0.96, 0.22, 0.74, 0.8, 0.8, 'ws'),
@@ -27,7 +27,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'countach',
-    rimStyle: 'dial', trim: 0xa07850, arch: 0.07, front: 'popup', make: 'LAMBORGHINI', country: 'IT', name: 'COUNTACH QV', nose: 'lip', year: 1985, group: '80s EXOTIC',
+    rimStyle: 'dial', trim: 0xa07850, arch: 0.07, front: 'popup', make: 'LAMBORGHINI', country: 'IT', name: 'COUNTACH QV', engine: 'v12', nose: 'lip', year: 1985, group: '80s EXOTIC',
     paints: [0xf4f4ee, 0xd81818, 0xffd418],
     stations: [
       S(-2.07, 0.86, 0.28, 0.4, 0.44, 0.76, 'p'), S(-1.3, 0.92, 0.24, 0.56, 0.62, 0.84, 'p'), S(-0.75, 0.95, 0.22, 0.66, 0.72, 0.84, 'ws'),
@@ -45,7 +45,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'f40',
-    rimStyle: 'star', trim: 0x8a1814, arch: 0.05, front: 'popup', make: 'FERRARI', country: 'IT', name: 'F40', nose: 'slots', year: 1987, group: '80s EXOTIC',
+    rimStyle: 'star', trim: 0x8a1814, arch: 0.05, front: 'popup', make: 'FERRARI', country: 'IT', name: 'F40', engine: 'v8tt', nose: 'slots', year: 1987, group: '80s EXOTIC',
     paints: [0xe01818, 0xffd418, 0xf2f2ee],
     stations: [
       S(-2.18, 0.9, 0.27, 0.46, 0.5, 0.8, 'p'), S(-1.5, 0.95, 0.22, 0.6, 0.66, 0.88, 'p'), S(-0.8, 0.97, 0.22, 0.7, 0.76, 0.82, 'ws'),
@@ -63,7 +63,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: '959',
-    rimStyle: 'six', trim: 0x3a3a40, front: 'round', make: 'PORSCHE', country: 'DE', name: '959', nose: 'twin', year: 1986, group: '80s EXOTIC',
+    rimStyle: 'six', trim: 0x3a3a40, front: 'round', make: 'PORSCHE', country: 'DE', name: '959', engine: 'flat6tt', nose: 'twin', year: 1986, group: '80s EXOTIC',
     paints: [0xc8ccd4, 0xf2f2ee, 0xd81818],
     stations: [
       S(-2.13, 0.84, 0.3, 0.5, 0.56, 0.74, 'p'), S(-1.6, 0.9, 0.26, 0.62, 0.7, 0.8, 'p'), S(-0.75, 0.92, 0.25, 0.76, 0.84, 0.72, 'ws'),
@@ -80,7 +80,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'r32',
-    rimStyle: 'six', trim: 0x2a2a30, arch: 0.045, front: 'rect', make: 'NISSAN', country: 'JP', name: 'SKYLINE GT-R R32', nose: 'grille', year: 1989, group: '90s JAPAN',
+    rimStyle: 'six', trim: 0x2a2a30, arch: 0.045, front: 'rect', make: 'NISSAN', country: 'JP', name: 'SKYLINE GT-R R32', engine: 'i6tt', nose: 'grille', year: 1989, group: '90s JAPAN',
     paints: [0x5a6470, 0xf2f2ee, 0xb81818],
     stations: [
       // upright nose, flat bonnet, near-upright screen, flat roof, notchback boot, squared tail
@@ -98,7 +98,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'supra',
-    rimStyle: 'star', trim: 0x3a3a3c, front: 'rect', make: 'TOYOTA', country: 'JP', name: 'SUPRA RZ', nose: 'mouth', year: 1993, group: '90s JAPAN',
+    rimStyle: 'star', trim: 0x3a3a3c, front: 'rect', make: 'TOYOTA', country: 'JP', name: 'SUPRA RZ', engine: 'i6tt', nose: 'mouth', year: 1993, group: '90s JAPAN',
     paints: [0xff6a10, 0xf2f2ee, 0xd81818],
     stations: [
       // rounded corners (narrow ends), domed bonnet, short bubble roof, wide haunches, high round tail
@@ -116,7 +116,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'rx7',
-    rimStyle: 'multi', trim: 0x2a2a2e, front: 'popup', make: 'MAZDA', country: 'JP', name: 'RX-7', nose: 'mouth', year: 1992, group: '90s JAPAN',
+    rimStyle: 'multi', trim: 0x2a2a2e, front: 'popup', make: 'MAZDA', country: 'JP', name: 'RX-7', engine: 'rotary', nose: 'mouth', year: 1992, group: '90s JAPAN',
     paints: [0xffd418, 0xd81818, 0x2a8a5a],
     stations: [
       // top below belt over the bonnet: the front wings stand proud of a sunken bonnet, as on the FD
@@ -134,7 +134,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'nsx',
-    rimStyle: 'multi', trim: 0x1e1e22, front: 'popup', make: 'HONDA', country: 'JP', name: 'NSX', nose: 'slim', year: 1990, group: '90s JAPAN',
+    rimStyle: 'multi', trim: 0x1e1e22, front: 'popup', make: 'HONDA', country: 'JP', name: 'NSX', engine: 'v6vtec', nose: 'slim', year: 1990, group: '90s JAPAN',
     paints: [0xc81820, 0xf2f2ee, 0xffd418],
     stations: [
       S(-2.21, 0.84, 0.3, 0.5, 0.56, 0.76, 'p'), S(-1.6, 0.89, 0.26, 0.62, 0.68, 0.84, 'p'), S(-0.95, 0.9, 0.26, 0.72, 0.78, 0.8, 'ws'),
@@ -152,7 +152,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'diablo',
-    rimStyle: 'dial', trim: 0xb89068, arch: 0.06, front: 'popup', make: 'LAMBORGHINI', country: 'IT', name: 'DIABLO', nose: 'twin', year: 1990, group: '90s SUPERCAR',
+    rimStyle: 'dial', trim: 0xb89068, arch: 0.06, front: 'popup', make: 'LAMBORGHINI', country: 'IT', name: 'DIABLO', engine: 'v12', nose: 'twin', year: 1990, group: '90s SUPERCAR',
     paints: [0x6a2ac8, 0xffd418, 0xf2f2ee],
     stations: [
       S(-2.23, 0.88, 0.28, 0.42, 0.46, 0.78, 'p'), S(-1.4, 0.95, 0.24, 0.58, 0.64, 0.88, 'p'), S(-0.8, 0.98, 0.22, 0.66, 0.72, 0.86, 'ws'),
@@ -170,7 +170,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'mclarenf1',
-    rimStyle: 'mesh', trim: 0x2a2a30, drive: 'C', front: 'slim', make: 'McLAREN', country: 'GB', name: 'F1', nose: 'mouth', year: 1992, group: '90s SUPERCAR',
+    rimStyle: 'mesh', trim: 0x2a2a30, drive: 'C', front: 'slim', make: 'McLAREN', country: 'GB', name: 'F1', engine: 'v12', nose: 'mouth', year: 1992, group: '90s SUPERCAR',
     paints: [0xff8a1a, 0xc8ccd4, 0xd81818],
     stations: [
       S(-2.15, 0.82, 0.3, 0.48, 0.52, 0.72, 'p'), S(-1.5, 0.88, 0.26, 0.6, 0.66, 0.82, 'p'), S(-1.0, 0.9, 0.25, 0.68, 0.74, 0.78, 'ws'),
@@ -189,7 +189,7 @@ export const ROSTER: CarSpec[] = [
   },
   {
     id: 'f355',
-    rimStyle: 'star', trim: 0xb08060, front: 'popup', make: 'FERRARI', country: 'IT', name: 'F355', nose: 'mouth', year: 1994, group: '90s SUPERCAR',
+    rimStyle: 'star', trim: 0xb08060, front: 'popup', make: 'FERRARI', country: 'IT', name: 'F355', engine: 'v8flat', nose: 'mouth', year: 1994, group: '90s SUPERCAR',
     paints: [0xe01818, 0xffd418, 0x1a4a9a],
     stations: [
       S(-2.12, 0.86, 0.3, 0.5, 0.56, 0.78, 'p'), S(-1.5, 0.92, 0.26, 0.62, 0.68, 0.86, 'p'), S(-0.8, 0.94, 0.24, 0.72, 0.78, 0.82, 'ws'),
@@ -210,7 +210,7 @@ export const ROSTER: CarSpec[] = [
   {
     id: 'mustang',
     rimStyle: 'multi', trim: 0x1a1a1c, arch: 0.03, front: 'round', nose: 'bar', chrome: true, drive: 'L',
-    make: 'FORD', country: 'US', name: 'MUSTANG BOSS 429', year: 1969, group: 'US MUSCLE',
+    make: 'FORD', country: 'US', name: 'MUSTANG BOSS 429', engine: 'v8big', year: 1969, group: 'US MUSCLE',
     paints: [0xd85010, 0x16161a, 0xf2f2ee],
     stations: [
       // tall flat nose, long flat hood, Sportsroof fastback down to a Kamm tail
@@ -230,7 +230,7 @@ export const ROSTER: CarSpec[] = [
   {
     id: 'camaro',
     rimStyle: 'six', trim: 0x1a1a1c, arch: 0.03, front: 'round', nose: 'bar', chrome: true, drive: 'L',
-    make: 'CHEVROLET', country: 'US', name: 'CAMARO Z/28', year: 1969, group: 'US MUSCLE',
+    make: 'CHEVROLET', country: 'US', name: 'CAMARO Z/28', engine: 'v8small', year: 1969, group: 'US MUSCLE',
     paints: [0x1a3a9a, 0xe88a10, 0xf2f2ee],
     stations: [
       // notchback: long hood, short cabin, flat boot
@@ -249,7 +249,7 @@ export const ROSTER: CarSpec[] = [
   {
     id: 'charger',
     rimStyle: 'six', trim: 0x1a1a1c, arch: 0.03, front: 'slim', nose: 'bar', chrome: true, drive: 'L',
-    make: 'DODGE', country: 'US', name: 'CHARGER R/T', year: 1969, group: 'US MUSCLE',
+    make: 'DODGE', country: 'US', name: 'CHARGER R/T', engine: 'v8big', year: 1969, group: 'US MUSCLE',
     paints: [0x141416, 0xb81818, 0x2a6ac8],
     stations: [
       // big and long: hidden headlights behind a full-width grille, flying-buttress roof
@@ -267,7 +267,7 @@ export const ROSTER: CarSpec[] = [
   {
     id: 'cuda',
     rimStyle: 'six', trim: 0x1a1a1c, arch: 0.04, front: 'round', nose: 'bar', chrome: true, drive: 'L',
-    make: 'PLYMOUTH', country: 'US', name: "'CUDA 440", year: 1970, group: 'US MUSCLE',
+    make: 'PLYMOUTH', country: 'US', name: "'CUDA 440", engine: 'v8big', year: 1970, group: 'US MUSCLE',
     paints: [0x7a2a9a, 0x60c030, 0xff6a10],
     stations: [
       // wide and short: hardtop notchback
@@ -286,7 +286,7 @@ export const ROSTER: CarSpec[] = [
   {
     id: 'transam',
     rimStyle: 'six', trim: 0x1a1a1c, arch: 0.04, front: 'rect', nose: 'twin', drive: 'L',
-    make: 'PONTIAC', country: 'US', name: 'FIREBIRD TRANS AM', year: 1977, group: 'US MUSCLE',
+    make: 'PONTIAC', country: 'US', name: 'FIREBIRD TRANS AM', engine: 'v8big', year: 1977, group: 'US MUSCLE',
     paints: [0x141416, 0xf2f2ee, 0x1a3a8a],
     stations: [
       // low shovel nose with twin grilles, bulging hood, ducktail
@@ -305,7 +305,7 @@ export const ROSTER: CarSpec[] = [
   {
     id: 'corvette',
     rimStyle: 'six', trim: 0x2a1a14, arch: 0.04, front: 'popup', nose: 'twin', chrome: true, drive: 'L',
-    make: 'CHEVROLET', country: 'US', name: 'CORVETTE STING RAY', year: 1963, group: 'US MUSCLE',
+    make: 'CHEVROLET', country: 'US', name: 'CORVETTE STING RAY', engine: 'v8small', year: 1963, group: 'US MUSCLE',
     paints: [0x9a1818, 0xc8c8cc, 0x1a3a6a],
     stations: [
       // low pointed nose, long bonnet, split-window fastback

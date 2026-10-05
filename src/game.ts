@@ -246,6 +246,7 @@ export class Game {
     return this.spec.stats.vmax / KMH;
   }
   private applyCar(spec = this.spec, paint = spec.paints[this.paintIdx % spec.paints.length]) {
+    this.audio.setEngine(spec.engine);
     this.world.setPlayerCar(spec, paint);
   }
 
