@@ -1574,8 +1574,11 @@ export class Game {
     const line = down ? "CAN'T REACH THE MATCHMAKING SERVERS" : blocked ? 'FOUND A PLAYER BUT COULD NOT CONNECT' : status;
     h.text(line, HUD_W / 2, 46, 16, net?.status === 'error' || down ? RED : blocked ? ORANGE : CYAN, 'center');
     if (net?.status === 'online') {
-      h.text(`ROOM ${net.room.toUpperCase()}${sv ? `  SERVERS ${sv[0]}/${sv[1]}` : ''}`, HUD_W - 12, 4, 8, GREY, 'right');
-      if (lk) h.text(`FOUND ${lk.found}  LINKED ${lk.linked}  FAILED ${lk.failed}`, HUD_W - 12, 16, 8, lk.failed ? ORANGE : GREY, 'right');
+      // connection report along the bottom edge
+      const parts = [`ROOM ${net.room.toUpperCase()}`];
+      if (sv) parts.push(`SERVERS ${sv[0]}/${sv[1]}`);
+      if (lk) parts.push(`FOUND ${lk.found}`, `LINKED ${lk.linked}`, `FAILED ${lk.failed}`, `RELAY ${net.relay() ? 'ON' : 'OFF'}`);
+      h.text(parts.join('   '), HUD_W / 2, 467, 8, lk && lk.failed && !lk.linked ? ORANGE : GREY, 'center');
     }
     // your car, settings, stats and controls on a see-through panel
     const L = LOBBY, kb = !this.touch;

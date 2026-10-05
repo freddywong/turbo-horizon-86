@@ -96,7 +96,37 @@ function localTransport(room: string): Transport {
  */
 const TURN_HOST = 'staticauth.openrelay.metered.ca';
 const TURN_SECRET = 'openrelayprojectsecret';
+/**
+ * Our own TURN relay account (metered.ca free plan): fresh credentials are fetched from it each time
+ * someone goes online. The key is meant to sit in client code; leave either value empty to skip it.
+ */
+const METERED_APP = '';
+const METERED_KEY = '';
+/** true once our own relay account handed out credentials */
+let relayReady = false;
+async function meteredServers(): Promise<RTCIceServer[]> {
+  if (!METERED_APP || !METERED_KEY) return [];
+  const ctl = new AbortController();
+  const timer = window.setTimeout(() => ctl.abort(), 5000);
+  try {
+    const res = await fetch(`https://${METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(METERED_KEY)}`, { signal: ctl.signal });
+    const list = (await res.json()) as RTCIceServer[];
+    // keep only TURN entries (Trystero already brings STUN) with credentials
+    const turn = Array.isArray(list) ? list.filter((x) => x && x.username && x.credential && JSON.stringify(x.urls).includes('turn')) : [];
+    relayReady = turn.length > 0;
+    return turn;
+  } catch {
+    return [];
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function turnServers(): Promise<RTCIceServer[]> {
+  return [...(await meteredServers()), ...(await openRelayServers())];
+}
+
+async function openRelayServers(): Promise<RTCIceServer[]> {
   try {
     const username = `${Math.floor(Date.now() / 1000) + 24 * 3600}:th86`;
     const enc = new TextEncoder();
@@ -268,6 +298,11 @@ export class Net {
   /** Matchmaking (Nostr relay) servers connected / tried; null for the same-browser test transport. */
   servers(): [number, number] | null {
     return this.tr?.servers?.() ?? null;
+  }
+
+  /** Whether our own TURN relay account is in use (shown in the lobby). */
+  relay(): boolean {
+    return relayReady;
   }
 
   links(): { found: number; linked: number; failed: number } | null {
