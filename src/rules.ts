@@ -18,7 +18,7 @@ export const SLIP_SPEED = 0.08;
 export const AMMO_STEPS = [30, 60, 100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
 export const AMMO_DEFAULT = 200;
 /** Online races have their own ammo setting, with a smaller default. */
-export const AMMO_DEFAULT_ONLINE = 60;
+export const AMMO_DEFAULT_ONLINE = 100;
 export const FIRE_RATE = 5; // rounds per second while FIRE is held
 /** Most one shooter's gunfire can take off a car: three quarters of the damage bar. */
 export const GUN_CAP = 75;
@@ -27,7 +27,7 @@ export const VS_AI_DAMAGE = 3;
 /** All the computer drivers' gunfire together can take at most this much of your bar. */
 export const AI_GUN_CAP = 40;
 // ---- bazooka ----------------------------------------------------------------
-export const ROCKETS_DEFAULT = 3; // rockets per race unless changed in the menu
+export const ROCKETS_DEFAULT = 5; // rockets per race unless changed in the menu
 export const ROCKETS_MAX = 5;
 export const ROCKET_SPEED = 70; // m/s on top of the shooter's own speed
 export const ROCKET_RANGE = 900; // metres before it burns out
