@@ -199,6 +199,30 @@ touch screens) to change stations mid-race. ROUTE THEME plays each route's own t
 Low-poly versions of real cars, with no badges or logos drawn. Each has its own top speed,
 acceleration and grip, plus three paint colours.
 
+The speeds follow the real cars' order (the McLaren F1 is fastest, the Ferrari exotics next, the
+Japanese cars after them and the muscle cars slowest), with the gaps squeezed so every car can win.
+The muscle cars have big torque: they launch hard but top out lowest. Real vs. game top speeds:
+
+| Car | Real (approx.) | Game |
+|---|---|---|
+| McLaren F1 | 386 | 345 |
+| Lamborghini Diablo | 325 | 325 |
+| Ferrari F40 | 324 | 324 |
+| Porsche 959 | 317 | 317 |
+| Lamborghini Countach QV | 298 | 298 |
+| Ferrari F355 | 295 | 295 |
+| Ferrari Testarossa | 290 | 290 |
+| Toyota Supra RZ (derestricted) | 285 | 285 |
+| Honda NSX | 270 | 275 |
+| Nissan Skyline GT-R R32 (derestricted) | 250 | 268 |
+| Mazda RX-7 | 250 | 265 |
+| Chevrolet Corvette Sting Ray | 230 | 262 |
+| Dodge Charger R/T | 225 | 259 |
+| Plymouth 'Cuda 440 | 220 | 257 |
+| Chevrolet Camaro Z/28 | 200 | 253 |
+| Ford Mustang Boss 429 | 195 | 251 |
+| Pontiac Firebird Trans Am | 185 | 246 |
+
 * **80s exotics:** Ferrari Testarossa, Lamborghini Countach QV, Ferrari F40, Porsche 959
 * **90s Japan:** Nissan Skyline GT-R R32, Toyota Supra RZ, Mazda RX-7, Honda NSX
 * **90s supercars:** Lamborghini Diablo, McLaren F1, Ferrari F355

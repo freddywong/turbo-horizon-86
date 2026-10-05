@@ -41,7 +41,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'big', z: 1.95, y: 1.28, w: 0.95, d: 0.38 },
     exhaust: [...pair(0.32, 0.32, 0.055), ...pair(0.5, 0.32, 0.055)],
     plateY: 0.42,
-    stats: { vmax: 298, accel: 1.0, grip: 0.92 },
+    stats: { vmax: 298, accel: 1.02, grip: 0.92 },
   },
   {
     id: 'f40',
@@ -59,7 +59,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'bridge', z: 1.98, y: 1.18, w: 0.98, d: 0.4 },
     exhaust: [{ x: 0, y: 0.5, r: 0.06 }, ...pair(0.16, 0.5, 0.06)],
     plateY: 0.32,
-    stats: { vmax: 324, accel: 1.05, grip: 0.9 },
+    stats: { vmax: 324, accel: 1.12, grip: 0.9 },
   },
   {
     id: '959',
@@ -76,7 +76,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'hoop', z: 1.85, y: 1.12, w: 0.9, d: 0.45 },
     exhaust: pair(0.45, 0.34, 0.05),
     plateY: 0.5,
-    stats: { vmax: 315, accel: 1.0, grip: 1.05 },
+    stats: { vmax: 317, accel: 1.12, grip: 1.05 },
   },
   {
     id: 'r32',
@@ -94,7 +94,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'hoop', z: 2.05, y: 1.1, w: 0.74, d: 0.26 },
     exhaust: [{ x: 0.55, y: 0.32, r: 0.065 }],
     plateY: 0.54,
-    stats: { vmax: 285, accel: 1.06, grip: 1.12 },
+    stats: { vmax: 268, accel: 1.06, grip: 1.12 },
   },
   {
     id: 'supra',
@@ -112,7 +112,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'hoop', z: 2.0, y: 1.22, w: 0.86, d: 0.32 },
     exhaust: [{ x: 0.6, y: 0.32, r: 0.075 }],
     plateY: 0.5,
-    stats: { vmax: 290, accel: 1.02, grip: 1.0 },
+    stats: { vmax: 285, accel: 1.06, grip: 1.0 },
   },
   {
     id: 'rx7',
@@ -130,7 +130,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'hoop', z: 1.98, y: 1.06, w: 0.78, d: 0.24 },
     exhaust: pair(0.55, 0.33, 0.055),
     plateY: 0.52,
-    stats: { vmax: 280, accel: 1.06, grip: 1.12 },
+    stats: { vmax: 265, accel: 1.04, grip: 1.12 },
   },
   {
     id: 'nsx',
@@ -148,7 +148,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'bridge', z: 2.0, y: 1.04, w: 0.9, d: 0.3 },
     exhaust: pair(0.4, 0.33, 0.05),
     plateY: 0.46,
-    stats: { vmax: 280, accel: 1.0, grip: 1.16 },
+    stats: { vmax: 275, accel: 1.0, grip: 1.16 },
   },
   {
     id: 'diablo',
@@ -166,7 +166,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'big', z: 2.0, y: 1.2, w: 0.96, d: 0.34 },
     exhaust: [...pair(0.12, 0.42, 0.055), ...pair(0.3, 0.42, 0.055)],
     plateY: 0.36,
-    stats: { vmax: 325, accel: 1.0, grip: 0.9 },
+    stats: { vmax: 325, accel: 1.06, grip: 0.9 },
   },
   {
     id: 'mclarenf1',
@@ -185,7 +185,7 @@ export const ROSTER: CarSpec[] = [
     scoop: true,
     exhaust: [{ x: 0, y: 0.54, r: 0.09 }],
     plateY: 0.34,
-    stats: { vmax: 340, accel: 1.1, grip: 0.95 },
+    stats: { vmax: 345, accel: 1.2, grip: 0.95 },
   },
   {
     id: 'f355',
@@ -204,7 +204,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'duck', z: 2.05, y: 1.0, w: 0.9, d: 0.16 },
     exhaust: [...pair(0.55, 0.38, 0.05), ...pair(0.7, 0.38, 0.05)],
     plateY: 0.6,
-    stats: { vmax: 295, accel: 1.0, grip: 1.05 },
+    stats: { vmax: 295, accel: 1.04, grip: 1.05 },
   },
   // ---- 60s/70s American muscle: long hoods, cabins set back, tall grilles, chrome bumpers ----
   {
@@ -225,7 +225,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'duck', z: 2.3, y: 1.02, w: 0.8, d: 0.12 },
     exhaust: pair(0.5, 0.3, 0.055),
     plateY: 0.56,
-    stats: { vmax: 275, accel: 1.15, grip: 0.88 },
+    stats: { vmax: 251, accel: 1.12, grip: 0.88 },
   },
   {
     id: 'camaro',
@@ -244,7 +244,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'duck', z: 2.26, y: 1.03, w: 0.82, d: 0.12 },
     exhaust: pair(0.62, 0.3, 0.05),
     plateY: 0.56,
-    stats: { vmax: 265, accel: 1.1, grip: 0.92 },
+    stats: { vmax: 253, accel: 1.08, grip: 0.92 },
   },
   {
     id: 'charger',
@@ -262,7 +262,7 @@ export const ROSTER: CarSpec[] = [
     lights: [{ x: 0.6, y: 0.8, w: 0.42, h: 0.1, c: RED, brake: true }, { x: 0.18, y: 0.8, w: 0.3, h: 0.1, c: RED }],
     exhaust: pair(0.6, 0.3, 0.06),
     plateY: 0.56,
-    stats: { vmax: 260, accel: 1.18, grip: 0.84 },
+    stats: { vmax: 259, accel: 1.13, grip: 0.84 },
   },
   {
     id: 'cuda',
@@ -281,7 +281,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'duck', z: 2.26, y: 1.0, w: 0.84, d: 0.12 },
     exhaust: pair(0.55, 0.3, 0.06),
     plateY: 0.56,
-    stats: { vmax: 270, accel: 1.2, grip: 0.85 },
+    stats: { vmax: 257, accel: 1.14, grip: 0.85 },
   },
   {
     id: 'transam',
@@ -300,7 +300,7 @@ export const ROSTER: CarSpec[] = [
     wing: { kind: 'duck', z: 2.35, y: 1.04, w: 0.86, d: 0.16 },
     exhaust: pair(0.55, 0.3, 0.055),
     plateY: 0.52,
-    stats: { vmax: 250, accel: 0.98, grip: 0.95 },
+    stats: { vmax: 246, accel: 1.0, grip: 0.95 },
   },
   {
     id: 'corvette',
@@ -318,7 +318,7 @@ export const ROSTER: CarSpec[] = [
     lights: [{ x: 0.6, y: 0.74, w: 0.14, h: 0.14, c: RED, round: true, brake: true }, { x: 0.4, y: 0.74, w: 0.14, h: 0.14, c: RED, round: true, brake: true }],
     exhaust: pair(0.45, 0.3, 0.05),
     plateY: 0.52,
-    stats: { vmax: 255, accel: 1.05, grip: 1.0 },
+    stats: { vmax: 262, accel: 1.08, grip: 1.0 },
   },
 ];
 

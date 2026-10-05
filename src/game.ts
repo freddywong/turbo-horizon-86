@@ -663,12 +663,6 @@ export class Game {
     const lobby = this.state === 'lobby', r = lobby ? 6.6 : 7;
     cam.position.set(this.px + Math.sin(a) * r, lobby ? 1.8 : 2.0, Math.cos(a) * r);
     cam.lookAt(this.px, 0.35, 0);
-    if (lobby) {
-      // slide the picture so the car sits in the open space between the settings and the player list
-      cam.projectionMatrix.elements[8] = -0.3;
-      cam.projectionMatrix.elements[9] = 0.2;
-      cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
-    }
   }
 
   // ------------------------------------------------------------------ online
@@ -1769,7 +1763,7 @@ export class Game {
         h.text('PERFORMANCE', C.lx + 12, C.py + 8, 8, YELLOW);
         const bars: [string, number, number, string][] = [
           ['SPEED', (s.stats.vmax - 230) / 120, RED, `${s.stats.vmax}KM/H`],
-          ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE, ''],
+          ['ACCEL', (s.stats.accel - 0.85) / 0.35, ORANGE, ''],
           ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN, ''],
         ];
         bars.forEach(([label, v, c, note], i) => {
@@ -1936,7 +1930,7 @@ export class Game {
     }
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
-      ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
+      ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.35, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
     ];
     bars.forEach(([label, v, c], i) => {
       const y = statsY + i * 11;
