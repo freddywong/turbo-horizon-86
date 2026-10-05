@@ -49,8 +49,10 @@ export interface CarSpec {
   id: string;
   name: string; // shown in the car select screen
   make: string;
+  /** the maker's country, for the flag on the car-select screen */
+  country?: 'IT' | 'DE' | 'JP' | 'GB' | 'US';
   year: number;
-  group: '80s EXOTIC' | '90s JAPAN' | '90s SUPERCAR' | 'TRAFFIC';
+  group: '80s EXOTIC' | '90s JAPAN' | '90s SUPERCAR' | 'US MUSCLE' | 'TRAFFIC';
   paints: number[]; // first is the default
   stations: Station[];
   wheels: { r: number; fz: number; rz: number; fx: number; rx: number; hw?: number; rim: number; spokes: number };
@@ -64,6 +66,8 @@ export interface CarSpec {
   front?: 'popup' | 'rect' | 'round' | 'slim'; // headlight style
   /** air intakes in the nose: full-width bar (default), upper grille + bar, oval mouth, three slots, twin side intakes, thin slit, low slim bar */
   nose?: 'bar' | 'grille' | 'mouth' | 'slots' | 'twin' | 'lip' | 'slim';
+  /** chrome bumpers front and back (60s/70s cars) */
+  chrome?: boolean;
   exhaust: { x: number; y: number; r: number }[];
   plateY: number;
   /** '92 detail: wheel style, arch flare (m), seat layout, cabin trim colour */

@@ -372,8 +372,14 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
     intakeAt(0, yb0 + 0.04, yb0 + 0.09, w0 * 0.18, 0.015);
   }
   if (!traffic) {
-    // splitter: a thin lip just proud of the nose, not a plank
-    body.box(0, yb0 - 0.008, zF + 0.1, w0 * 1.62, 0.022, 0.24, [DARK, BLACK]);
+    if (spec.chrome) {
+      // full-width chrome bumper across the bottom of the nose, wrapping round the corners
+      body.box(0, yb0 + 0.07, zN - 0.03, w0 * 1.96, 0.1, 0.1, [CHROME, 0xa8acb4]);
+      for (const s of [-1, 1]) body.box(s * w0 * 0.98, yb0 + 0.07, zN + 0.08, 0.06, 0.1, 0.24, [CHROME, 0xa8acb4]);
+    } else {
+      // splitter: a thin lip just proud of the nose, not a plank
+      body.box(0, yb0 - 0.008, zF + 0.1, w0 * 1.62, 0.022, 0.24, [DARK, BLACK]);
+    }
     const hy = (f0[4][1] + f0[6][1]) / 2;
     for (const s of [-1, 1]) {
       const x = s * w0 * 0.62;
@@ -446,7 +452,7 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
     const y0 = ybR - 0.04, y1 = bTop, zb = zT + 0.075, d = 0.09;
     const tuck = Math.max(0, W(zT - 0.4) - wR);
     const r = Math.min(0.32, 0.07 + tuck * 2.2), cx = wR * 0.98 - r, cz = zb - r;
-    const face = eighties || traffic ? 0x2a2a2e : shade, top = eighties || traffic ? 0x38383c : paint;
+    const face = spec.chrome ? CHROME : eighties || traffic ? 0x2a2a2e : shade, top = spec.chrome ? 0xe8ecf0 : eighties || traffic ? 0x38383c : paint;
     const plan: [number, number][] = [[0, zb]];
     for (let k = 0; k <= 5; k++) {
       const a = (k / 5) * (Math.PI / 2);

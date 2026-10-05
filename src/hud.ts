@@ -253,6 +253,50 @@ export class Hud {
     }
   }
 
+  /** Small pixel flag (IT, DE, JP, GB, US) with a dark border; w x h in HUD pixels. */
+  flag(code: string, x: number, y: number, w = 24, h = 16) {
+    x = Math.round(x);
+    y = Math.round(y);
+    this.rect(x - 1, y - 1, w + 2, h + 2, 0x000000);
+    const g = this.g;
+    g.save();
+    g.beginPath();
+    g.rect(x, y, w, h);
+    g.clip();
+    if (code === 'IT') {
+      this.rect(x, y, w / 3, h, 0x009246);
+      this.rect(x + w / 3, y, w / 3, h, 0xf1f2f1);
+      this.rect(x + (2 * w) / 3, y, w / 3 + 1, h, 0xce2b37);
+    } else if (code === 'DE') {
+      this.rect(x, y, w, h / 3, 0x000000);
+      this.rect(x, y + h / 3, w, h / 3, 0xdd0000);
+      this.rect(x, y + (2 * h) / 3, w, h / 3 + 1, 0xffce00);
+    } else if (code === 'JP') {
+      this.rect(x, y, w, h, 0xffffff);
+      this.circle(x + w / 2, y + h / 2, h * 0.3, 0xbc002d);
+    } else if (code === 'GB') {
+      this.rect(x, y, w, h, 0x012169);
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(x, y); g.lineTo(x + w, y + h); g.moveTo(x + w, y); g.lineTo(x, y + h);
+      g.stroke();
+      g.strokeStyle = '#c8102e';
+      g.lineWidth = 1;
+      g.stroke();
+      this.rect(x, y + h / 2 - 3, w, 6, 0xffffff);
+      this.rect(x + w / 2 - 3, y, 6, h, 0xffffff);
+      this.rect(x, y + h / 2 - 1.5, w, 3, 0xc8102e);
+      this.rect(x + w / 2 - 1.5, y, 3, h, 0xc8102e);
+    } else if (code === 'US') {
+      for (let i = 0; i < 7; i++) this.rect(x, y + (i * h) / 7, w, h / 7 + 0.5, i % 2 ? 0xffffff : 0xb22234);
+      const cw = w * 0.45, ch = (h * 4) / 7;
+      this.rect(x, y, cw, ch, 0x3c3b6e);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) this.rect(x + 1.5 + c * (cw / 4), y + 1.5 + r * (ch / 3), 1, 1, 0xffffff);
+    }
+    g.restore();
+  }
+
   /** Sun or crescent moon badge. */
   sky(night: boolean, cx: number, cy: number) {
     if (night) {

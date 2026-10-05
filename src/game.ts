@@ -1733,6 +1733,7 @@ export class Game {
         h.text(`${Math.max(0, Math.ceil(25 - this.t))}`, HUD_W - 30, 12, 24, ORANGE, 'right');
         // name plate
         h.text(s.make, HUD_W / 2, 46, 16, CYAN, 'center');
+        if (s.country) h.flag(s.country, HUD_W / 2 - s.make.length * 8 - 34, 46, 24, 16);
         h.text(s.name, HUD_W / 2, 66, s.name.length > 14 ? 24 : 32, WHITE, 'center');
         const tag = `${s.year}  ${s.group}`, tw = tag.length * 8 + 20;
         h.box(HUD_W / 2 - tw / 2, 104, tw, 18, 0x2a1a50, PINK, 1);
@@ -1751,7 +1752,7 @@ export class Game {
         h.shade(C.lx, C.py, 300, C.ph, 0.68);
         h.text('PERFORMANCE', C.lx + 12, C.py + 8, 8, YELLOW);
         const bars: [string, number, number, string][] = [
-          ['SPEED', (s.stats.vmax - 260) / 90, RED, `${s.stats.vmax}KM/H`],
+          ['SPEED', (s.stats.vmax - 230) / 120, RED, `${s.stats.vmax}KM/H`],
           ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE, ''],
           ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN, ''],
         ];
@@ -1902,6 +1903,7 @@ export class Game {
     h.chip(L.x0 + 6, L.carY + 4, 30, L.carH - 8, '←', YELLOW);
     h.chip(L.x1 - 36, L.carY + 4, 30, L.carH - 8, '→', YELLOW);
     h.text(s.make, L.mid, L.carY + 2, 16, CYAN, 'center');
+    if (s.country) h.flag(s.country, L.mid - s.make.length * 8 - 26, L.carY + 3, 18, 12);
     const big = s.name.length <= 11;
     h.text(s.name, L.mid, L.carY + (big ? 20 : 24), big ? 24 : 16, WHITE, 'center');
     const n = s.paints.length, sx = L.mid - (n * 22 - 6) / 2;
@@ -1930,7 +1932,7 @@ export class Game {
     else h.text(`SET BY THE HOST, ${host?.name ?? ''}`, L.mid, 230, 8, ORANGE, 'center');
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
-      ['SPEED', (s.stats.vmax - 260) / 90, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
+      ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
     ];
     bars.forEach(([label, v, c], i) => {
       const y = 244 + i * 11;

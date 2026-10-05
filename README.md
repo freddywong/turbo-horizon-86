@@ -201,6 +201,11 @@ acceleration and grip, plus three paint colours.
 * **80s exotics:** Ferrari Testarossa, Lamborghini Countach QV, Ferrari F40, Porsche 959
 * **90s Japan:** Nissan Skyline GT-R R32, Toyota Supra RZ, Mazda RX-7, Honda NSX
 * **90s supercars:** Lamborghini Diablo, McLaren F1, Ferrari F355
+* **US muscle (60s/70s):** Ford Mustang Boss 429, Chevrolet Camaro Z/28, Dodge Charger R/T,
+  Plymouth 'Cuda 440, Pontiac Firebird Trans Am, Chevrolet Corvette Sting Ray. Long hoods, chrome
+  bumpers, huge acceleration, less grip.
+
+The car-select screen and the lobby show each maker's national flag.
 
 Traffic is period-correct too. Miami has a VW Golf Mk2, Volvo 240 estate, AE86, Jeep
 Cherokee, Chevrolet Caprice, Mercedes W124 and Ford F-150. Tokyo has a Toyota Crown
