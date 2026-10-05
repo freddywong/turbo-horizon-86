@@ -163,6 +163,8 @@ export class Game {
    * both ways, with a damage log on screen. For checking online damage feels right.
    */
   readonly testPvp = new URLSearchParams(location.search).get('test') === 'pvp';
+  /** test mode: cars on the grid including you (?players=2..8, default 8) */
+  readonly testPlayers = Math.max(2, Math.min(8, Math.round(Number(new URLSearchParams(location.search).get('players')) || 8)));
   private testLog: { text: string; col: number; n: number }[] = [];
   private testDealt = new Map<string, number>();
   private testScrape = 0;
@@ -335,7 +337,9 @@ export class Game {
     this.table = [];
     if (this.mode === 'rivals') {
       // start from the back of the grid; lighter traffic, pushed further up the road
-      this.world.setRivals(makeGrid(this.spec, this.pos, Date.now() & 0xffff, this.raceTurbos, this.weapons ? this.raceAmmo : 0));
+      const grid = makeGrid(this.spec, this.pos, Date.now() & 0xffff, this.raceTurbos, this.weapons ? this.raceAmmo : 0);
+      // test mode: only as many computer cars as the players asked for (the ones nearest the front of the grid)
+      this.world.setRivals(this.testPvp ? grid.slice(0, this.testPlayers - 1) : grid);
       if (this.testPvp) for (const r of this.world.rivals) r.rockets = this.raceRockets;
       this.world.resetTraffic(this.pos, 10, 520);
       this.place = 8;
@@ -2062,7 +2066,7 @@ export class Game {
     const h = this.hud, x = 14, y0 = 118, w = 270;
     const rows = this.world.rivals;
     h.shade(x - 6, y0 - 6, w, 36 + (rows.length + 1) * 10 + this.testLog.length * 10 + 16, 0.7);
-    h.text('TEST: PLAYER RULES', x, y0, 8, ORANGE);
+    h.text(`TEST  ${this.world.rivals.length + 1} PLAYERS  ${this.pvpPerHit()}% A ROUND`, x, y0, 8, ORANGE);
     h.text(`YOU ${(100 - this.hp).toFixed(1)}% DAMAGE`, x, y0 + 11, 8, damageColour(1 - this.hp / 100));
     if (this.testScrape > 0.05) h.text(`WALLS ${this.testScrape.toFixed(1)}`, x + w - 12, y0 + 11, 8, CYAN, 'right');
     h.text('CAR       DMG   YOU>  >YOU', x, y0 + 25, 8, GREY);
