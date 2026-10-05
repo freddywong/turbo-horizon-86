@@ -9,7 +9,7 @@ import { CATCHUP_FROM, CATCHUP_FULL, CATCHUP_MAX, SLIP_BUILD, SLIP_SPEED, SLIP_T
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, RaceSettings, RkMsg, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
-import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, AI_PER_HIT, PVP_CROWD, PVP_PER_HIT, PVP_PER_HIT_CROWD, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
+import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, AI_PER_HIT, pvpPerHit, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 import type { RouteDef } from './routes/types';
@@ -997,9 +997,9 @@ export class Game {
     this.audio.rocket(0.45);
   }
 
-  /** Player-vs-player damage per round: lower once the race has PVP_CROWD or more cars. */
+  /** Player-vs-player damage per round for the size of this race. */
   private pvpPerHit(): number {
-    return this.world.rivals.length + 1 >= PVP_CROWD ? PVP_PER_HIT_CROWD : PVP_PER_HIT;
+    return pvpPerHit(this.world.rivals.length + 1);
   }
 
   /** A rocket hit us: a big jolt and a chunk of the bar (counts toward that shooter's cap). */

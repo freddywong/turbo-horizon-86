@@ -64,8 +64,8 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
-* **Online, between players:** each round that hits takes **1%** of the damage bar (**0.5%** in races with 4 or
-  more players) and each rocket
+* **Online, between players:** each round that hits takes **2%** of the damage bar with 2-3 players, **1%** with
+  4-5 and **0.5%** with 6-8 and each rocket
   **10%**. There's no limit on how much one player can do, so someone who keeps you in their sights
   can wreck you.
 * **VS RIVALS, against the computer cars:** your rounds take **7.5%** of their bar (3 times a base
