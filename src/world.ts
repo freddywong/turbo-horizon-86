@@ -275,6 +275,16 @@ export class World {
     return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h, dist };
   }
 
+  /** Screen position (HUD pixels) of a point on the road at (d, x), y metres up; null when off screen. */
+  roadScreenPos(d: number, x: number, y: number, camera: THREE.Camera, w: number, h: number): { x: number; y: number; dist: number } | null {
+    if (!this.view.sample(d, x, tmp)) return null;
+    const p = new THREE.Vector3(tmp.x, tmp.y + y, tmp.z);
+    const dist = p.distanceTo(camera.position);
+    p.project(camera);
+    if (p.z > 1 || Math.abs(p.x) > 1.1 || Math.abs(p.y) > 1.1) return null;
+    return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h, dist };
+  }
+
   updateTraffic(dt: number, playerPos: number, onPass: () => void) {
     if (this.net) return this.updateNetTraffic(playerPos, onPass);
     const goal = this.track.goalDist;

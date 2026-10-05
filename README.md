@@ -56,7 +56,8 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
 
 * Hold **F** (or the red **FIRE** button on phones) and your driver leans out of the window and shoots.
 * **No auto-aim: the gun fires dead ahead.** Rounds fly straight down your line and hit the first car
-  in it, a racer or traffic, up to 90 m ahead. Line up behind someone to hit them; change lanes to
+  in it, a racer or traffic, up to 90 m ahead. While you fire, a crosshair shows where the rounds
+  go: white down an empty lane, red on the car in your line. Line up behind someone to hit them; change lanes to
   get out of someone's sights.
 * **Ammo: 100 to 500 rounds per race** (default 200), set with B (or tap AMMO).
 * **Bazooka: 3 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or

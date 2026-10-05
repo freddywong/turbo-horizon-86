@@ -1968,6 +1968,34 @@ export class Game {
     h.text('TO TURN OFF', x + 140, y + 70, 8, GREY, 'center');
   }
 
+  /** While the gun fires: a crosshair where the rounds land, red and tighter when a car is in your line. */
+  private crosshair() {
+    const h = this.hud;
+    const lf = this.lineOfFire(this.pos, this.px, 'player');
+    const onCar = lf.hit !== null && lf.hit !== -3;
+    // on the car in your line, or 45 m straight down the road
+    const p = onCar || lf.hit === -3 ? this.world.roadScreenPos(lf.d, lf.x, 0.9, this.camera, HUD_W, HUD_H)
+      : this.world.roadScreenPos(this.pos + 45, this.px, 0.9, this.camera, HUD_W, HUD_H);
+    if (!p) return;
+    const c = onCar ? RED : WHITE, r = Math.round(Math.max(16, Math.min(34, (onCar ? 900 : 1100) / p.dist)));
+    const x = Math.round(p.x), y = Math.round(p.y);
+    // corner brackets, four ticks and a centre dot; drawn twice, a dark outline then the colour, so it reads on any background
+    const shape = (o: number, col: number) => {
+      const t = 3 + o * 2, L = 9 + o * 2;
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        h.rect(x + sx * r - (sx > 0 ? L - o : o), y + sy * r - (sy > 0 ? t - o : o), L, t, col);
+        h.rect(x + sx * r - (sx > 0 ? t - o : o), y + sy * r - (sy > 0 ? L - o : o), t, L, col);
+      }
+      h.rect(x - r - 12 - o, y - 1 - o, 8 + o * 2, t, col);
+      h.rect(x + r + 4 - o, y - 1 - o, 8 + o * 2, t, col);
+      h.rect(x - 1 - o, y - r - 12 - o, t, 8 + o * 2, col);
+      h.rect(x - 1 - o, y + r + 4 - o, t, 8 + o * 2, col);
+      h.rect(x - 1 - o, y - 1 - o, t, t, col);
+    };
+    shape(1, 0x000000);
+    shape(0, c);
+  }
+
   /** Test mode (?test=pvp): every car's condition, what you dealt it and took from it, and the last hits. */
   private testPanel() {
     const h = this.hud, x = 14, y0 = 118, w = 270;
@@ -2134,6 +2162,7 @@ export class Game {
           h.rect(bx, by, bw * f, 5, damageColour(f));
         }
       }
+      if (this.firingT > 0 && this.state === 'race' && !this.wrecked) this.crosshair();
       if (this.noTargetT > 0) h.text('OUT OF AMMO', HUD_W / 2, 124, 16, RED, 'center');
       if (this.testPvp) this.testPanel();
       if (this.hitFlash > 0) {
