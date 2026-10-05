@@ -1568,8 +1568,15 @@ export class Game {
     // matchmaking servers and room name, so two players can check they're looking in the same place
     const sv = net?.status === 'online' ? net.servers() : null;
     const down = net?.status === 'online' && net.serversDown();
-    h.text(down ? "CAN'T REACH THE MATCHMAKING SERVERS" : status, HUD_W / 2, 46, 16, net?.status === 'error' || down ? RED : CYAN, 'center');
-    if (net?.status === 'online') h.text(`ROOM ${net.room.toUpperCase()}${sv ? `  SERVERS ${sv[0]}/${sv[1]}` : ''}`, HUD_W - 20, 18, 8, GREY, 'right');
+    // found someone but the direct link keeps failing: their network or ours is blocking it
+    const lk = net?.status === 'online' ? net.links() : null;
+    const blocked = !!lk && !others.length && lk.failed > 0 && lk.linked === 0;
+    const line = down ? "CAN'T REACH THE MATCHMAKING SERVERS" : blocked ? 'FOUND A PLAYER BUT COULD NOT CONNECT' : status;
+    h.text(line, HUD_W / 2, 46, 16, net?.status === 'error' || down ? RED : blocked ? ORANGE : CYAN, 'center');
+    if (net?.status === 'online') {
+      h.text(`ROOM ${net.room.toUpperCase()}${sv ? `  SERVERS ${sv[0]}/${sv[1]}` : ''}`, HUD_W - 12, 4, 8, GREY, 'right');
+      if (lk) h.text(`FOUND ${lk.found}  LINKED ${lk.linked}  FAILED ${lk.failed}`, HUD_W - 12, 16, 8, lk.failed ? ORANGE : GREY, 'right');
+    }
     // your car, settings, stats and controls on a see-through panel
     const L = LOBBY, kb = !this.touch;
     h.shade(L.x0, 68, L.x1 - L.x0, 316);

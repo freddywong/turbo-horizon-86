@@ -65,6 +65,8 @@ interface Transport {
   leave(): void;
   /** matchmaking servers connected / tried */
   servers?(): [number, number];
+  /** direct links: players found (answered an offer), linked now, failed so far */
+  links?(): { found: number; linked: number; failed: number };
 }
 
 /** Same-browser transport for tests: tabs share a BroadcastChannel. */
@@ -112,7 +114,38 @@ export async function turnServers(): Promise<RTCIceServer[]> {
 
 async function trysteroTransport(room: string): Promise<Transport> {
   const [t, turnConfig] = await Promise.all([import('trystero'), turnServers()]);
-  const r = t.joinRoom({ appId: APP_ID, turnConfig }, room);
+  // ?relay=ws://host:port points at one test relay instead of the public ones (for testing only)
+  const relay = new URLSearchParams(location.search).get('relay');
+  const relayConfig = relay && /^wss?:\/\/[\w.:-]+\/?$/.test(relay) ? { urls: [relay] } : undefined;
+  // watch every peer connection so the lobby can say which step fails (finding vs linking)
+  const pcs = new Set<RTCPeerConnection>();
+  let found = 0, failed = 0;
+  const failedPeers = new Set<string>();
+  class Tracked extends RTCPeerConnection {
+    constructor(cfg?: RTCConfiguration) {
+      super(cfg);
+      pcs.add(this);
+      let seen = false, lost = false;
+      const check = () => {
+        if (!seen && this.remoteDescription) { seen = true; found++; }
+        if (!lost && this.connectionState === 'failed') { lost = true; failed++; }
+        if (this.connectionState === 'closed') pcs.delete(this);
+      };
+      this.addEventListener('signalingstatechange', check);
+      this.addEventListener('connectionstatechange', check);
+    }
+  }
+  const r = t.joinRoom({
+    appId: APP_ID, turnConfig, rtcPolyfill: Tracked,
+    relayConfig: relayConfig ?? { redundancy: 8 }, // more public relays, so a few dead or fussy ones don't matter
+  }, room, {
+    // a found player we couldn't link to (Trystero gives up after its handshake timeout)
+    onJoinError: (e) => {
+      const id = (e as { peerId?: string }).peerId ?? '';
+      if (!failedPeers.has(id)) { failedPeers.add(id); failed++; }
+      console.warn('join error', e);
+    },
+  });
   const actions = new Map<string, { send: (d: unknown, o?: { target?: string }) => Promise<void> }>();
   const act = (name: string) => {
     let a = actions.get(name);
@@ -129,6 +162,7 @@ async function trysteroTransport(room: string): Promise<Transport> {
     onLeave: (fn) => { r.onPeerLeave = fn; },
     onJoin: (fn) => { r.onPeerJoin = fn; },
     leave: () => { r.leave().catch(() => {}); },
+    links: () => ({ found, linked: [...pcs].filter((pc) => pc.connectionState === 'connected').length, failed }),
     servers: () => {
       const socks = Object.values((t.getRelaySockets as () => Record<string, WebSocket>)() ?? {});
       return [socks.filter((w) => w.readyState === 1).length, socks.length];
@@ -234,6 +268,10 @@ export class Net {
   /** Matchmaking (Nostr relay) servers connected / tried; null for the same-browser test transport. */
   servers(): [number, number] | null {
     return this.tr?.servers?.() ?? null;
+  }
+
+  links(): { found: number; linked: number; failed: number } | null {
+    return this.tr?.links?.() ?? null;
   }
 
   /** True once we've waited 8 seconds and still reach none of the matchmaking servers. */

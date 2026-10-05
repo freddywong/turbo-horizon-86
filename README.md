@@ -93,6 +93,9 @@ reached (`ROOM LOBBY  SERVERS 4/5`). Both players need the same room, so open th
 Pages link above: the claude.ai preview can't go online. If you see SERVERS 0/5, that network is blocking
 the servers. Once two players have found each other they connect directly, and if a network (mobile data,
 office or school wi-fi) blocks that, the game falls back to a free public relay server (Open Relay).
+Under that the lobby shows `FOUND n  LINKED n  FAILED n`: FOUND counts players your game found through the
+servers, LINKED the ones it connected to. FOUND with FAILED and no LINKED means a network is blocking the
+connection; FOUND 0 means the servers never passed your messages along.
 You can also pick ONLINE on the mode screen.
 
 How it works: there's no game server. Browsers find each other through free public Nostr relays
