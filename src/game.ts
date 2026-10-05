@@ -8,7 +8,7 @@ import { ROSTER } from './cars/roster';
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, RaceSettings, RkMsg, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
-import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
+import { VS_AI_DAMAGE, AI_GUN_CAP, AMMO_DEFAULT, AMMO_STEPS, FIRE_RATE, GUN_CAP, GUN_WIDTH, PER_HIT, PVP_PER_HIT, PVP_ROCKET_DAMAGE, RANGE_AHEAD, ROCKET_DAMAGE, ROCKET_RANGE, ROCKET_SPEED, ROCKET_WIDTH, ROCKETS_DEFAULT, ROCKETS_MAX, TURBO_DEFAULT, TURBO_SPEED, TURBO_TIME } from './rules';
 import { CarSpec } from './cars/spec';
 import { World } from './world';
 import type { RouteDef } from './routes/types';
@@ -978,7 +978,7 @@ export class Game {
   private takeRocketHit(from: string) {
     if (this.state !== 'race' || this.wrecked) return;
     const taken = this.gunFrom.get(from) ?? 0;
-    const dmg = Math.min(ROCKET_DAMAGE, GUN_CAP - taken);
+    const dmg = PVP_ROCKET_DAMAGE;
     this.speed *= 0.55;
     this.shakeKick = Math.max(this.shakeKick, 0.7);
     this.hitFlash = 0.5;
@@ -1278,7 +1278,8 @@ export class Game {
   private takeGunHit(from: string, n: number) {
     if (this.state !== 'race' || this.wrecked) return;
     const taken = this.gunFrom.get(from) ?? 0;
-    let dmg = Math.min(n * PER_HIT, GUN_CAP - taken);
+    // another player (or a test-mode car): flat damage, no cap; computer drivers: capped as before
+    let dmg = from.startsWith('ai:') ? Math.min(n * PER_HIT, GUN_CAP - taken) : n * PVP_PER_HIT;
     if (from.startsWith('ai:')) {
       // the computer drivers together can only take a fifth of the bar
       let ai = 0;
@@ -1313,8 +1314,8 @@ export class Game {
     // computer cars: your bullets do triple damage and can finish them off; a rocket finishes them outright
     let dmg = (rocket ? ROCKET_DAMAGE : PER_HIT) * VS_AI_DAMAGE;
     if (this.testPvp) {
-      // test mode: exactly what a real player would take from you, capped per shooter
-      dmg = Math.max(0, Math.min(rocket ? ROCKET_DAMAGE : PER_HIT, GUN_CAP - r.gunTaken));
+      // test mode: exactly what a real player would take from you
+      dmg = rocket ? PVP_ROCKET_DAMAGE : PVP_PER_HIT;
       this.testDealt.set(r.name, (this.testDealt.get(r.name) ?? 0) + dmg);
       this.testNote(`YOU > ${r.name} ${rocket ? 'ROCKET' : 'GUN'} ${dmg.toFixed(1)}${dmg === 0 ? ' (CAPPED)' : ''}`, dmg === 0 ? GREY : YELLOW);
       if (dmg <= 0) return;
@@ -1455,7 +1456,7 @@ export class Game {
         if (this.mode === 'online' && this.raceId) this.net?.sendRk({ r: this.raceId, d: this.pos, x: this.px, v });
       } else this.rocketMsgT = 1;
     }
-    for (const rk of w.moveRockets(dt, ROCKET_RANGE)) w.explodeRocket(rk);
+    for (const rk of w.moveRockets(dt, ROCKET_RANGE, this.pos)) w.explodeRocket(rk);
     for (const rk of [...w.rockets]) {
       const d0 = rk.d - rk.v * dt - 2.3, d1 = rk.d + 2.3;
       const inPath = (d: number, x: number) => d >= d0 && d <= d1 && Math.abs(x - rk.x) < ROCKET_WIDTH;

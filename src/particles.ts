@@ -11,7 +11,7 @@ interface P {
   color: THREE.Color;
 }
 
-const MAX = 96;
+const MAX = 160;
 const tmp = { x: 0, y: 0, z: 0, h: 0 };
 
 /**

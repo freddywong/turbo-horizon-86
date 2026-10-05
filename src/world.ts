@@ -419,14 +419,15 @@ export class World {
   }
 
   /** Moves the rockets and trails their smoke; returns the ones that burned out (call once per frame). */
-  moveRockets(dt: number, range: number): Rocket[] {
+  moveRockets(dt: number, range: number, viewD: number): Rocket[] {
     const spent: Rocket[] = [];
     for (const r of this.rockets) {
       r.d += r.v * dt;
       r.travelled += r.v * dt;
       r.smokeT -= dt;
-      if (r.smokeT <= 0) {
-        r.smokeT = 0.015;
+      // trail only where you can see it, so long flights don't use up every smoke puff
+      if (r.smokeT <= 0 && Math.abs(r.d - viewD) < 250) {
+        r.smokeT = 0.035;
         this.particles.spawn(r.d - 1.8, r.x + (Math.random() - 0.5) * 0.3, 1.0 + (Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.8, 0.5, 1.1, 0.6, 1.8, 0xf0ece4);
       }
       if (r.travelled > range) spent.push(r);

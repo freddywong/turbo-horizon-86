@@ -58,21 +58,21 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
 * **No auto-aim: the gun fires dead ahead.** Rounds fly straight down your line and hit the first car
   in it, a racer or traffic, up to 90 m ahead. Line up behind someone to hit them; change lanes to
   get out of someone's sights.
-* **Ammo: 100 to 500 rounds per race** (default 300), set with B (or tap AMMO). Every round that
-  hits takes **2.5% of the damage bar**, so holding fire on someone in front of you takes about 12% a
-  second. That's still less than a crash, and **one car's weapons can take at most three quarters of
-  your bar**. Several shooters together, or gunfire on top of crash damage, can still wreck you.
-* **Bazooka: 1 rocket per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
+* **Ammo: 100 to 500 rounds per race** (default 200), set with B (or tap AMMO).
+* **Bazooka: 3 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
-  flies straight down your line, with no auto-aim, and explodes on the first car in its path, or
-  after 300 m. A hit takes **40%** of a player's bar (it counts toward that three-quarter limit) and
-  **wrecks a computer car** outright.
-* In VS RIVALS the computer drivers shoot back in short bursts when you're in front of them, but
-  **all of them together can take at most 20% of your bar**. They don't have bazookas.
-* **Against computer cars your bullets do 300% damage** (7.5% of their bar per hit, about 3 seconds
-  of fire to wreck one). A bar over the car you're hitting shows how it's holding up. Shot-up cars
-  smoke, lose a tail lamp and limp. At zero they're **wrecked**: they roll to a stop in black smoke
-  and drop out of the race (DNF), and you get 50,000 points.
+  flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
+  900 m away.
+* **Online, between players:** each round that hits takes **1%** of the damage bar and each rocket
+  **20%**. There's no limit on how much one player can do, so someone who keeps you in their sights
+  can wreck you.
+* **VS RIVALS, against the computer cars:** your rounds take **7.5%** of their bar (3 times a base
+  2.5%, about 3 seconds of fire to wreck one) and a rocket wrecks them outright. A bar over the car
+  you're hitting shows how it's holding up. Shot-up cars smoke, lose a tail lamp and limp. At zero
+  they're **wrecked**: they roll to a stop in black smoke and drop out of the race (DNF), and you get
+  50,000 points. The computer drivers shoot back in short bursts when you're in front of them
+  (2.5% a round), but **all of them together can take at most 20% of your bar**. They don't have
+  bazookas.
 * Online, the shooter's game decides what hits and tells the victim's game, which applies the damage
   (and the cap). Everyone sees everyone's gunfire and rockets.
 

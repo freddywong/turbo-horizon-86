@@ -6,7 +6,7 @@ export const TURBO_DEFAULT = 5; // boosts per race unless changed in the menu
 
 // ---- weapons ----------------------------------------------------------------
 export const AMMO_STEPS = [100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
-export const AMMO_DEFAULT = 300;
+export const AMMO_DEFAULT = 200;
 export const FIRE_RATE = 5; // rounds per second while FIRE is held
 /** Most one shooter's gunfire can take off a car: three quarters of the damage bar. */
 export const GUN_CAP = 75;
@@ -15,13 +15,19 @@ export const VS_AI_DAMAGE = 3;
 /** All the computer drivers' gunfire together can take at most this much of your bar. */
 export const AI_GUN_CAP = 20;
 // ---- bazooka ----------------------------------------------------------------
-export const ROCKETS_DEFAULT = 1; // rockets per race unless changed in the menu
+export const ROCKETS_DEFAULT = 3; // rockets per race unless changed in the menu
 export const ROCKETS_MAX = 5;
 export const ROCKET_SPEED = 70; // m/s on top of the shooter's own speed
-export const ROCKET_RANGE = 300; // metres before it burns out
+export const ROCKET_RANGE = 900; // metres before it burns out
 export const ROCKET_WIDTH = 1.5; // half-width of its path: no auto-aim, it only hits what's in its lane
-/** A rocket hit on a player; counts toward GUN_CAP, so one shooter still can't wreck you alone. */
+/** A rocket hit on a computer car in VS RIVALS (x VS_AI_DAMAGE: wrecks it). */
 export const ROCKET_DAMAGE = 40;
+
+// ---- player vs player (online, and the ?test=pvp mode) --------------------------
+/** Damage per round between players. No per-shooter cap: one player can wreck another. */
+export const PVP_PER_HIT = 1;
+/** Damage per rocket between players. */
+export const PVP_ROCKET_DAMAGE = 20;
 
 /** Damage per round that hits (30 hits reach the cap; more ammo doesn't make a shooter stronger, it just lasts longer). */
 export const PER_HIT = 2.5;
