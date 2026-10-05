@@ -5,6 +5,7 @@ import { CYAN, GREEN, Hud, HUD_H, HUD_W, ORANGE, PINK, RED, WHITE, YELLOW } from
 import { Input } from './input';
 import { LANE_W, ROAD_HALF, SEG } from './track';
 import { ROSTER } from './cars/roster';
+import { CATCHUP_FROM, CATCHUP_FULL, CATCHUP_MAX, SLIP_BUILD, SLIP_SPEED, SLIP_TIME } from './rules';
 import { fmtTime, makeGrid, ordinal, playerPosition, raceClock, results, ResultRow, Rival, updateRivals } from './rivals';
 import { GoMsg, HitMsg, Net, RaceSettings, RkMsg, roomFromHash, StMsg } from './net';
 import { NameBox } from './nameui';
@@ -204,6 +205,12 @@ export class Game {
   private lastGunTarget: number | null = null;
   private noTargetT = 0;
   private rocketMsgT = 0;
+  // ---- help for whoever's behind
+  /** catch-up: extra top speed (0-0.06) when well behind the leading car */
+  private catchUp = 0;
+  /** slipstream: tow builds 0-1 behind another car; full gives a SLIPSTREAM burst for slipT seconds */
+  private tow = 0;
+  private slipT = 0;
   private bazookaT = 0;
   private lastHitT = 0;
   private muteToast = -1;
@@ -310,6 +317,7 @@ export class Game {
     this.raceRockets = go ? go.rockets : this.rocketCount;
     this.rockets = this.weapons ? this.raceRockets : 0;
     this.world.clearRockets();
+    this.catchUp = this.tow = this.slipT = 0;
     this.testLog = [];
     this.testDealt.clear();
     this.testScrape = 0;
@@ -520,6 +528,7 @@ export class Game {
           this.audio.turbo();
           this.flash('TURBO!', '', 1.0);
         }
+        this.assists(dt);
         this.drive(dt, { accel: inp.accel || this.turboT > 0, brake: inp.brake, steer: inp.steer, drift: inp.drift }, false);
         this.timeLeft -= dt;
         this.score += Math.floor(this.speed * KMH * dt * 9);
@@ -528,7 +537,17 @@ export class Game {
         if (seg.stage > this.stage) {
           this.stage = seg.stage;
           this.timeLeft += this.world.route.extendTime;
-          this.flash('CHECKPOINT!', 'EXTENDED PLAY', 2.5);
+          const field = this.world.rivals.length + 1;
+          const place = field > 1 ? playerPosition(this.world.rivals, this.pos, -1) : 1;
+          if (this.mode !== 'arcade' && field > 1 && place > Math.ceil(field / 2)) {
+            // back half of the field: a free turbo (and a rocket when weapons are on)
+            this.turbos++;
+            if (this.weapons) {
+              this.rockets++;
+              this.raceRockets = Math.max(this.raceRockets, this.rockets);
+            }
+            this.flash('CHECKPOINT!', this.weapons ? 'BONUS TURBO + ROCKET' : 'BONUS TURBO', 2.5);
+          } else this.flash('CHECKPOINT!', 'EXTENDED PLAY', 2.5);
           this.audio.jingle();
         }
         if (this.pos >= this.world.track.goalDist) {
@@ -1091,8 +1110,10 @@ export class Game {
       const v = this.speed;
       const st = this.spec.stats;
       const boost = this.turboT > 0;
-      const vlim = this.vmax * (boost ? TURBO_SPEED : 1) * this.limp();
-      if (c.accel) this.speed += 30 * st.accel * (boost ? 1.9 : 1) * (1 - Math.pow(Math.min(1, v / vlim), 1.8)) * dt + 2 * dt;
+      const slip = this.slipT > 0 ? SLIP_SPEED : 0;
+      const vlim = this.vmax * (boost ? TURBO_SPEED : 1) * this.limp() * (1 + this.catchUp + slip);
+      const help = 1 + this.catchUp * 3 + (slip ? 0.4 : 0);
+      if (c.accel) this.speed += 30 * st.accel * (boost ? 1.9 : 1) * help * (1 - Math.pow(Math.min(1, v / vlim), 1.8)) * dt + 2 * dt;
       else if (c.brake) this.speed -= 58 * dt;
       else this.speed -= (3 + v * 0.035) * dt;
 
@@ -1439,6 +1460,37 @@ export class Game {
     });
     this.rocketsTick(dt);
     w.tickTracers(dt);
+  }
+
+  /**
+   * Help for whoever's behind, in races with other cars: catch-up when well behind the leader,
+   * and a slipstream tow from driving close behind any car.
+   */
+  private assists(dt: number) {
+    const w = this.world;
+    this.slipT = Math.max(0, this.slipT - dt);
+    if (this.mode === 'arcade' && !w.traffic.length) return;
+    // catch-up: from 150 m behind the leading car, rising to the full boost at 400 m
+    let lead = -Infinity;
+    for (const r of w.rivals) if (!r.wrecked) lead = Math.max(lead, r.d);
+    const gap = lead - this.pos;
+    const target = this.mode === 'arcade' || !Number.isFinite(gap) ? 0 : CATCHUP_MAX * Math.max(0, Math.min(1, (gap - CATCHUP_FROM) / (CATCHUP_FULL - CATCHUP_FROM)));
+    this.catchUp += (target - this.catchUp) * Math.min(1, dt * 2);
+    // slipstream: close behind a car in its lane, at speed
+    let towing = false;
+    if (this.speed * KMH > 100 && this.crashT <= 0) {
+      const behind = (d: number, x: number) => d - this.pos > 4 && d - this.pos < 30 && Math.abs(x - this.px) < 1.6;
+      towing = w.rivals.some((r) => !r.wrecked && behind(r.d, r.x)) || w.traffic.some((c) => behind(c.d, c.x));
+    }
+    if (towing && this.slipT <= 0) {
+      this.tow = Math.min(1, this.tow + dt / SLIP_BUILD);
+      if (this.tow >= 1) {
+        this.tow = 0;
+        this.slipT = SLIP_TIME;
+        this.flash('SLIPSTREAM!', '', 1.2);
+        this.audio.turbo();
+      }
+    } else if (!towing) this.tow = Math.max(0, this.tow - dt * 1.2);
   }
 
   /** Bazooka: E fires a rocket straight down your line (no auto-aim); it blows up on the first car in its path. */
@@ -2106,6 +2158,22 @@ export class Game {
       h.text('POS', px - 12, py + 8, 16, YELLOW, 'right');
       h.text(p, px, py, 32, this.place === 1 ? YELLOW : WHITE);
       h.text(`/${this.world.rivals.length + 1}`, px + p.length * 32 + 4, py + 16, 16, WHITE);
+    }
+    if (this.state === 'race') {
+      // catch-up, shown: how much extra speed you're getting for being behind
+      const pct = Math.round(this.catchUp * 100);
+      if (pct >= 1) {
+        const t = `CATCH-UP +${pct}%`, bw = t.length * 8 + 16;
+        h.box(HUD_W / 2 - bw / 2, 128, bw, 16, 0x0a2a3a, CYAN, 1);
+        h.text(t, HUD_W / 2, 132, 8, CYAN, 'center');
+      }
+      // slipstream: the tow building behind a car, then the burst
+      if (this.slipT > 0) h.text('SLIPSTREAM', HUD_W / 2, 150, 16, Math.floor(this.clock * 8) % 2 ? WHITE : CYAN, 'center');
+      else if (this.tow > 0.05) {
+        h.text('SLIPSTREAM', HUD_W / 2 - 54, 151, 8, CYAN, 'right');
+        h.rect(HUD_W / 2 - 46, 150, 92, 10, 0x000000);
+        h.rect(HUD_W / 2 - 45, 151, 90 * this.tow, 8, CYAN);
+      }
     }
 
     // damage bar: fills up as the car takes damage (full = wrecked), green -> yellow -> red, blinking when critical

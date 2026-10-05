@@ -224,6 +224,15 @@ Each route has five stages. Reaching a checkpoint adds time (EXTENDED PLAY).
 Reach the GOAL before the timer runs out. Score comes from speed, drifting,
 overtaking, and the time bonus at the goal.
 
+**Help for whoever's behind** (VS RIVALS and online):
+* **Slipstream:** drive close behind any car (a racer or traffic, within about 30 m, in its lane,
+  above 100 km/h) and the SLIPSTREAM meter fills in about 1.5 s. When it's full you get a burst of
+  +8% top speed and extra acceleration for 2.5 s. Works in ARCADE behind traffic too.
+* **Catch-up:** more than 150 m behind the leading car, your top speed and acceleration go up,
+  rising to +6% at 400 m behind. A CATCH-UP badge under your position shows how much.
+* **Checkpoint bonus:** cross a checkpoint in the back half of the field and you get a free turbo
+  (and a rocket when weapons are on).
+
 Turning scrubs off speed, as in other racers: the harder you steer and the faster you go, the more you lose
 (cars with more GRIP lose less). Take bends with a light touch, or drift through them.
 

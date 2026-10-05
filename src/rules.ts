@@ -4,6 +4,16 @@ export const TURBO_TIME = 5; // seconds per boost
 export const TURBO_SPEED = 1.18; // top speed multiplier while boosting
 export const TURBO_DEFAULT = 5; // boosts per race unless changed in the menu
 
+// ---- help for whoever's behind ----------------------------------------------
+/** Catch-up: extra top speed when well behind the leading car (0 at CATCHUP_FROM metres, full at CATCHUP_FULL). */
+export const CATCHUP_MAX = 0.06;
+export const CATCHUP_FROM = 150;
+export const CATCHUP_FULL = 400;
+/** Slipstream: seconds of towing close behind a car to fill the meter, then the burst. */
+export const SLIP_BUILD = 1.5;
+export const SLIP_TIME = 2.5;
+export const SLIP_SPEED = 0.08;
+
 // ---- weapons ----------------------------------------------------------------
 export const AMMO_STEPS = [100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
 export const AMMO_DEFAULT = 200;
