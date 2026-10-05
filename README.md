@@ -27,7 +27,7 @@ npm run build    # type-check + production build into dist/
 | N | Next music track (car select and while racing) |
 | Shift | Turbo boost (5 per race by default) |
 | F | Fire the gun (weapons on) |
-| R (or E) | Fire a bazooka rocket (weapons on) |
+| R | Fire a bazooka rocket (weapons on) |
 | M | Mute / unmute on any screen (remembered next time) |
 
 ### Phones and tablets

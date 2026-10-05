@@ -41,7 +41,7 @@ export class TouchControls {
     mk('radio', 'MUSIC', 'KeyN');
     this.turboBtn = mk('turbo', 'TURBO\n5', 'ShiftLeft');
     this.fireBtn = mk('fire hidden', 'FIRE', 'KeyF');
-    this.rocketBtn = mk('rocket hidden', 'ROCKET\n1', 'KeyE');
+    this.rocketBtn = mk('rocket hidden', 'ROCKET\n1', 'KeyR');
     this.autoBtn = mk('auto', 'AUTO\nGAS', '');
     this.rotate = document.createElement('div');
     this.rotate.id = 'rotate';
@@ -118,7 +118,7 @@ export class TouchControls {
     e.preventDefault();
     const code = this.codeAt(e.clientX, e.clientY);
     // only steering/pedal buttons follow a sliding thumb; pause stays a tap
-    if (code !== 'Escape' && code !== 'KeyN' && code !== 'ShiftLeft' && code !== 'KeyE') this.pointers.set(e.pointerId, code);
+    if (code !== 'Escape' && code !== 'KeyN' && code !== 'ShiftLeft' && code !== 'KeyR') this.pointers.set(e.pointerId, code);
     this.sync();
   }
 

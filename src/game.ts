@@ -1579,7 +1579,7 @@ export class Game {
   private rocketsTick(dt: number) {
     const w = this.world, inp = this.input;
     this.rocketMsgT = Math.max(0, this.rocketMsgT - dt);
-    if (this.weapons && this.state === 'race' && !this.wrecked && this.crashT <= 0 && inp.hit('KeyR', 'KeyE')) {
+    if (this.weapons && this.state === 'race' && !this.wrecked && this.crashT <= 0 && inp.hit('KeyR')) {
       if (this.rockets > 0) {
         this.rockets--;
         const v = Math.max(this.speed, 15) + ROCKET_SPEED;
