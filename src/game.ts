@@ -235,6 +235,8 @@ export class Game {
   place = 8;
   private table: ResultRow[] = [];
   private musicToast = 0;
+  private msgPrio = 0;
+  private msgQueue: { a: string; b: string; dur: number; prio: number; at: number }[] = [];
   carIdx = loadCar()[0];
   paintIdx = loadCar()[1];
   touch = false; // set by the touch controls; changes prompts
@@ -310,10 +312,32 @@ export class Game {
     this.musicToast = this.clock + 2.5;
   }
 
-  private flash(a: string, b = '', dur = 2) {
+  /**
+   * Big message in the middle of the screen. One at a time: a more important one (prio) takes over
+   * straight away, a less important one waits its turn (and is dropped if it's gone stale).
+   */
+  private flash(a: string, b = '', dur = 2, prio = 1) {
+    const busy = this.clock < this.msgUntil && this.msg;
+    if (busy && prio < this.msgPrio) {
+      this.msgQueue = this.msgQueue.filter((m) => m.a !== a);
+      this.msgQueue.push({ a, b, dur, prio, at: this.clock });
+      this.msgQueue.sort((p, q) => q.prio - p.prio);
+      return;
+    }
     this.msg = a;
     this.msg2 = b;
+    this.msgPrio = prio;
     this.msgUntil = this.clock + dur;
+  }
+
+  /** The next queued message, once the current one has finished. */
+  private nextMsg() {
+    if (this.clock < this.msgUntil) return;
+    this.msgPrio = 0;
+    while (this.msgQueue.length) {
+      const m = this.msgQueue.shift()!;
+      if (this.clock - m.at < 3) return this.flash(m.a, m.b, Math.min(m.dur, 1.5), m.prio);
+    }
   }
 
   startRace() {
@@ -363,6 +387,7 @@ export class Game {
     this.score = 0;
     this.lastBeep = -1;
     this.msg = '';
+    this.msgQueue = [];
     this.go('countdown');
     this.audio.music(this.trackId());
   }
@@ -534,7 +559,7 @@ export class Game {
         this.updateWorld(0, { steer: 0, yaw: 0, spin: 0, bounce: inp.accel ? Math.random() * 0.02 : 0 });
         if (this.t >= 3) {
           this.go('race');
-          this.flash('GO!', '', 1.0);
+          this.flash('GO!', '', 1.0, 3);
         }
         if (inp.hit('Escape')) this.paused = true;
         if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
@@ -569,8 +594,8 @@ export class Game {
               this.rockets++;
               this.raceRockets = Math.max(this.raceRockets, this.rockets);
             }
-            this.flash('CHECKPOINT!', gotRocket ? 'BONUS TURBO + ROCKET' : 'BONUS TURBO', 2.5);
-          } else this.flash('CHECKPOINT!', 'EXTENDED PLAY', 2.5);
+            this.flash('CHECKPOINT!', gotRocket ? 'BONUS TURBO + ROCKET' : 'BONUS TURBO', 2.5, 2);
+          } else this.flash('CHECKPOINT!', 'EXTENDED PLAY', 2.5, 2);
           this.audio.jingle();
         }
         if (this.pos >= this.world.track.goalDist) {
@@ -1046,7 +1071,7 @@ export class Game {
     this.hitFlash = 0.5;
     this.world.car.hit(0.6, Math.random() < 0.5 ? 'left' : 'rear');
     this.audio.boom();
-    this.flash('ROCKET HIT!', '', 1.2);
+    this.flash('ROCKET HIT!', '', 1.2, 3);
     if (this.testPvp && from.startsWith('p:')) {
       const who = from.slice(2);
       this.testTaken.set(who, (this.testTaken.get(who) ?? 0) + Math.max(0, dmg));
@@ -1337,7 +1362,7 @@ export class Game {
     const before = this.hp + amount;
     if (before >= 55 && this.hp < 55) this.world.car.breakLamp(Math.random() < 0.5 ? -1 : 1);
     if (this.hp <= 0) this.wreck();
-    else if (this.hp < 25 && before >= 25) this.flash('WARNING!', 'HEAVY DAMAGE', 2.0);
+    else if (this.hp < 25 && before >= 25) this.flash('WARNING!', 'LOW HP', 2.0, 3);
   }
 
   /** Bullets hit us: small dents, and no one shooter can take more than half the bar. */
@@ -1400,7 +1425,7 @@ export class Game {
       r.gunT = 0;
       r.burst = 0;
       this.score += 50000;
-      this.flash(`${r.name} WRECKED!`, '+50000', 2.0);
+      this.flash(`${r.name} WRECKED!`, '+50000', 2.0, 2);
       this.audio.crash(true);
       this.audio.pop();
     }
@@ -1535,7 +1560,6 @@ export class Game {
       if (this.tow >= 1) {
         this.tow = 0;
         this.slipT = SLIP_TIME;
-        this.flash('SLIPSTREAM!', '', 1.2);
         this.audio.turbo();
       }
     } else if (!towing) this.tow = Math.max(0, this.tow - dt * 1.2);
@@ -1860,13 +1884,17 @@ export class Game {
             if (blink) h.text(this.touch ? 'TAP TO CONTINUE' : 'PRESS ENTER', HUD_W / 2, 310, 24, YELLOW, 'center');
           }
         }
+        // big messages sit under the status line (which is under the timer / position)
+        const my = this.touch ? 200 : 180;
         if (this.clock < this.musicToast && this.state !== 'goal' && this.state !== 'over') {
-          h.box(HUD_W / 2 - 200, 150 - 4, 400, 34, 0x101030, PINK, 3);
-          h.text(`MUSIC  ${this.musicLabel()}`, HUD_W / 2, 156, 16, WHITE, 'center');
+          const ty = this.clock < this.msgUntil ? my + 90 : my;
+          h.box(HUD_W / 2 - 200, ty - 4, 400, 34, 0x101030, PINK, 3);
+          h.text(`MUSIC  ${this.musicLabel()}`, HUD_W / 2, ty + 6, 16, WHITE, 'center');
         }
+        this.nextMsg();
         if (this.clock < this.msgUntil && (this.msg === 'GO!' || blink)) {
-          h.text(this.msg, HUD_W / 2, 150, this.msg === 'GO!' ? 64 : 32, this.msg === 'GO!' ? YELLOW : CYAN, 'center');
-          if (this.msg2) h.text(this.msg2, HUD_W / 2, 200, 24, YELLOW, 'center');
+          h.text(this.msg, HUD_W / 2, my, this.msg === 'GO!' ? 64 : 32, this.msg === 'GO!' ? YELLOW : CYAN, 'center');
+          if (this.msg2) h.text(this.msg2, HUD_W / 2, my + 44, 24, YELLOW, 'center');
         }
         if (this.paused) {
           h.box(HUD_W / 2 - 220, 150, 440, 170, 0x101030, WHITE);
@@ -2204,6 +2232,31 @@ export class Game {
   private raceHud(blink: boolean) {
     const h = this.hud;
     const route = this.world.route;
+    const t = this.touch;
+    // where everything goes. Computer: speed + revs bottom left; what you use up (turbo, ammo,
+    // rockets) in a column bottom right, stacked up from the bottom; course top right; the HP meter
+    // bottom centre, under the car. Phone: the thumbs cover the bottom corners, so speed, revs and
+    // turbo go top left and ammo and rockets top right, under the MUSIC / AUTO / pause buttons.
+    const colX = HUD_W - 20 - 170;
+    const W = this.weapons;
+    const rockY = t ? 196 : HUD_H - 46;
+    const ammoY = t ? 150 : rockY - 46;
+    const turboY = W ? ammoY - 54 : HUD_H - 50;
+    const sy = t ? 70 : HUD_H - 100; // speed
+    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 20, cy = t ? 118 : 44; // course bar
+
+    // faint panels behind each group, so the numbers read over bright scenery
+    const PA = 0.38;
+    h.shade(12, 10, 148, 50, PA); // score
+    if (t) {
+      h.shade(12, sy - 6, 278, 172 + (this.mode !== 'arcade' && this.world.rivals.length ? 44 : 0), PA);
+      if (W) h.shade(colX - 8, ammoY - 6, 186, rockY + 34 - ammoY, PA);
+    } else {
+      h.shade(12, sy - 6, 236, HUD_H - sy, PA);
+      h.shade(colX - 8, turboY - 6, 186, HUD_H - turboY, PA);
+    }
+    h.shade(x0 - 8, cy - 32, x1 - x0 + 16, 58, PA);
+
     h.text('SCORE', 20, 16, 16, YELLOW);
     h.text(String(this.score).padStart(8, '0'), 20, 38, 16, WHITE);
     h.text('TIME', HUD_W / 2, 12, 16, YELLOW, 'center');
@@ -2212,56 +2265,37 @@ export class Game {
     if (!low || blink) h.text(String(tl).padStart(2, '0'), HUD_W / 2, 34, 48, low ? RED : ORANGE, 'center');
     if (this.mode !== 'arcade' && this.world.rivals.length && this.state === 'race') {
       // live race position, in the gap under the timer
-      // on phones the course bar sits under the timer, so the position goes under the speed gauge
+      // on phones the course bar sits under the timer, so the position goes under the turbo lamps
       const p = ordinal(this.place);
-      const px = this.touch ? 84 : HUD_W / 2 - 52, py = this.touch ? 222 : 90;
+      const px = t ? 84 : HUD_W / 2 - 52, py = t ? 222 : 90;
       h.text('POS', px - 12, py + 8, 16, YELLOW, 'right');
       h.text(p, px, py, 32, this.place === 1 ? YELLOW : WHITE);
       h.text(`/${this.world.rivals.length + 1}`, px + p.length * 32 + 4, py + 16, 16, WHITE);
     }
-    if (this.state === 'race') {
-      // catch-up, shown: how much extra speed you're getting for being behind
-      const pct = Math.round(this.catchUp * 100);
-      if (pct >= 1) {
-        const t = `CATCH-UP +${pct}%`, bw = t.length * 8 + 16;
-        h.box(HUD_W / 2 - bw / 2, 128, bw, 16, 0x0a2a3a, CYAN, 1);
-        h.text(t, HUD_W / 2, 132, 8, CYAN, 'center');
-      }
-      // slipstream: the tow building behind a car, then the burst
-      if (this.slipT > 0) h.text('SLIPSTREAM', HUD_W / 2, 150, 16, Math.floor(this.clock * 8) % 2 ? WHITE : CYAN, 'center');
-      else if (this.tow > 0.05) {
-        h.text('SLIPSTREAM', HUD_W / 2 - 54, 151, 8, CYAN, 'right');
-        h.rect(HUD_W / 2 - 46, 150, 92, 10, 0x000000);
-        h.rect(HUD_W / 2 - 45, 151, 90 * this.tow, 8, CYAN);
-      }
-    }
+    if (this.state === 'race') this.statusLine();
 
-    // on a computer the car's condition sits in the bottom-right corner, stacked from the bottom:
-    // rockets, ammo, damage, then turbo on top; the course bar goes top right under the stage
-    const colX = HUD_W - 20 - 170;
-    const ammoY = HUD_H - 66, dmgY = this.weapons ? ammoY - 46 : HUD_H - 44, turboY = dmgY - 54;
-    // damage bar: fills up as the car takes damage (full = wrecked), green -> yellow -> red, blinking when critical
+    // HP meter, bottom centre under the car: empties as it takes hits (empty = wrecked), green ->
+    // yellow -> red, blinking when critical. The number is in the car's own HP (Charger 130, F1 80).
     {
-      const n = 10, sw = 15;
-      const bx = this.touch ? 20 : colX, by = this.touch ? (this.mode !== 'arcade' ? 270 : 236) : dmgY;
-      const dmg = Math.min(1, 1 - this.hp / 100);
-      const col = damageColour(dmg);
+      const n = 20, sw = 11, bw = n * (sw + 2) - 2, bx = HUD_W / 2 - bw / 2, by = HUD_H - 22;
+      const max = this.spec.stats.hp;
+      const left = Math.max(0, Math.min(1, this.hp / 100));
+      const col = damageColour(1 - left);
       const crit = this.hp < 25 && this.state === 'race';
-      h.text('DAMAGE', bx, by, 16, crit && blink ? RED : YELLOW);
-      const lit = this.hp >= 100 ? 0 : Math.max(1, Math.ceil(dmg * n));
-      for (let i = 0; i < n; i++) h.rect(bx + i * (sw + 2), by + 22, sw, 12, i < lit && (!crit || blink) ? col : 0x202040);
+      h.shade(bx - 10, by - 28, bw + 20, 46, PA);
+      h.text('HP', bx, by - 22, 16, crit && blink ? RED : YELLOW);
+      h.text(`${Math.ceil(left * max)}/${max}`, bx + bw, by - 22, 16, crit ? RED : WHITE, 'right');
+      const lit = this.hp <= 0 ? 0 : Math.max(1, Math.ceil(left * n));
+      h.rect(bx - 2, by - 2, bw + 4, 16, 0x000000);
+      for (let i = 0; i < n; i++) h.rect(bx + i * (sw + 2), by, sw, 12, i < lit && (!crit || blink) ? col : 0x202040);
     }
 
     // speed + tach
     const kmh = Math.round(this.speed * KMH);
-    // on phones the thumbs cover the bottom corners, so the gauges move up; on a computer speed and
-    // revs sit in the bottom-left corner, leaving the middle clear for the car
-    const t = this.touch;
-    const sy = t ? 70 : HUD_H - 100;
     h.text('SPEED', 20, sy, 16, YELLOW);
     h.text(String(kmh).padStart(3, ' '), 20, sy + 22, 32, WHITE);
     h.text('KM/H', 130, sy + 38, 16, CYAN);
-    if (t) h.tach(20, sy + 100, this.speed / this.vmax);
+    if (t) h.tach(20, sy + 100, this.speed / this.vmax, 11);
     else h.tach(20, HUD_H - 10, this.speed / this.vmax, 9);
     // turbo stock: one lamp per boost left, and a draining bar while one is firing
     const tn = this.raceTurbos, ts = tn > 5 ? 13 : 20, tstep = ts + (tn > 5 ? 4 : 6);
@@ -2273,34 +2307,27 @@ export class Game {
     if (this.turboLayers.length > 1) h.text(`x${this.turboLayers.length}`, t ? lx + 4 + tn * tstep : tx + 92, ty, 16, blink ? YELLOW : RED);
     for (let i = 0; i < tn; i++) h.box(lx + i * tstep, ly - 2 + (20 - ts) / 2, ts, ts, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, tn > 5 ? 2 : 3);
     if (this.turboT > 0) h.rect(lx, ly + 22, (this.turboT / TURBO_TIME) * (tn * tstep - 6), 5, YELLOW);
-    if (this.weapons) {
-      // ammo strip, lock-on bracket over the target, NO TARGET, red flash when we're hit
-      const ax = t ? 20 : colX, ay = t ? 314 : ammoY;
-      h.text('AMMO', ax, ay, 16, this.ammo ? CYAN : RED);
-      h.text(String(this.ammo).padStart(3, '0'), ax + 120, ay, 16, WHITE);
+    if (W) {
+      // ammo: count and a strip that empties
+      h.text('AMMO', colX, ammoY, 16, this.ammo ? CYAN : RED);
+      h.text(String(this.ammo).padStart(3, '0'), colX + 170, ammoY, 16, WHITE, 'right');
       const lit = Math.ceil((this.ammo / Math.max(1, this.raceAmmo)) * 30);
-      for (let i = 0; i < 30; i++) h.rect(ax + i * 5.6, ay + 22, 3, 10, i < lit ? YELLOW : 0x303040);
-      // rockets left: a little rocket per shot
-      h.text(this.touch ? 'ROCKET' : 'E ROCKET', ax, ay + 40, 8, this.rockets ? ORANGE : 0x6a6a7a);
-      for (let i = 0; i < this.raceRockets; i++) {
-        const rx = ax + 80 + i * 18, on = i < this.rockets;
-        h.rect(rx, ay + 41, 10, 5, on ? 0x6a7a3a : 0x303040);
-        h.rect(rx + 10, ay + 41, 4, 5, on ? RED : 0x303040);
-        h.rect(rx - 3, ay + 39, 3, 9, on ? 0x2a2a2a : 0x303040);
-      }
-      if (this.rocketMsgT > 0) h.text('NO ROCKETS LEFT', HUD_W / 2, 150, 16, RED, 'center');
+      for (let i = 0; i < 30; i++) h.rect(colX + i * 5.7, ammoY + 22, 3, 10, i < lit ? YELLOW : 0x303040);
+      // rockets: the key, then a rocket per shot left
+      h.text('ROCKETS', colX, rockY, 16, this.rockets ? ORANGE : 0x6a6a7a);
+      if (!t) h.keycap(colX + 170 - 18, rockY - 1, 'E');
+      for (let i = 0; i < this.raceRockets; i++) this.rocketIcon(colX + 4 + i * 30, rockY + 22, i < this.rockets);
       if (this.lastHitT > 0 && this.lastGunTarget !== null && this.state === 'race') {
         // the computer car you're hitting: its condition over its roof
         const tr = this.world.rivals[this.lastGunTarget];
         const p = tr && !tr.remote ? this.world.rivalScreenPos(this.lastGunTarget, this.camera, HUD_W, HUD_H) : null;
         if (p) {
-          const bw = 44, bx = p.x - bw / 2, by = p.y - 14, f = Math.min(1, 1 - tr.hp / 100);
+          const bw = 44, bx = p.x - bw / 2, by = p.y - 14, f = Math.max(0, Math.min(1, tr.hp / 100));
           h.rect(bx - 1, by - 1, bw + 2, 7, 0x000000);
-          h.rect(bx, by, bw * f, 5, damageColour(f));
+          h.rect(bx, by, bw * f, 5, damageColour(1 - f));
         }
       }
       if (this.firingT > 0 && this.state === 'race' && !this.wrecked) this.crosshair();
-      if (this.noTargetT > 0) h.text('OUT OF AMMO', HUD_W / 2, 124, 16, RED, 'center');
       if (this.testPvp) this.testPanel();
       if (this.hitFlash > 0) {
         h.rect(0, 0, HUD_W, 6, RED);
@@ -2310,17 +2337,53 @@ export class Game {
       }
     }
 
-    // course progress bar
-    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 20, y = t ? 118 : 44;
-    h.text('COURSE', x0, y - 26, 16, YELLOW);
-    h.rect(x0, y, x1 - x0, 8, 0x202040);
+    // course progress bar, named with the stage you're on
+    h.text('COURSE', x0, cy - 26, 16, YELLOW);
+    h.rect(x0, cy, x1 - x0, 8, 0x202040);
     const goal = this.world.track.goalDist;
     const starts = this.world.track.stageStarts;
-    for (const s of starts) h.rect(x0 + ((s * SEG) / goal) * (x1 - x0) - 1, y - 4, 4, 16, WHITE);
+    for (const s of starts) h.rect(x0 + ((s * SEG) / goal) * (x1 - x0) - 1, cy - 4, 4, 16, WHITE);
     const p = Math.min(1, this.pos / goal);
-    h.rect(x0, y, p * (x1 - x0), 8, PINK);
-    h.rect(x0 + p * (x1 - x0) - 4, y - 6, 8, 20, YELLOW);
+    h.rect(x0, cy, p * (x1 - x0), 8, PINK);
+    h.rect(x0 + p * (x1 - x0) - 4, cy - 6, 8, 20, YELLOW);
     const si = Math.min(this.stage, route.stageNames.length - 1);
-    h.text(`STAGE ${si + 1}  ${route.stageNames[si]}`, x1, y + 14, 8, WHITE, 'right');
+    h.text(`STAGE ${si + 1}  ${route.stageNames[si]}`, x1, cy + 14, 8, WHITE, 'right');
+  }
+
+  /** Under the timer: catch-up on its own line, then ONE status line (most urgent first). */
+  private statusLine() {
+    const h = this.hud, cy = this.touch ? 150 : 128, y = cy + 22;
+    const pct = Math.round(this.catchUp * 100);
+    if (pct >= 1) {
+      // catch-up: how much extra speed you're getting for being behind
+      const s = `CATCH-UP +${pct}%`, bw = s.length * 8 + 16;
+      h.box(HUD_W / 2 - bw / 2, cy, bw, 16, 0x0a2a3a, CYAN, 1);
+      h.text(s, HUD_W / 2, cy + 4, 8, CYAN, 'center');
+    }
+    const flick = Math.floor(this.clock * 8) % 2;
+    const pill = (s: string, c: number, bg: number) => {
+      const bw = s.length * 16 + 20;
+      h.box(HUD_W / 2 - bw / 2, y - 3, bw, 22, bg, c, 1);
+      h.text(s, HUD_W / 2, y, 16, c, 'center');
+    };
+    if (this.weapons && this.rocketMsgT > 0) pill('NO ROCKETS LEFT', RED, 0x2a1014);
+    else if (this.weapons && this.noTargetT > 0) pill('OUT OF AMMO', RED, 0x2a1014);
+    else if (this.slipT > 0) pill('SLIPSTREAM', flick ? WHITE : CYAN, 0x0a2a3a);
+    else if (this.tow > 0.05) {
+      // the tow building behind a car
+      h.shade(HUD_W / 2 - 112, y - 3, 224, 18, 0.5);
+      h.text('SLIPSTREAM', HUD_W / 2 - 4, y + 1, 8, CYAN, 'right');
+      h.rect(HUD_W / 2 + 2, y + 1, 100, 10, 0x000000);
+      h.rect(HUD_W / 2 + 3, y + 2, 98 * this.tow, 8, CYAN);
+    }
+  }
+
+  /** One rocket in the HUD's rocket row: a green tube with a red warhead and tail fins. */
+  private rocketIcon(x: number, y: number, on: boolean) {
+    const h = this.hud, off = 0x303040;
+    h.rect(x, y - 2, 4, 14, on ? 0x2a2a2a : off); // fins
+    h.rect(x + 4, y + 1, 14, 8, on ? 0x6a7a3a : off); // tube
+    h.rect(x + 18, y + 1, 5, 8, on ? RED : off); // warhead
+    h.rect(x + 23, y + 3, 2, 4, on ? RED : off);
   }
 }

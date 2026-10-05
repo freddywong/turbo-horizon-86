@@ -66,8 +66,8 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
-* **Online, between players:** each round that hits takes **1%** of the damage bar and each rocket
-  **10%**. There's no limit on how much one player can do, so someone who keeps you in their sights
+* **Online, between players:** each round that hits takes **1%** of the HP meter and each rocket
+  **10%** (scaled by the car's HP). There's no limit on how much one player can do, so someone who keeps you in their sights
   can wreck you.
 * **VS RIVALS, against the computer cars:** your rounds take **7.5%** of their bar (3 times a base
   2.5%, about 3 seconds of fire to wreck one) and a rocket wrecks them outright. A bar over the car
@@ -123,19 +123,32 @@ TURN relay server. The claude.ai version of the game is single-player only.
 For testing several tabs in one browser without the internet, add `?net=local`
 (`http://localhost:5173/?net=local#join`).
 
-## Damage
+## Damage and HP
 
-The DAMAGE bar shows how much damage your car has taken. It starts empty every race and fills up,
-green, then yellow, then red; when it's full the car is wrecked:
+The **HP meter** at the bottom centre of the screen shows how much your car has left, in its own HP
+(`98/130` on a Charger). It starts full every race and empties as you take hits, green, then
+yellow, then red; when it's empty the car is wrecked:
 
 * hard crashes into traffic, scenery or the back of a rival take a big chunk (more the faster you hit);
 * side-swipes and rival bumps take a little; scraping along a wall wears it down steadily.
 
 You can see the damage on the car: panels crumple in where it was hit, paint is scraped to bare
 metal and soot, the glass cracks, a tail lamp gets smashed, and the engine starts to smoke, grey
-at first and black when it's critical (the bar blinks and the car loses some top speed). When it's full
+at first and black when it's critical (the meter blinks and the car loses some top speed). When it's empty
 the engine blows: the car rolls to a stop under black smoke and flames, and it's game over
 (WRECKED). A new race gives you a fresh car.
+
+## Race screen
+
+* **Top left:** score. **Top centre:** time and your position. **Top right:** the course bar and the stage you're on.
+* **Bottom left:** speed and revs. **Bottom centre:** the HP meter.
+* **Bottom right:** what you use up: turbo lamps, then (with weapons on) ammo and rockets.
+* **Middle:** one status line under the timer (SLIPSTREAM, OUT OF AMMO, NO ROCKETS LEFT, with
+  CATCH-UP above it) and one big message at a time under that. Urgent ones (GO!, ROCKET HIT,
+  WARNING) take over; the rest wait their turn.
+* Each group sits on a faint dark panel so it reads over bright scenery.
+* On phones the thumbs cover the bottom corners, so speed, revs and turbo go top left, ammo and
+  rockets top right, and the course bar under the timer.
 
 ## Graphics
 
