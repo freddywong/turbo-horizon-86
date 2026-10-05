@@ -268,7 +268,13 @@ export class Audio {
   private engG!: GainNode;
   private skidG!: GainNode;
   private delay!: DelayNode;
-  muted = false;
+  muted = (() => {
+    try {
+      return localStorage.getItem('th86-muted') === '1';
+    } catch {
+      return false;
+    }
+  })();
 
   private song: Song | null = null;
   private step = 0;
@@ -281,7 +287,7 @@ export class Audio {
     const ctx = new AC();
     this.ctx = ctx;
     this.master = ctx.createGain();
-    this.master.gain.value = 0.55;
+    this.master.gain.value = this.muted ? 0 : 0.55;
     const comp = ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(ctx.destination);
     this.sfx = ctx.createGain();
@@ -336,6 +342,11 @@ export class Audio {
 
   toggleMute() {
     this.muted = !this.muted;
+    try {
+      localStorage.setItem('th86-muted', this.muted ? '1' : '0');
+    } catch {
+      /* private mode: just this session */
+    }
     if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.55, this.ctx.currentTime, 0.02);
   }
 
@@ -412,6 +423,27 @@ export class Audio {
       this.tone(125 * p, 0.07, 'sine', 0.38 * v, when, 42); // the thump
       this.burst(0.014, 0.22 * v, 5200, when + 0.004, 'highpass'); // the bolt's clack
     }
+  }
+  /** Bazooka launch: a thump and a hiss that trails away. */
+  rocket(vol = 1) {
+    if (!this.ctx) return;
+    this.tone(160, 0.12, 'square', 0.4 * vol, 0, 50);
+    this.burst(0.06, 0.5 * vol, 900);
+    for (let i = 0; i < 4; i++) this.burst(0.18, (0.32 - i * 0.07) * vol, 2600 - i * 450, 0.05 + i * 0.12, 'bandpass');
+  }
+  /** Rocket explosion: a deep boom with a rumbling tail (quieter far away). */
+  boom(vol = 1) {
+    if (!this.ctx) return;
+    this.tone(70, 0.9, 'sine', 0.6 * vol, 0, 24);
+    this.burst(1.1, 0.9 * vol, 1400);
+    this.burst(0.25, 0.5 * vol, 4200, 0, 'highpass');
+    this.tone(45, 1.2, 'triangle', 0.35 * vol, 0.08, 20);
+  }
+  /** Two rising notes: someone joined the lobby. */
+  chime() {
+    if (!this.ctx) return;
+    this.tone(880, 0.12, 'triangle', 0.3, 0, 880);
+    this.tone(1320, 0.18, 'triangle', 0.3, 0.12, 1320);
   }
   /** Bullet hitting your own car: a metallic ping. */
   ping() {

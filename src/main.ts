@@ -70,7 +70,7 @@ async function boot() {
     if (touch.update(driving) && driving) game.paused = true;
     if (touch.enabled) {
       touch.setTurbo(game.turbos, game.turboT > 0);
-      touch.setFire(game.weapons);
+      touch.setFire(game.weapons, game.rockets);
     }
     game.update(dt);
     game.draw();

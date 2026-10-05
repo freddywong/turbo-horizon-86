@@ -319,7 +319,7 @@ export class PlayerCar {
 
   private hubs: THREE.Mesh[] = [];
   /** the driver leaning out of each side window with a gun (-1 left, +1 right) */
-  private gunners: { group: THREE.Group; arm: THREE.Group; flash: THREE.Mesh }[] = [];
+  private gunners: { group: THREE.Group; arm: THREE.Group; flash: THREE.Mesh; tube: THREE.Group; blast: THREE.Object3D }[] = [];
   private gunSide = 1;
   private detail: THREE.Object3D[] = [];
   private paintwork: THREE.Mesh[] = []; // dents + scrapes
@@ -595,10 +595,29 @@ export class PlayerCar {
       flash.position.set(...muzzle);
       flash.visible = false;
       lean.add(armG);
+      // the bazooka: an olive tube on the outer shoulder, pointing dead ahead, with fire at both ends when it goes off
+      const tube = new THREE.Group();
+      const olive = new THREE.MeshLambertMaterial({ color: 0x4a5a2a }), dark = new THREE.MeshLambertMaterial({ color: 0x1e1e20 });
+      tube.add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 1.15, 10).rotateX(Math.PI / 2), olive));
+      tube.add(new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.08, 10).rotateX(Math.PI / 2).translate(0, 0, -0.58), dark)); // muzzle ring
+      tube.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.085, 0.12, 10).rotateX(Math.PI / 2).translate(0, 0, 0.6), dark)); // flared back
+      tube.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.16, 0.06).translate(0, -0.12, -0.12), dark)); // grip
+      tube.add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.08, 0.08).translate(0, 0.1, -0.2), dark)); // sight
+      // hands on the grip and under the tube
+      tube.add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4).translate(0, -0.2, -0.12), dark));
+      tube.add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4).translate(0, -0.09, -0.36), dark));
+      const hot = new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+      const blast = new THREE.Group();
+      blast.add(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.9, 8).rotateX(Math.PI / 2).translate(0, 0, 1.1), hot)); // back-blast
+      blast.add(new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 8).rotateX(-Math.PI / 2).translate(0, 0, -0.85), hot)); // muzzle flash
+      tube.add(blast);
+      tube.position.set(s * 0.3, 0.46, 0.05);
+      tube.visible = false;
+      lean.add(tube);
       group.position.set(s * (w - 0.14), belt - 0.06, z);
       group.visible = false;
       this.body.add(group);
-      this.gunners.push({ group, arm: armG, flash });
+      this.gunners.push({ group, arm: armG, flash, tube, blast });
     }
   }
 
@@ -607,14 +626,19 @@ export class PlayerCar {
    * the gun turned to `yaw` (radians, 0 = straight ahead, + to the left);
    * side 0 hides them. `flash` lights the muzzle for this frame.
    */
-  aim(side: number, yaw = 0, flash = false) {
+  aim(side: number, yaw = 0, flash = false, rocket = 0) {
     if (side) this.gunSide = side;
     this.gunners.forEach((g, i) => {
       const on = side !== 0 && (i === 0 ? -1 : 1) === this.gunSide;
       g.group.visible = on;
       if (!on) return;
+      // rocket > 0: shouldering the bazooka (1 = just fired) instead of the gun
+      g.arm.visible = rocket <= 0;
+      g.tube.visible = rocket > 0;
+      g.blast.visible = rocket > 0.75;
+      if (rocket > 0.75) g.blast.scale.setScalar(0.7 + Math.random() * 0.6);
       g.arm.rotation.set(0, yaw, 0);
-      g.flash.visible = flash;
+      g.flash.visible = flash && rocket <= 0;
       if (flash) g.flash.rotation.z = Math.random() * Math.PI;
     });
   }

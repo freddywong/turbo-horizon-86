@@ -28,7 +28,7 @@ export interface PeerInfo {
 }
 
 /** The race settings the host picks for everyone in the lobby. */
-export interface RaceSettings { route: number; turbos: number; weapons: boolean; ammo: number }
+export interface RaceSettings { route: number; turbos: number; weapons: boolean; ammo: number; rockets: number }
 
 export interface GoMsg {
   raceId: string;
@@ -37,8 +37,12 @@ export interface GoMsg {
   turbos: number;
   weapons: boolean;
   ammo: number;
+  rockets: number;
   players: { id: string; name: string; car: number; paint: number }[];
 }
+
+/** A rocket someone fired from (d, x) at speed v (everyone flies it locally; only the shooter decides hits). */
+export interface RkMsg { r: string; d: number; x: number; v: number }
 
 export interface StMsg {
   r: string; // race id
@@ -53,8 +57,8 @@ export interface StMsg {
   gun: string; // peer id of whoever they're shooting at, '' when not firing
 }
 
-/** Rounds that hit `to`, decided by the shooter. */
-export interface HitMsg { r: string; to: string; n: number }
+/** Rounds that hit `to` (or a rocket when rk), decided by the shooter. */
+export interface HitMsg { r: string; to: string; n: number; rk?: boolean }
 
 interface Transport {
   selfId: string;
@@ -221,6 +225,13 @@ export class Net {
   onGo: ((m: GoMsg, from: string) => void) | null = null;
   onSt: ((m: StMsg, from: string) => void) | null = null;
   onHit: ((m: HitMsg, from: string) => void) | null = null;
+  onRk: ((m: RkMsg, from: string) => void) | null = null;
+  /** the host removed us from the lobby */
+  onKicked: (() => void) | null = null;
+  /** players the host removed: their messages are ignored from then on */
+  private banned = new Set<string>();
+  /** someone new turned up in the room */
+  onPeer: ((p: PeerInfo) => void) | null = null;
 
   constructor(readonly room: string, local: boolean) {
     (local ? Promise.resolve(localTransport(room)) : trysteroTransport(room))
@@ -232,6 +243,8 @@ export class Net {
         tr.on('go', (d, f) => this.gotGo(d, f));
         tr.on('st', (d, f) => this.gotSt(d, f));
         tr.on('hit', (d, f) => this.gotHit(d, f));
+        tr.on('rk', (d, f) => this.gotRk(d, f));
+        tr.on('kick', (d, f) => this.gotKick(d, f));
         tr.onJoin((id) => this.sendHi(id));
         tr.onLeave((id) => this.peers.delete(id));
         this.sendHi();
@@ -269,10 +282,35 @@ export class Net {
     this.tr?.send('hit', { p: PROTO, ...m });
   }
 
+  /** Host only: remove a player from the lobby. */
+  kick(id: string) {
+    if (!this.isHost()) return;
+    this.banned.add(id);
+    this.peers.delete(id);
+    this.tr?.send('kick', { p: PROTO, to: id });
+  }
+
+  private gotKick(d: unknown, from: string) {
+    const m = d as Record<string, unknown>;
+    // only the player we also see as host may remove us
+    if (!m || m.p !== PROTO || m.to !== this.selfId || this.host().id !== from) return;
+    this.onKicked?.();
+  }
+
+  sendRk(m: RkMsg) {
+    this.tr?.send('rk', { p: PROTO, ...m });
+  }
+
+  private gotRk(d: unknown, from: string) {
+    const m = d as Record<string, unknown>;
+    if (!m || m.p !== PROTO) return;
+    this.onRk?.({ r: str(m.r, 24), d: num(m.d, -1e3, 1e6), x: num(m.x, -50, 50), v: num(m.v, 0, 400) }, from);
+  }
+
   private gotHit(d: unknown, from: string) {
     const m = d as Record<string, unknown>;
     if (!m || m.p !== PROTO) return;
-    this.onHit?.({ r: str(m.r, 24), to: str(m.to, 64), n: Math.round(num(m.n, 0, 10)) }, from);
+    this.onHit?.({ r: str(m.r, 24), to: str(m.to, 64), n: Math.round(num(m.n, 0, 10)), rk: m.rk === true }, from);
   }
 
   leave() {
@@ -327,6 +365,7 @@ export class Net {
   private gotHi(d: unknown, from: string) {
     const m = d as Record<string, unknown>;
     if (!m || m.p !== PROTO) return;
+    if (this.banned.has(from)) return;
     const old = this.peers.get(from);
     const now = performance.now() / 1000;
     if (!old) this.sendHi(from); // a newcomer: introduce ourselves straight away
@@ -342,6 +381,7 @@ export class Net {
       since: num(m.since, 0, 1e14, Date.now()),
       set: readSettings(m.set),
     });
+    if (!old) this.onPeer?.(this.peers.get(from)!);
   }
 
   private gotGo(d: unknown, from: string) {
@@ -353,7 +393,8 @@ export class Net {
     })).filter((p) => p.id);
     const go: GoMsg = {
       raceId: str(m.raceId, 24), route: Math.round(num(m.route, 0, 5)), seed: Math.round(num(m.seed, 0, 1e9)),
-      turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)), players,
+      turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)),
+      rockets: Math.round(num(m.rockets, 0, 5, 1)), players,
     };
     if (go.raceId) this.onGo?.(go, from);
   }
@@ -371,7 +412,10 @@ export class Net {
 function readSettings(v: unknown): RaceSettings | null {
   const m = v as Record<string, unknown>;
   if (!m || typeof m !== 'object') return null;
-  return { route: Math.round(num(m.route, 0, 5)), turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true, ammo: Math.round(num(m.ammo, 10, 999, 300)) };
+  return {
+    route: Math.round(num(m.route, 0, 5)), turbos: Math.round(num(m.turbos, 1, 9, 5)), weapons: m.weapons === true,
+    ammo: Math.round(num(m.ammo, 10, 999, 300)), rockets: Math.round(num(m.rockets, 0, 5, 1)),
+  };
 }
 
 /** Room name from the URL: `#join` is the public lobby, `#join=code` a private one. */

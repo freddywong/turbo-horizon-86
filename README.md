@@ -27,7 +27,9 @@ npm run build    # type-check + production build into dist/
 | Esc | Pause (Q in the pause menu quits to route select) |
 | N | Next music track (car select and while racing) |
 | Shift | Turbo boost (5 per race by default) |
-| M | Mute |
+| F | Fire the gun (weapons on) |
+| E | Fire a bazooka rocket (weapons on) |
+| M | Mute / unmute on any screen (remembered next time) |
 
 ### Phones and tablets
 
@@ -53,21 +55,26 @@ VS RIVALS and online races can be played with guns: WEAPONS ON/OFF (V, or tap) o
 screen or in the online lobby. It's on by default. Online, the host sets it for everyone.
 
 * Hold **F** (or the red **FIRE** button on phones) and your driver leans out of the window and shoots.
-* **Aiming is automatic.** It locks onto the nearest racer up to 90 m ahead or 35 m behind (a bracket
-  marks the target; red means a good chance to hit). Traffic is never targeted. Close up almost every
-  round hits; far away it's a spray.
-* **Ammo: 100 to 500 rounds per race** (default 300), set with B (or tap AMMO) next to the weapons
-  switch. A hit does a small dent and takes about 1.7% of the damage bar. That's much less than a
-  crash, and **one car's guns can take at most three quarters of your bar**. Several shooters
-  together, or gunfire on top of crash damage, can still wreck you.
-* In VS RIVALS the computer drivers shoot back in short bursts, but **all of them together can take
-  at most 20% of your bar** with gunfire.
-* **Against computer cars your bullets do 300% damage** (about 5% of their bar per hit). The bar
-  under the lock-on bracket shows how they're holding up. Shot-up cars smoke, lose a tail lamp and
-  limp. At zero they're **wrecked**: they roll to a stop in black smoke and drop out of the race
-  (DNF), and you get 50,000 points.
+* **No auto-aim: the gun fires dead ahead.** Rounds fly straight down your line and hit the first car
+  in it, a racer or traffic, up to 90 m ahead. Line up behind someone to hit them; change lanes to
+  get out of someone's sights.
+* **Ammo: 100 to 500 rounds per race** (default 300), set with B (or tap AMMO). Every round that
+  hits takes **2.5% of the damage bar**, so holding fire on someone in front of you takes about 12% a
+  second. That's still less than a crash, and **one car's weapons can take at most three quarters of
+  your bar**. Several shooters together, or gunfire on top of crash damage, can still wreck you.
+* **Bazooka: 1 rocket per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
+  the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
+  flies straight down your line, with no auto-aim, and explodes on the first car in its path, or
+  after 300 m. A hit takes **40%** of a player's bar (it counts toward that three-quarter limit) and
+  **wrecks a computer car** outright.
+* In VS RIVALS the computer drivers shoot back in short bursts when you're in front of them, but
+  **all of them together can take at most 20% of your bar**. They don't have bazookas.
+* **Against computer cars your bullets do 300% damage** (7.5% of their bar per hit, about 3 seconds
+  of fire to wreck one). A bar over the car you're hitting shows how it's holding up. Shot-up cars
+  smoke, lose a tail lamp and limp. At zero they're **wrecked**: they roll to a stop in black smoke
+  and drop out of the race (DNF), and you get 50,000 points.
 * Online, the shooter's game decides what hits and tells the victim's game, which applies the damage
-  (and the cap).
+  (and the cap). Everyone sees everyone's gunfire and rockets.
 
 ## Online multiplayer
 
@@ -78,7 +85,10 @@ phones and computers, with no account and no sign-in.
 2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the ◀ ▶ arrows and the colour swatches).
    The **host**, the first player in the lobby (marked HOST), sets the race for everyone: the route (R, or tap
    ROUTE) and TURBOS, WEAPONS and AMMO with their ◀ ▶ / ON-OFF buttons. Everyone else sees the host's settings.
-   If the host leaves, the next player in takes over. The lobby shows the driving keys as keycaps, or on a
+   If the host leaves, the next player in takes over. The host can also **REMOVE** a player from the
+   lobby with the button on their row.
+   On a computer, if you're in another window or app when someone joins, you get a desktop
+   notification (the browser asks once), the tab title flashes and a chime plays. The lobby shows the driving keys as keycaps, or on a
    phone a picture of where each on-screen button is. The keys you need also show under the 3-2-1 countdown.
 3. **Anyone** can press START; the race uses the host's settings. Everyone in the lobby (up to 8) gets a short countdown and lines up on
    the same grid with the same traffic. Players who arrive while a race is running wait in the lobby

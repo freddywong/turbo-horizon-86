@@ -36,9 +36,36 @@ const MAX_TRACERS = 48;
 
 /** A bullet streak, kept in track coordinates so it stays put while everything moves. */
 interface Tracer { d0: number; x0: number; y0: number; d1: number; x1: number; y1: number; life: number }
+/** A bazooka rocket flying straight down the road at fixed x. */
+export interface Rocket { d: number; x: number; v: number; travelled: number; mine: boolean; from: string; mesh: THREE.Group; smokeT: number }
+
+/** Olive tube, red warhead, tail fins and an additive exhaust flame; points down -z like the cars. */
+function rocketModel(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.9, 10).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x4a5a2a }));
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 10).rotateX(-Math.PI / 2).translate(0, 0, -0.59), new THREE.MeshLambertMaterial({ color: 0xc81810 }));
+  g.add(body, tip);
+  const finMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide });
+  for (const r of [0, Math.PI / 2]) {
+    const fin = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.22).rotateY(Math.PI / 2).translate(0, 0, 0.38), finMat);
+    fin.rotation.z = r;
+    g.add(fin);
+  }
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.7, 8).rotateX(Math.PI / 2).translate(0, 0, 0.8),
+    new THREE.MeshBasicMaterial({ color: 0xffa030, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  flame.name = 'flame';
+  g.add(flame);
+  // a hot glow round the exhaust so it reads from behind
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6).translate(0, 0, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0xffe080, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+  g.add(glow);
+  g.scale.setScalar(1.8); // arcade-sized, so you can follow it down the road
+  return g;
+}
 
 /** Who a car is shooting at this frame: -1 = the player, a rival index, or null. */
-export interface GunAim { target: number | null; flash: boolean }
+/** The player's gunner this frame: firing straight ahead, muzzle flash, bazooka pose (1 = just fired). */
+export interface GunAim { firing: boolean; flash: boolean; rocket: number }
 
 /** One fully built route: scene graph, road, scenery, traffic and the player's car. */
 export class World {
@@ -147,9 +174,11 @@ export class World {
 
   private net: NetTraffic | null = null;
   private tracers: Tracer[] = [];
+  rockets: Rocket[] = [];
+  private rocketPool: THREE.Group[] = [];
   private tracerMesh: THREE.LineSegments;
   /** the player's gun this frame (target = rival index) */
-  playerGun: GunAim = { target: null, flash: false };
+  playerGun: GunAim = { firing: false, flash: false, rocket: 0 };
 
   /**
    * A shot from a car at (d, x) towards (td, tx). Misses fly past and wide.
@@ -175,13 +204,7 @@ export class World {
     } else if (ey < 0.1) P.spawn(ed, ex, 0.1, 0, 0, 0.6, 0.5, 0.35, 1.5, 0xc8c0a8);
   }
 
-  /** Points the lean-out gunner of a car at (d, x) towards (td, tx). */
-  private aimCar(car: PlayerCar, d: number, x: number, td: number, tx: number, flash: boolean) {
-    const dx = tx - x, dd = td - d;
-    const side = Math.abs(dx) > 0.4 ? Math.sign(dx) : 1;
-    const ax = dx - side * 1.1; // from the window, not the car's centre
-    car.aim(side, Math.atan2(-ax, Math.max(-60, Math.min(60, dd))), flash);
-  }
+
   /** race time driving the shared traffic (online races) */
   netTime = 0;
 
@@ -332,8 +355,10 @@ export class World {
 
     // the player's gunner
     const pg = this.playerGun;
-    const pt = pg.target !== null ? this.rivals[pg.target] : null;
-    if (pt) this.aimCar(this.car, pos, px, pt.d, pt.x, pg.flash);
+    // out of the window on the side towards the middle of the road; guns and bazooka point dead ahead
+    const pside = px > 0 ? -1 : 1;
+    if (pg.rocket > 0) this.car.aim(pside, 0, false, pg.rocket);
+    else if (pg.firing) this.car.aim(pside, 0, pg.flash);
     else this.car.aim(0);
 
     // rival drivers
@@ -351,11 +376,10 @@ export class World {
       car.setNear(Math.abs(r.d - pos) < 28);
       car.root.position.set(tmp.x, tmp.y, tmp.z);
       car.pose(r.steer, -tmp.h - r.steer * 0.08, r.spin, 0, Math.atan2(f - b, 4), r.braking, r.turboT > 0 ? 1 : 0);
-      if (r.gunT > 0) {
-        const t = r.gunTo === -1 ? { d: pos, x: px } : this.rivals[r.gunTo];
-        if (t) this.aimCar(car, r.d, r.x, t.d, t.x, Math.random() < 0.5);
-        else car.aim(0);
-      } else car.aim(0);
+      const side = r.x > 0 ? -1 : 1;
+      if (r.rocketT > 0) car.aim(side, 0, false, r.rocketT);
+      else if (r.gunT > 0) car.aim(side, 0, Math.random() < 0.5);
+      else car.aim(0);
     });
 
     // camera: low, behind, always looking straight down the player's heading
@@ -368,6 +392,7 @@ export class World {
     this.data.backdrop.update(camera.position, v.heading);
     this.particles.render(v, camera);
     this.renderTracers(v);
+    this.renderRockets(v);
   }
 
   private renderTracers(v: View) {
@@ -381,6 +406,67 @@ export class World {
     }
     attr.needsUpdate = true;
     this.tracerMesh.geometry.setDrawRange(0, n * 2);
+  }
+
+  /** Fire a rocket from a car at (d, x) going v m/s: it flies straight down that line. */
+  launchRocket(d: number, x: number, v: number, mine: boolean, from: string) {
+    const mesh = this.rocketPool.pop() ?? rocketModel();
+    mesh.visible = false;
+    this.scene.add(mesh);
+    this.rockets.push({ d: d + 2.5, x, v, travelled: 0, mine, from, mesh, smokeT: 0 });
+    const P = this.particles;
+    for (let i = 0; i < 6; i++) P.spawn(d + 2, x + (Math.random() - 0.5), 1.0, -6 + Math.random() * 4, (Math.random() - 0.5) * 3, 1 + Math.random(), 0.6, 0.6, 1.8, 0xd8d0c0);
+  }
+
+  /** Moves the rockets and trails their smoke; returns the ones that burned out (call once per frame). */
+  moveRockets(dt: number, range: number): Rocket[] {
+    const spent: Rocket[] = [];
+    for (const r of this.rockets) {
+      r.d += r.v * dt;
+      r.travelled += r.v * dt;
+      r.smokeT -= dt;
+      if (r.smokeT <= 0) {
+        r.smokeT = 0.015;
+        this.particles.spawn(r.d - 1.8, r.x + (Math.random() - 0.5) * 0.3, 1.0 + (Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.8, 0.5, 1.1, 0.6, 1.8, 0xf0ece4);
+      }
+      if (r.travelled > range) spent.push(r);
+    }
+    return spent;
+  }
+
+  /** Blows a rocket up where it is: fireball, sparks and a smoke cloud. */
+  explodeRocket(r: Rocket) {
+    this.removeRocket(r);
+    const P = this.particles;
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 7;
+      P.spawn(r.d, r.x, 1.0, Math.cos(a) * sp, Math.sin(a) * sp, 2 + Math.random() * 4, 0.35 + Math.random() * 0.25, 0.9, 2.5, i % 3 ? 0xffa020 : 0xffe060);
+    }
+    for (let i = 0; i < 10; i++) P.spawn(r.d + (Math.random() - 0.5) * 3, r.x + (Math.random() - 0.5) * 3, 0.8 + Math.random(), 0, (Math.random() - 0.5) * 2, 1.5 + Math.random() * 2, 1.4 + Math.random(), 1.4, 2.2, 0x4a4440);
+  }
+
+  removeRocket(r: Rocket) {
+    this.rockets = this.rockets.filter((o) => o !== r);
+    this.scene.remove(r.mesh);
+    this.rocketPool.push(r.mesh);
+  }
+
+  clearRockets() {
+    for (const r of [...this.rockets]) this.removeRocket(r);
+  }
+
+  private renderRockets(v: View) {
+    for (const r of this.rockets) {
+      if (!v.sample(r.d, r.x, tmp)) {
+        r.mesh.visible = false;
+        continue;
+      }
+      r.mesh.visible = true;
+      r.mesh.position.set(tmp.x, tmp.y + 1.0, tmp.z);
+      r.mesh.rotation.set(0, -tmp.h, 0);
+      const flame = r.mesh.getObjectByName('flame');
+      if (flame) flame.scale.set(1, 1, 0.7 + Math.random() * 0.6);
+    }
   }
 
   /** Ages the bullet streaks (call once per frame). */

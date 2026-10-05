@@ -18,6 +18,7 @@ export class TouchControls {
   private autoBtn: HTMLDivElement;
   private turboBtn!: HTMLDivElement;
   private fireBtn!: HTMLDivElement;
+  private rocketBtn!: HTMLDivElement;
 
   constructor(private input: Input, private stage: HTMLElement, private onEnable: () => void) {
     this.root = document.createElement('div');
@@ -40,6 +41,7 @@ export class TouchControls {
     mk('radio', 'MUSIC', 'KeyN');
     this.turboBtn = mk('turbo', 'TURBO\n5', 'ShiftLeft');
     this.fireBtn = mk('fire hidden', 'FIRE', 'KeyF');
+    this.rocketBtn = mk('rocket hidden', 'ROCKET\n1', 'KeyE');
     this.autoBtn = mk('auto', 'AUTO\nGAS', '');
     this.rotate = document.createElement('div');
     this.rotate.id = 'rotate';
@@ -116,7 +118,7 @@ export class TouchControls {
     e.preventDefault();
     const code = this.codeAt(e.clientX, e.clientY);
     // only steering/pedal buttons follow a sliding thumb; pause stays a tap
-    if (code !== 'Escape' && code !== 'KeyN' && code !== 'ShiftLeft') this.pointers.set(e.pointerId, code);
+    if (code !== 'Escape' && code !== 'KeyN' && code !== 'ShiftLeft' && code !== 'KeyE') this.pointers.set(e.pointerId, code);
     this.sync();
   }
 
@@ -127,8 +129,12 @@ export class TouchControls {
   }
 
   /** The FIRE button only appears in races with weapons. */
-  setFire(show: boolean) {
+  setFire(show: boolean, rockets = 0) {
     if (this.fireBtn.classList.contains('hidden') === show) this.fireBtn.classList.toggle('hidden', !show);
+    if (this.rocketBtn.classList.contains('hidden') === show) this.rocketBtn.classList.toggle('hidden', !show);
+    const txt = `ROCKET\n${rockets}`;
+    if (this.rocketBtn.textContent !== txt) this.rocketBtn.textContent = txt;
+    this.rocketBtn.classList.toggle('empty', rockets === 0);
   }
 
   /** Shows how many boosts are left on the TURBO button. */

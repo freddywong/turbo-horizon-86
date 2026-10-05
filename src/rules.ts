@@ -14,8 +14,19 @@ export const GUN_CAP = 75;
 export const VS_AI_DAMAGE = 3;
 /** All the computer drivers' gunfire together can take at most this much of your bar. */
 export const AI_GUN_CAP = 20;
-/** Damage per round that hits (45 hits reach the cap; more ammo doesn't make a shooter stronger, it just lasts longer). */
-export const PER_HIT = 50 / 30;
+// ---- bazooka ----------------------------------------------------------------
+export const ROCKETS_DEFAULT = 1; // rockets per race unless changed in the menu
+export const ROCKETS_MAX = 5;
+export const ROCKET_SPEED = 70; // m/s on top of the shooter's own speed
+export const ROCKET_RANGE = 300; // metres before it burns out
+export const ROCKET_WIDTH = 1.5; // half-width of its path: no auto-aim, it only hits what's in its lane
+/** A rocket hit on a player; counts toward GUN_CAP, so one shooter still can't wreck you alone. */
+export const ROCKET_DAMAGE = 40;
+
+/** Damage per round that hits (30 hits reach the cap; more ammo doesn't make a shooter stronger, it just lasts longer). */
+export const PER_HIT = 2.5;
+/** Guns fire dead ahead (no auto-aim): a round hits the first car within this half-width of your line. */
+export const GUN_WIDTH = 1.3;
 export const RANGE_AHEAD = 90; // metres
 export const RANGE_BEHIND = 35;
 export const RANGE_SIDE = 6;

@@ -45,7 +45,8 @@ export interface Rival {
   burst: number; // rounds left in the current burst
   fireCool: number;
   gunT: number; // >0 while shooting (gunner leaning out)
-  gunTo: number; // target: -1 = the player, otherwise a rival index
+  gunTo: number; // -2 = straight ahead (guns have no auto-aim)
+  rocketT: number; // >0 while shouldering the bazooka (1 = just fired)
   /** online: another human player, driven by their network updates instead of the AI */
   remote?: { id: string; d: number; x: number; v: number; at: number; hp: number };
 }
@@ -72,7 +73,7 @@ export function makeGrid(playerCar: CarSpec, startPos: number, seed: number, tur
       lane: side * rng.range(1, 4), steer: 0, spin: 0, braking: false, finished: -1, bumpT: 0,
       turbos, turboT: 0,
       hp: 100, wrecked: false, wreckT: 0, smokeT: 0,
-      ammo, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -1,
+      ammo, gunTaken: 0, burst: 0, fireCool: 0, gunT: 0, gunTo: -2, rocketT: 0,
     };
   });
 }
