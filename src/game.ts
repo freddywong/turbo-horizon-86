@@ -1545,7 +1545,7 @@ export class Game {
     const w = this.world;
     this.slipT = Math.max(0, this.slipT - dt);
     if (this.mode === 'arcade' && !w.traffic.length) return;
-    // catch-up: from 150 m behind the leading car, rising to the full boost at 400 m
+    // catch-up: only for players hopelessly behind: from 300 m behind the leading car, full boost at 700 m
     let lead = -Infinity;
     for (const r of w.rivals) if (!r.wrecked) lead = Math.max(lead, r.d);
     const gap = lead - this.pos;
