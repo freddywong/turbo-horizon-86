@@ -339,7 +339,7 @@ export class Net {
     return this.tr?.servers?.() ?? null;
   }
 
-  /** Whether our own TURN relay account is in use (shown in the lobby). */
+  /** Whether our own TURN relay account is in use. */
   relay(): boolean {
     return relayReady;
   }

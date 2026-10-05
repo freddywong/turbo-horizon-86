@@ -89,13 +89,14 @@ Up to **8 players** race at once (the lobby can hold more; they wait for the nex
 1. Open the link and type your name. You go straight into the **online lobby**.
 2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the ◀ ▶ arrows and the colour swatches).
    The **host**, the first player in the lobby (marked HOST), sets the race for everyone: the route (R, or tap
-   ROUTE) and TURBOS, WEAPONS and AMMO with their ◀ ▶ / ON-OFF buttons. Everyone else sees the host's settings.
+   ROUTE) and TURBOS, WEAPONS, AMMO and ROCKETS with their ◀ ▶ / ON-OFF buttons. Only the host sees that panel;
+   everyone gets the host's settings (they show on the 3-2-1 countdown).
    If the host leaves, the next player in takes over. The host can also **REMOVE** a player from the
    lobby with the button on their row.
    On a computer, if you're in another window or app when someone joins, you get a desktop
-   notification (the browser asks once), the tab title flashes and a chime plays. Your car sits in the middle of the lobby, with the
-   settings in a compact panel beside it. **SHOW CONTROLS** (H, or tap it) opens the driving keys as keycaps, or on a
-   phone a picture of where each on-screen button is. The keys you need also show under the 3-2-1 countdown.
+   notification (the browser asks once), the tab title flashes and a chime plays. Your car sits in the middle of the lobby, with a
+   compact panel beside it and the driving keys under it as keycaps (on a phone, a picture of where each
+   on-screen button is). The keys you need also show under the 3-2-1 countdown.
 3. Everyone else presses **I'M READY** (Enter, or tap it; press again to undo). The player list shows
    READY / NOT READY for each player and the host's START button counts them (`1 OF 2 READY`,
    `EVERYONE IS READY!`). Ready resets after each race.
@@ -107,14 +108,10 @@ Up to **8 players** race at once (the lobby can hold more; they wait for the nex
 
 Use `#join=yourcode` (e.g. `.../#join=friday`) for a private lobby that only people with that link find.
 
-**Can't see each other?** The top right of the lobby shows the room and how many matchmaking servers you
-reached (`ROOM LOBBY  SERVERS 4/5`). Both players need the same room, so open the same link. Use the GitHub
-Pages link above: the claude.ai preview can't go online. If you see SERVERS 0/5, that network is blocking
-the servers. Once two players have found each other they connect directly, and if a network (mobile data,
-office or school wi-fi) blocks that, the game falls back to a free public relay server (Open Relay).
-Under that the lobby shows `FOUND n  LINKED n  FAILED n`: FOUND counts players your game found through the
-servers, LINKED the ones it connected to. FOUND with FAILED and no LINKED means a network is blocking the
-connection; FOUND 0 means the servers never passed your messages along.
+**Can't see each other?** Both players need the same room, so open the same link. Use the GitHub
+Pages link above: the claude.ai preview can't go online. Once two players have found each other they
+connect directly, and if a network (mobile data, office or school wi-fi) blocks that, the game goes
+through a TURN relay server instead.
 You can also pick ONLINE on the mode screen.
 
 How it works: there's no game server. Browsers find each other through free public Nostr relays

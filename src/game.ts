@@ -22,7 +22,7 @@ const CARD_X = 39, CARD_Y = 52, CARD_STEP_X = 262, CARD_STEP_Y = 106;
 /** Route select: mode tabs and the GO button under the course map. */
 const MODE_X = 39, MODE_STEP = 262, MODE_W = 250, MODE_Y = 330, MODE_H = 46, GO_Y = 396;
 /** Online lobby left panel: positions shared by the drawing and the tap zones. */
-const LOBBY = { x0: 16, x1: 330, mid: 173, carY: 64, carH: 44, paintY: 112, turbY: 132, weapY: 154, ammoY: 176, rockY: 198, chipH: 20, minusX: 170, plusX: 262, ctrlY: 278 };
+const LOBBY = { x0: 16, x1: 330, mid: 173, carY: 64, carH: 44, paintY: 112, turbY: 132, weapY: 154, ammoY: 176, rockY: 198, chipH: 20, minusX: 170, plusX: 262, ctrlY: 278 }; // ctrlY: the controls guide under the host's panel
 const GREY = 0x8a8aa8;
 /** Car select: side arrows, the two bottom panels and the RACE button. */
 const CSEL = { arrowX: 14, arrowY: 170, arrowW: 46, arrowH: 84, lx: 20, py: 274, ph: 124, paintY: 284, swX: 106, turbY: 308, weapY: 330, ammoY: 352, rockY: 374, minusX: 146, plusX: 234, goY: 410 };
@@ -214,7 +214,6 @@ export class Game {
   private noTargetT = 0;
   private rocketMsgT = 0;
   /** lobby: the driving-controls card is folded away unless asked for */
-  private showControls = false;
   // ---- help for whoever's behind
   /** catch-up: extra top speed (0-0.06) when well behind the leading car */
   private catchUp = 0;
@@ -833,7 +832,6 @@ export class Game {
     let turb = inp.hit('KeyT') ? 1 : 0, weap = inp.hit('KeyV'), ammo = inp.hit('KeyB') ? 1 : 0, rock = inp.hit('KeyK') ? 1 : 0, paint = -1;
     let exit = inp.hit('Escape', 'KeyQ');
     const L = LOBBY;
-    if (inp.hit('KeyH')) this.showControls = !this.showControls;
     for (const tp of inp.taps) {
       const inX = (x0: number, w: number) => tp.x >= x0 - 4 && tp.x < x0 + w + 4;
       const row = (y: number) => tp.y >= y - 3 && tp.y < y + L.chipH + 3;
@@ -844,10 +842,6 @@ export class Game {
         const p = others[row1 - 1];
         net?.kick(p.id);
         this.audio.blip();
-        continue;
-      }
-      if (tp.y >= L.ctrlY - 3 && tp.y < L.ctrlY + 21 && tp.x >= L.x0 && tp.x < L.x0 + 170) {
-        this.showControls = !this.showControls;
         continue;
       }
       if (tp.y > 405 && Math.abs(tp.x - HUD_W / 2) < 150) start = true;
@@ -1902,24 +1896,12 @@ export class Game {
     const others = net?.list() ?? [];
     const status = !net || net.status === 'connecting' ? 'CONNECTING...'
       : net.status === 'error' ? "COULDN'T CONNECT" : others.length ? `${others.length + 1} PLAYERS HERE` : 'WAITING FOR PLAYERS...';
-    // matchmaking servers and room name, so two players can check they're looking in the same place
-    const sv = net?.status === 'online' ? net.servers() : null;
-    const down = net?.status === 'online' && net.serversDown();
-    // found someone but the direct link keeps failing: their network or ours is blocking it
-    const lk = net?.status === 'online' ? net.links() : null;
-    const blocked = !!lk && !others.length && lk.failed > 0 && lk.linked === 0;
-    const line = down ? "CAN'T REACH THE MATCHMAKING SERVERS" : blocked ? 'FOUND A PLAYER BUT COULD NOT CONNECT' : status;
-    h.text(line, HUD_W / 2, 46, 16, net?.status === 'error' || down ? RED : blocked ? ORANGE : CYAN, 'center');
-    if (net?.status === 'online') {
-      // connection report along the bottom edge
-      const parts = [`ROOM ${net.room.toUpperCase()}`];
-      if (sv) parts.push(`SERVERS ${sv[0]}/${sv[1]}`);
-      if (lk) parts.push(`FOUND ${lk.found}`, `LINKED ${lk.linked}`, `FAILED ${lk.failed}`, `RELAY ${net.relay() ? 'ON' : 'OFF'}`);
-      h.text(parts.join('   '), HUD_W / 2, 467, 8, lk && lk.failed && !lk.linked ? ORANGE : GREY, 'center');
-    }
-    // your car, settings and stats on a compact panel; the driving controls fold away
+    h.text(status, HUD_W / 2, 46, 16, net?.status === 'error' ? RED : CYAN, 'center');
+    // your car and stats on a compact panel (plus the race settings for the host), the driving controls under it
     const L = LOBBY, kb = !this.touch;
-    h.shade(L.x0, 60, L.x1 - L.x0, 212);
+    const host = net?.status === 'online' ? net.host() : null, amHost = !host || host.id === net?.selfId;
+    const statsY = amHost ? 237 : 140, ctrlY = amHost ? L.ctrlY : 186;
+    h.shade(L.x0, 60, L.x1 - L.x0, statsY + 35 - 60);
     // car: arrows either side of the name, paint swatches under it
     h.chip(L.x0 + 6, L.carY + 4, 30, L.carH - 8, '←', YELLOW);
     h.chip(L.x1 - 36, L.carY + 4, 30, L.carH - 8, '→', YELLOW);
@@ -1941,33 +1923,32 @@ export class Game {
       h.keycap(L.x1 - 42, L.paintY - 2, '↑');
       h.keycap(L.x1 - 24, L.paintY - 2, '↓');
     }
-    // race settings: < value > chips, with the key that changes each
-    const host = net?.status === 'online' ? net.host() : null, amHost = !host || host.id === net?.selfId;
-    const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) =>
-      this.settingRow(L.x0 + 10, y, L.minusX, L.plusX, kb && amHost ? L.x1 - 30 : -1, label, val, on, key, toggle, !amHost);
-    setting(L.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
-    setting(L.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
-    setting(L.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
-    setting(L.rockY, 'ROCKETS', String(this.rocketCount), this.weaponsSetting, 'K', false);
-    if (amHost) h.text(others.length ? 'YOU ARE THE HOST: YOU SET THE RACE' : 'FIRST IN IS THE HOST: YOU SET THE RACE', L.mid, 223, 8, ORANGE, 'center');
-    else h.text(`SET BY THE HOST, ${host?.name ?? ''}`, L.mid, 223, 8, ORANGE, 'center');
+    // race settings, host only: < value > chips, with the key that changes each
+    if (amHost) {
+      const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) =>
+        this.settingRow(L.x0 + 10, y, L.minusX, L.plusX, kb ? L.x1 - 30 : -1, label, val, on, key, toggle);
+      setting(L.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
+      setting(L.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
+      setting(L.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
+      setting(L.rockY, 'ROCKETS', String(this.rocketCount), this.weaponsSetting, 'K', false);
+      h.text(others.length ? 'YOU ARE THE HOST: YOU SET THE RACE' : 'FIRST IN IS THE HOST: YOU SET THE RACE', L.mid, 223, 8, ORANGE, 'center');
+    }
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
       ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
     ];
     bars.forEach(([label, v, c], i) => {
-      const y = 237 + i * 11;
+      const y = statsY + i * 11;
       h.text(label, L.x0 + 10, y + 1, 8, YELLOW);
       const lit = Math.round(Math.max(0.1, Math.min(1, v)) * 12);
       for (let k = 0; k < 12; k++) h.rect(L.x0 + 66 + k * 11, y, 9, 8, k < lit ? c : 0x202040);
     });
-    h.text(`${s.stats.vmax} KM/H`, L.x1 - 10, 238, 8, WHITE, 'right');
-    // the driving controls: folded away behind a button so the car stays in view
-    h.chip(L.x0, L.ctrlY, 170, 18, this.showControls ? 'HIDE CONTROLS' : `${kb ? 'H' : '?'}  SHOW CONTROLS`, this.showControls ? YELLOW : CYAN, 8, 0x101030);
-    if (this.showControls && !this.pending) {
-      h.shade(L.x0, L.ctrlY + 22, kb ? L.x1 - L.x0 : 346, 98, 0.8);
-      if (kb) this.keyGuide(L.x0 + 10, L.ctrlY + 28);
-      else this.buttonGuide(L.x0 + 4, L.ctrlY + 26);
+    h.text(`${s.stats.vmax} KM/H`, L.x1 - 10, statsY + 1, 8, WHITE, 'right');
+    // the driving controls (hidden under the countdown)
+    if (!this.pending) {
+      h.shade(L.x0, ctrlY, kb ? L.x1 - L.x0 : 346, 98, 0.8);
+      if (kb) this.keyGuide(L.x0 + 10, ctrlY + 6);
+      else this.buttonGuide(L.x0 + 4, ctrlY + 4);
     }
     // player list
     const lx = HUD_W - 320, ly = 70;
