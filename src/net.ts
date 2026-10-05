@@ -25,6 +25,7 @@ export interface PeerInfo {
   seen: number; // local clock when last heard
   since: number; // their wall clock when they entered the room: the earliest is the host
   set: RaceSettings | null; // the race settings they're advertising
+  ready: boolean; // a non-host player has said they're ready to race
 }
 
 /** The race settings the host picks for everyone in the lobby. */
@@ -221,7 +222,7 @@ export class Net {
   private created = performance.now();
   private timer = 0;
   /** what we tell everyone about ourselves */
-  me = { name: 'PLAYER', car: 0, paint: 0, status: 'lobby' as Status, raceId: '', since: Date.now(), set: null as RaceSettings | null };
+  me = { name: 'PLAYER', car: 0, paint: 0, status: 'lobby' as Status, raceId: '', since: Date.now(), set: null as RaceSettings | null, ready: false };
   onGo: ((m: GoMsg, from: string) => void) | null = null;
   onSt: ((m: StMsg, from: string) => void) | null = null;
   onHit: ((m: HitMsg, from: string) => void) | null = null;
@@ -380,6 +381,7 @@ export class Net {
       seen: now,
       since: num(m.since, 0, 1e14, Date.now()),
       set: readSettings(m.set),
+      ready: m.ready === true,
     });
     if (!old) this.onPeer?.(this.peers.get(from)!);
   }

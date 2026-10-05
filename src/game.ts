@@ -22,7 +22,7 @@ const CARD_X = 39, CARD_Y = 52, CARD_STEP_X = 262, CARD_STEP_Y = 106;
 /** Route select: mode tabs and the GO button under the course map. */
 const MODE_X = 39, MODE_STEP = 262, MODE_W = 250, MODE_Y = 330, MODE_H = 46, GO_Y = 396;
 /** Online lobby left panel: positions shared by the drawing and the tap zones. */
-const LOBBY = { x0: 28, x1: 378, mid: 203, carY: 72, carH: 46, paintY: 122, turbY: 140, weapY: 162, ammoY: 184, rockY: 206, chipH: 20, minusX: 190, plusX: 284 };
+const LOBBY = { x0: 16, x1: 330, mid: 173, carY: 64, carH: 44, paintY: 112, turbY: 132, weapY: 154, ammoY: 176, rockY: 198, chipH: 20, minusX: 170, plusX: 262, ctrlY: 278 };
 const GREY = 0x8a8aa8;
 /** Car select: side arrows, the two bottom panels and the RACE button. */
 const CSEL = { arrowX: 14, arrowY: 170, arrowW: 46, arrowH: 84, lx: 20, py: 274, ph: 124, paintY: 284, swX: 106, turbY: 308, weapY: 330, ammoY: 352, rockY: 374, minusX: 146, plusX: 234, goY: 410 };
@@ -213,6 +213,8 @@ export class Game {
   private lastGunTarget: number | null = null;
   private noTargetT = 0;
   private rocketMsgT = 0;
+  /** lobby: the driving-controls card is folded away unless asked for */
+  private showControls = false;
   // ---- help for whoever's behind
   /** catch-up: extra top speed (0-0.06) when well behind the leading car */
   private catchUp = 0;
@@ -658,8 +660,15 @@ export class Game {
     const cam = this.camera;
     cam.fov = 40;
     cam.updateProjectionMatrix();
-    cam.position.set(this.px + Math.sin(a) * 7, 2.0, Math.cos(a) * 7);
+    const lobby = this.state === 'lobby', r = lobby ? 6.6 : 7;
+    cam.position.set(this.px + Math.sin(a) * r, lobby ? 1.8 : 2.0, Math.cos(a) * r);
     cam.lookAt(this.px, 0.35, 0);
+    if (lobby) {
+      // slide the picture so the car sits in the open space between the settings and the player list
+      cam.projectionMatrix.elements[8] = -0.3;
+      cam.projectionMatrix.elements[9] = 0.2;
+      cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+    }
   }
 
   // ------------------------------------------------------------------ online
@@ -721,7 +730,7 @@ export class Game {
     this.pending = null;
     this.raceId = '';
     this.world.setRivals([]);
-    this.net?.setMe({ status: 'lobby', raceId: '' });
+    this.net?.setMe({ status: 'lobby', raceId: '', ready: false }); // say READY again for the next race
     this.go('lobby');
     this.applyCar();
     this.resetPlayer(false);
@@ -824,6 +833,7 @@ export class Game {
     let turb = inp.hit('KeyT') ? 1 : 0, weap = inp.hit('KeyV'), ammo = inp.hit('KeyB') ? 1 : 0, rock = inp.hit('KeyK') ? 1 : 0, paint = -1;
     let exit = inp.hit('Escape', 'KeyQ');
     const L = LOBBY;
+    if (inp.hit('KeyH')) this.showControls = !this.showControls;
     for (const tp of inp.taps) {
       const inX = (x0: number, w: number) => tp.x >= x0 - 4 && tp.x < x0 + w + 4;
       const row = (y: number) => tp.y >= y - 3 && tp.y < y + L.chipH + 3;
@@ -834,6 +844,10 @@ export class Game {
         const p = others[row1 - 1];
         net?.kick(p.id);
         this.audio.blip();
+        continue;
+      }
+      if (tp.y >= L.ctrlY - 3 && tp.y < L.ctrlY + 21 && tp.x >= L.x0 && tp.x < L.x0 + 170) {
+        this.showControls = !this.showControls;
         continue;
       }
       if (tp.y > 405 && Math.abs(tp.x - HUD_W / 2) < 150) start = true;
@@ -902,7 +916,14 @@ export class Game {
         if (host) net.setMe({ set: { route: this.routeIdx, turbos: this.turboCount, weapons: this.weaponsSetting, ammo: this.ammoCount, rockets: this.rocketCount } });
         else this.adoptSettings(net.host().set);
       }
-      if (start && net?.status === 'online' && host) this.startOnline(); // only the host starts the race
+      if (start && net?.status === 'online') {
+        if (host) this.startOnline(); // only the host starts the race
+        else {
+          // everyone else tells the host they're ready (or not, again)
+          net.setMe({ ready: !net.me.ready });
+          this.audio.blip();
+        }
+      }
     }
     if (this.pending && raceClock() >= this.pending.at) this.beginOnlineRace(this.pending.go);
     this.showroom(dt);
@@ -1896,16 +1917,16 @@ export class Game {
       if (lk) parts.push(`FOUND ${lk.found}`, `LINKED ${lk.linked}`, `FAILED ${lk.failed}`, `RELAY ${net.relay() ? 'ON' : 'OFF'}`);
       h.text(parts.join('   '), HUD_W / 2, 467, 8, lk && lk.failed && !lk.linked ? ORANGE : GREY, 'center');
     }
-    // your car, settings, stats and controls on a see-through panel
+    // your car, settings and stats on a compact panel; the driving controls fold away
     const L = LOBBY, kb = !this.touch;
-    h.shade(L.x0, 68, L.x1 - L.x0, 322);
+    h.shade(L.x0, 60, L.x1 - L.x0, 212);
     // car: arrows either side of the name, paint swatches under it
     h.chip(L.x0 + 6, L.carY + 4, 30, L.carH - 8, '←', YELLOW);
     h.chip(L.x1 - 36, L.carY + 4, 30, L.carH - 8, '→', YELLOW);
     h.text(s.make, L.mid, L.carY + 2, 16, CYAN, 'center');
     if (s.country) h.flag(s.country, L.mid - s.make.length * 8 - 26, L.carY + 3, 18, 12);
-    const big = s.name.length <= 11;
-    h.text(s.name, L.mid, L.carY + (big ? 20 : 24), big ? 24 : 16, WHITE, 'center');
+    const ns = s.name.length <= 9 ? 24 : s.name.length <= 14 ? 16 : 12;
+    h.text(s.name, L.mid, L.carY + (ns === 24 ? 20 : ns === 16 ? 24 : 26), ns, WHITE, 'center');
     const n = s.paints.length, sx = L.mid - (n * 22 - 6) / 2;
     s.paints.forEach((c, i) => {
       const on = i === this.paintIdx % n;
@@ -1913,45 +1934,48 @@ export class Game {
       h.rect(sx + i * 22, L.paintY, 16, 12, c);
     });
     if (kb) {
-      h.keycap(L.x0 + 12, L.paintY - 2, '←');
-      h.keycap(L.x0 + 30, L.paintY - 2, '→');
-      h.text('CAR', L.x0 + 52, L.paintY + 2, 8, GREY);
-      h.text('PAINT', L.x1 - 48, L.paintY + 2, 8, GREY, 'right');
-      h.keycap(L.x1 - 44, L.paintY - 2, '↑');
-      h.keycap(L.x1 - 26, L.paintY - 2, '↓');
+      h.keycap(L.x0 + 10, L.paintY - 2, '←');
+      h.keycap(L.x0 + 28, L.paintY - 2, '→');
+      h.text('CAR', L.x0 + 50, L.paintY + 2, 8, GREY);
+      h.text('PAINT', L.x1 - 46, L.paintY + 2, 8, GREY, 'right');
+      h.keycap(L.x1 - 42, L.paintY - 2, '↑');
+      h.keycap(L.x1 - 24, L.paintY - 2, '↓');
     }
     // race settings: < value > chips, with the key that changes each
     const host = net?.status === 'online' ? net.host() : null, amHost = !host || host.id === net?.selfId;
     const setting = (y: number, label: string, val: string, on: boolean, key: string, toggle: boolean) =>
-      this.settingRow(L.x0 + 12, y, L.minusX, L.plusX, kb && amHost ? L.x1 - 34 : -1, label, val, on, key, toggle, !amHost);
+      this.settingRow(L.x0 + 10, y, L.minusX, L.plusX, kb && amHost ? L.x1 - 30 : -1, label, val, on, key, toggle, !amHost);
     setting(L.turbY, 'TURBOS', String(this.turboCount), true, 'T', false);
     setting(L.weapY, 'WEAPONS', this.weaponsSetting ? 'ON' : 'OFF', this.weaponsSetting, 'V', true);
     setting(L.ammoY, 'AMMO', String(this.ammoCount), this.weaponsSetting, 'B', false);
     setting(L.rockY, 'ROCKETS', String(this.rocketCount), this.weaponsSetting, 'K', false);
-    if (amHost) h.text(others.length ? 'YOU ARE THE HOST: YOU SET THE RACE' : 'FIRST IN IS THE HOST: YOU SET THE RACE', L.mid, 230, 8, ORANGE, 'center');
-    else h.text(`SET BY THE HOST, ${host?.name ?? ''}`, L.mid, 230, 8, ORANGE, 'center');
+    if (amHost) h.text(others.length ? 'YOU ARE THE HOST: YOU SET THE RACE' : 'FIRST IN IS THE HOST: YOU SET THE RACE', L.mid, 223, 8, ORANGE, 'center');
+    else h.text(`SET BY THE HOST, ${host?.name ?? ''}`, L.mid, 223, 8, ORANGE, 'center');
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
       ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.3, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
     ];
     bars.forEach(([label, v, c], i) => {
-      const y = 244 + i * 11;
-      h.text(label, 40, y + 1, 8, YELLOW);
+      const y = 237 + i * 11;
+      h.text(label, L.x0 + 10, y + 1, 8, YELLOW);
       const lit = Math.round(Math.max(0.1, Math.min(1, v)) * 12);
-      for (let k = 0; k < 12; k++) h.rect(96 + k * 11, y, 9, 8, k < lit ? c : 0x202040);
+      for (let k = 0; k < 12; k++) h.rect(L.x0 + 66 + k * 11, y, 9, 8, k < lit ? c : 0x202040);
     });
-    h.text(`${s.stats.vmax} KM/H`, 236, 245, 8, WHITE);
-    // how to drive
-    h.rect(L.x0 + 8, 280, L.x1 - L.x0 - 16, 1, 0x3a3a5a);
-    h.text(kb ? 'DRIVING KEYS' : 'DRIVING BUTTONS', L.mid, 285, 8, YELLOW, 'center');
-    if (kb) this.keyGuide(40, 298);
-    else this.buttonGuide(L.x0 + 10, 297);
+    h.text(`${s.stats.vmax} KM/H`, L.x1 - 10, 238, 8, WHITE, 'right');
+    // the driving controls: folded away behind a button so the car stays in view
+    h.chip(L.x0, L.ctrlY, 170, 18, this.showControls ? 'HIDE CONTROLS' : `${kb ? 'H' : '?'}  SHOW CONTROLS`, this.showControls ? YELLOW : CYAN, 8, 0x101030);
+    if (this.showControls && !this.pending) {
+      h.shade(L.x0, L.ctrlY + 22, kb ? L.x1 - L.x0 : 346, 98, 0.8);
+      if (kb) this.keyGuide(L.x0 + 10, L.ctrlY + 28);
+      else this.buttonGuide(L.x0 + 4, L.ctrlY + 26);
+    }
     // player list
     const lx = HUD_W - 320, ly = 70;
     h.box(lx, ly, 300, 40 + Math.min(8, others.length + 1) * 34 + (others.length > 7 ? 16 : 0), 0x101030, 0x3a3a5a, 3);
     h.text('PLAYERS', lx + 14, ly + 12, 16, YELLOW);
     const rows = [{ name: this.playerName || 'PLAYER', car: s.name, st: 'YOU', me: true, host: amHost },
-      ...others.map((p) => ({ name: p.name, car: ROSTER[p.car % ROSTER.length].name, st: p.status === 'race' ? 'RACING' : 'READY', me: false, host: p.id === host?.id }))];
+      ...others.map((p) => ({ name: p.name, car: ROSTER[p.car % ROSTER.length].name, st: p.status === 'race' ? 'RACING' : p.id === host?.id ? '' : p.ready ? 'READY' : 'NOT READY', me: false, host: p.id === host?.id }))];
+    if (!amHost) rows[0].st = net?.me.ready ? 'READY' : 'NOT READY';
     rows.slice(0, 8).forEach((r, i) => {
       const y = ly + 40 + i * 34;
       h.text(r.name, lx + 14, y, 16, r.me ? YELLOW : WHITE);
@@ -1960,7 +1984,10 @@ export class Game {
         h.text('HOST', lx + 212, y + 4, 8, ORANGE, 'center');
       }
       if (amHost && !r.me) h.chip(lx + 230, y + 15, 60, 15, 'REMOVE', RED, 8, 0x2a1014);
-      h.text(r.st, lx + 286, y + 4, 8, r.st === 'RACING' ? ORANGE : r.me ? YELLOW : 0x40e040, 'right');
+      if (r.st === 'READY') {
+        h.box(lx + 238, y + 1, 50, 14, 0x103a18, 0x40e040, 1);
+        h.text('READY', lx + 263, y + 4, 8, 0x40e040, 'center');
+      } else if (r.st) h.text(r.st, lx + 286, y + 4, 8, r.st === 'RACING' ? ORANGE : r.st === 'NOT READY' ? GREY : YELLOW, 'right');
       h.text(r.car, lx + 14, y + 19, 8, 0x8a8aa8);
     });
     if (rows.length > 8) h.text(`+${rows.length - 8} MORE`, lx + 14, ly + 40 + 8 * 34, 8, WHITE);
@@ -1978,6 +2005,7 @@ export class Game {
     }
     if (this.pending) {
       const n = Math.max(1, Math.ceil(this.pending.at - raceClock()));
+      h.shade(HUD_W / 2 - 270, 156, 540, 176, 0.85);
       h.text('STARTING IN', HUD_W / 2, 170, 24, CYAN, 'center');
       h.text(String(n), HUD_W / 2, 206, 64, YELLOW, 'center');
       const rt = this.routes[this.pending.go.route] ?? this.world.route;
@@ -1988,13 +2016,25 @@ export class Game {
     }
     if (others.some((p) => p.status === 'race')) h.text('RACE IN PROGRESS - JOIN THE NEXT ONE', HUD_W / 2, 395, 8, ORANGE, 'center');
     else if (!others.length) h.text('SHARE THIS PAGE LINK TO INVITE PLAYERS', HUD_W / 2, 395, 8, WHITE, 'center');
-    const ready = net?.status === 'online';
-    const canStart = ready && amHost;
-    h.box(HUD_W / 2 - 150, 410, 300, 50, canStart ? 0x1a8a3a : 0x202030, canStart && blink ? YELLOW : 0x5a5a7a);
-    if (ready && !amHost) {
-      h.text('WAITING FOR HOST', HUD_W / 2, 420, 16, 0x8a8aa8, 'center');
-      h.text(`${host?.name ?? 'THE HOST'} STARTS THE RACE`, HUD_W / 2, 442, 8, 0x8a8aa8, 'center');
-    } else h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, 427, 16, canStart ? WHITE : 0x8a8aa8, 'center');
+    const online = net?.status === 'online';
+    const canStart = online && amHost;
+    const lobbyOthers = others.filter((p) => p.status === 'lobby');
+    const nReady = lobbyOthers.filter((p) => p.ready).length;
+    if (online && !amHost) {
+      // not the host: a READY button, so the host knows they can start
+      const me = net!.me.ready;
+      h.box(HUD_W / 2 - 150, 410, 300, 50, me ? 0x1a8a3a : 0x1a5ab8, !me && blink ? YELLOW : me ? 0x40e040 : WHITE);
+      h.text(me ? "YOU'RE READY!" : this.touch ? "TAP WHEN YOU'RE READY" : "ENTER  I'M READY", HUD_W / 2, 418, 16, WHITE, 'center');
+      h.text(me ? `WAITING FOR ${host?.name ?? 'THE HOST'}  -  ${this.touch ? 'TAP' : 'ENTER'} TO UNDO` : `${host?.name ?? 'THE HOST'} STARTS THE RACE`, HUD_W / 2, 441, 8, me ? 0xc0ffc0 : 0xc0d0ff, 'center');
+    } else {
+      h.box(HUD_W / 2 - 150, 410, 300, 50, canStart ? 0x1a8a3a : 0x202030, canStart && blink ? YELLOW : 0x5a5a7a);
+      const tally = canStart && lobbyOthers.length;
+      h.text(this.touch ? 'TAP TO START' : 'ENTER  START', HUD_W / 2, tally ? 418 : 427, 16, canStart ? WHITE : 0x8a8aa8, 'center');
+      if (tally) {
+        const all = nReady === lobbyOthers.length;
+        h.text(all ? 'EVERYONE IS READY!' : `${nReady} OF ${lobbyOthers.length} READY`, HUD_W / 2, 441, 8, all ? YELLOW : 0xc0ffc0, 'center');
+      }
+    }
   }
 
   /** A race-setting row: label, then < value > chips (or one ON/OFF chip), then the key that changes it. */

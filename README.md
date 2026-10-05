@@ -93,9 +93,13 @@ Up to **8 players** race at once (the lobby can hold more; they wait for the nex
    If the host leaves, the next player in takes over. The host can also **REMOVE** a player from the
    lobby with the button on their row.
    On a computer, if you're in another window or app when someone joins, you get a desktop
-   notification (the browser asks once), the tab title flashes and a chime plays. The lobby shows the driving keys as keycaps, or on a
+   notification (the browser asks once), the tab title flashes and a chime plays. Your car sits in the middle of the lobby, with the
+   settings in a compact panel beside it. **SHOW CONTROLS** (H, or tap it) opens the driving keys as keycaps, or on a
    phone a picture of where each on-screen button is. The keys you need also show under the 3-2-1 countdown.
-3. **The host** presses START (everyone else sees WAITING FOR HOST). Everyone in the lobby (up to 8) gets a short countdown and lines up on
+3. Everyone else presses **I'M READY** (Enter, or tap it; press again to undo). The player list shows
+   READY / NOT READY for each player and the host's START button counts them (`1 OF 2 READY`,
+   `EVERYONE IS READY!`). Ready resets after each race.
+   **The host** presses START when they like; the host doesn't have to wait for everyone. Everyone in the lobby (up to 8) gets a short countdown and lines up on
    the same grid with the same traffic. Players who arrive while a race is running wait in the lobby
    for the next one.
 4. Name tags show who's who, POS shows your place, and the results fill in as people finish. After
