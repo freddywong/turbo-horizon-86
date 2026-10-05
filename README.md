@@ -43,7 +43,8 @@ fullscreen and lock to landscape where the browser allows it.
 
 Every race you get a set number of turbo boosts: 5 by default. Change it from 1 to 9 with T (or tap
 "TURBOS") on the car-select screen or in the online lobby. Online, the host (the first player in
-the lobby) sets it for everyone. Fire one with Shift, or the TURBO button on phones. Each boost
+the lobby) sets it for everyone. Turbos **stack**: fire another while one is burning and the boosts multiply (+18% top speed each,
+so three at once is +64% and five is +129%), each layer lasting its own 5 seconds. Fire one with Shift, or the TURBO button on phones. Each boost
 gives five seconds of extra acceleration and roughly 18% more top speed, with flames from the exhausts.
 Afterwards the car eases back to its normal top speed. The HUD lamps show how many you have left. In
 VS RIVALS every computer driver gets the same number and fires them on straights when they're fighting

@@ -190,6 +190,12 @@ export class Game {
   /** turbo boosts left this race, and time left on the active one */
   turbos = TURBO_DEFAULT;
   turboT = 0;
+  /** turbo layers firing at once (seconds left on each): they stack, multiplying the boost */
+  turboLayers: number[] = [];
+  /** speed multiplier from the turbos firing now: TURBO_SPEED per layer, compounded */
+  private get turboMul() {
+    return Math.pow(TURBO_SPEED, this.turboLayers.length);
+  }
   /** menu settings: boosts per race (1-9) and weapons on/off (VS RIVALS, online) */
   turboCount = Math.max(1, Math.min(9, loadNum('th86-turbos', TURBO_DEFAULT) || TURBO_DEFAULT));
   weaponsSetting = loadNum('th86-weapons', 1) === 1;
@@ -268,6 +274,7 @@ export class Game {
     this.px = demo ? this.world.laneX(1) : 0;
     this.speed = demo ? 50 : 0;
     this.turboT = 0;
+    this.turboLayers = [];
     this.steer = 0;
     this.driftYaw = 0;
     this.crashT = 0;
@@ -312,6 +319,7 @@ export class Game {
     this.raceTurbos = go ? go.turbos : this.turboCount;
     this.turbos = this.raceTurbos;
     this.turboT = 0;
+    this.turboLayers = [];
     this.weapons = go ? go.weapons : this.mode === 'rivals' && this.weaponsSetting;
     this.raceAmmo = go ? go.ammo : this.ammoCount;
     this.ammo = this.weapons ? this.raceAmmo : 0;
@@ -526,11 +534,14 @@ export class Game {
         break;
       }
       case 'race': {
-        if (inp.hit('ShiftLeft', 'ShiftRight') && this.turbos > 0 && this.turboT <= 0 && this.crashT <= 0) {
+        if (inp.hit('ShiftLeft', 'ShiftRight') && this.turbos > 0 && this.crashT <= 0) {
+          // turbos stack: firing one while another burns adds a layer on top
           this.turbos--;
-          this.turboT = TURBO_TIME;
+          this.turboLayers.push(TURBO_TIME);
+          this.turboT = Math.max(...this.turboLayers);
           this.audio.turbo();
-          this.flash('TURBO!', '', 1.0);
+          const n = this.turboLayers.length;
+          this.flash(n > 1 ? `TURBO x${n}!` : 'TURBO!', '', 1.0);
         }
         this.assists(dt);
         this.drive(dt, { accel: inp.accel || this.turboT > 0, brake: inp.brake, steer: inp.steer, drift: inp.drift }, false);
@@ -1128,9 +1139,9 @@ export class Game {
       const st = this.spec.stats;
       const boost = this.turboT > 0;
       const slip = this.slipT > 0 ? SLIP_SPEED : 0;
-      const vlim = this.vmax * (boost ? TURBO_SPEED : 1) * this.limp() * (1 + this.catchUp + slip);
+      const vlim = this.vmax * this.turboMul * this.limp() * (1 + this.catchUp + slip);
       const help = 1 + this.catchUp * 3 + (slip ? 0.4 : 0);
-      if (c.accel) this.speed += 30 * st.accel * (boost ? 1.9 : 1) * help * (1 - Math.pow(Math.min(1, v / vlim), 1.8)) * dt + 2 * dt;
+      if (c.accel) this.speed += 30 * st.accel * (boost ? 1 + 0.9 * this.turboLayers.length : 1) * help * (1 - Math.pow(Math.min(1, v / vlim), 1.8)) * dt + 2 * dt;
       else if (c.brake) this.speed -= 58 * dt;
       else this.speed -= (3 + v * 0.035) * dt;
 
@@ -1227,11 +1238,12 @@ export class Game {
       }
     }
     // after a boost the car bleeds back down to its normal top speed instead of snapping
-    const cap = this.vmax * (this.turboT > 0 ? TURBO_SPEED : 1);
+    const cap = this.vmax * this.turboMul;
     if (this.speed > cap) this.speed = Math.max(cap, this.speed - 14 * dt);
     this.speed = Math.max(0, this.speed);
-    if (this.turboT > 0) {
-      this.turboT = Math.max(0, this.turboT - dt);
+    if (this.turboLayers.length) {
+      this.turboLayers = this.turboLayers.map((t) => t - dt).filter((t) => t > 0);
+      this.turboT = this.turboLayers.length ? Math.max(...this.turboLayers) : 0;
       this.flameT = Math.max(this.flameT, 0.08);
       this.shakeKick = Math.max(this.shakeKick, 0.1);
     }
@@ -1553,6 +1565,7 @@ export class Game {
     this.hp = 0;
     this.wrecked = true;
     this.turboT = 0;
+    this.turboLayers = [];
     this.audio.crash(true);
     this.audio.pop();
     if (this.mode !== 'arcade') this.table = results(this.world.rivals, this.world.track, 'YOU', this.spec.name, Infinity, this.raceTime);
@@ -1612,7 +1625,7 @@ export class Game {
   private updateWorld(dt: number, pose: { steer: number; yaw: number; spin: number; bounce: number; brake?: boolean; flame?: number }) {
     const f = this.speed / VMAX;
     const cam = this.camera;
-    const fov = 54 + 14 * Math.min(1.3, f) * Math.min(1.3, f) + (this.turboT > 0 ? 6 : 0);
+    const fov = 54 + 14 * Math.min(1.3, f) * Math.min(1.3, f) + (this.turboT > 0 ? Math.min(30, 6 * this.turboLayers.length) : 0);
     if (Math.abs(cam.fov - fov) > 0.01) {
       // ease small changes (turbo), snap big ones (coming back from the car-select camera)
       cam.fov = Math.abs(fov - cam.fov) > 8 ? fov : cam.fov + (fov - cam.fov) * Math.min(1, dt * 5);
@@ -2222,6 +2235,7 @@ export class Game {
     // turbo stock: one lamp per boost left, and a draining bar while one is firing
     const tx = t ? 20 : 220, ty = t ? sy + 112 : HUD_H - 80;
     h.text('TURBO', tx, ty, 16, this.turboT > 0 && blink ? WHITE : ORANGE);
+    if (this.turboLayers.length > 1) h.text(`x${this.turboLayers.length}`, tx + 88, ty - 18, 16, blink ? YELLOW : RED, 'right');
     const tn = this.raceTurbos, ts = tn > 5 ? 13 : 20, tstep = ts + (tn > 5 ? 4 : 6);
     for (let i = 0; i < tn; i++) h.box(tx + 92 + i * tstep, ty - 2 + (20 - ts) / 2, ts, ts, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, tn > 5 ? 2 : 3);
     if (this.turboT > 0) h.rect(tx + 92, ty + 22, (this.turboT / TURBO_TIME) * (tn * tstep - 6), 5, YELLOW);
