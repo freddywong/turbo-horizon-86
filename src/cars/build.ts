@@ -5,7 +5,7 @@ import { CarSpec, Light, Station } from './spec';
 import { brakeGeoHD, buildBodyHD, wheelGeoHD } from './hd';
 import { carMaterials } from './mats';
 import { shadowGeo, shadowMaterial } from './shadow';
-import { ellipsoid, gunArm, helmet, torso } from './figure';
+import { driverColours, ellipsoid, gunArm, helmet, torso } from './figure';
 
 const GLASS = 0x18283c, GLASS_SIDE = 0x22364c, DARK = 0x141416, BLACK = 0x0a0a0c, CHROME = 0xc8ccd4;
 
@@ -558,17 +558,17 @@ export class PlayerCar {
     const rf = rfI >= 0 ? st[rfI] : ws;
     const z = rf.z + 0.15;
     const belt = at(st, z, 'belt'), w = at(st, z, 'w');
-    const suit = new THREE.Color(paint).lerp(new THREE.Color(0x202030), 0.55).getHex();
+    const dc = driverColours(paint), suit = dc.suit;
     for (const s of [-1, 1]) {
       const body = new GeoBuilder(tiled), arm = new GeoBuilder(tiled), fl = new GeoBuilder(tiled);
       // leaning out of the window: suited torso, neck, full-face helmet
-      torso(body, [s * 0.1, 0.16, 0.02], [0.2, 0.2, 0.14], suit, paint);
+      torso(body, [s * 0.1, 0.16, 0.02], [0.2, 0.2, 0.14], suit, dc.band);
       ellipsoid(body, [s * 0.16, 0.36, 0.0], [0.05, 0.06, 0.05], 0x1a1a1c, 6, 4);
-      helmet(body, [s * 0.2, 0.5, -0.01], 0.135, paint);
+      helmet(body, [s * 0.2, 0.5, -0.01], 0.135, dc.band, 12, 8, dc.shell);
       // the other arm braced on the door
       ellipsoid(body, [s * 0.02, 0.12, -0.2], [0.05, 0.05, 0.13], suit, 8, 5);
       ellipsoid(body, [s * 0.0, 0.08, -0.33], [0.045, 0.045, 0.045], 0x141416, 6, 4);
-      const muzzle = gunArm(arm, suit, paint);
+      const muzzle = gunArm(arm, suit, dc.band);
       // muzzle flash: a star of glowing blades and a hot core
       for (let k = 0; k < 4; k++) {
         const a = (k / 4) * Math.PI;

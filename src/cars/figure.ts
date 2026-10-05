@@ -24,14 +24,31 @@ export function ellipsoid(g: GeoBuilder, c: V3, r: V3, col: number | ColFn, seg 
   }
 }
 
-/** Full-face racing helmet: white shell, stripe in the car's colour, dark visor facing forward (-z). */
-export function helmet(g: GeoBuilder, c: V3, r: number, stripe: number, seg = 12, rings = 8) {
+/** How different two colours look (weighted RGB distance, 0-~765). */
+function colourGap(a: number, b: number): number {
+  const ca = new THREE.Color(a), cb = new THREE.Color(b);
+  return Math.hypot((ca.r - cb.r) * 2, (ca.g - cb.g) * 3, (ca.b - cb.b) * 1.5) * 100;
+}
+const pickFar = (paint: number, from: number[], not: number[] = []) =>
+  from.filter((c) => !not.includes(c)).reduce((best, c) => (colourGap(c, paint) > colourGap(best, paint) ? c : best));
+
+/** Driver colours chosen to stand out against the car's paint, so the gunner leaning out is easy to see. */
+export function driverColours(paint: number): { suit: number; band: number; shell: number } {
+  const suit = pickFar(paint, [0x1a3a9a, 0xf2f2ee, 0x1c1c22, 0xffcc10, 0x18a0b8, 0xff6410, 0x2a9a3a]);
+  const band = pickFar(suit, [0xffffff, 0xffcc10, 0xff3030, 0x20e0ff, 0x1c1c22]);
+  const shell = pickFar(paint, [0xffffff, 0xffd020, 0x30d8ff, 0xff4aa0, 0x40e040], [suit]);
+  return { suit, band, shell };
+}
+
+/** Full-face racing helmet: a shell (white unless given), centre stripe, dark visor facing forward (-z). */
+export function helmet(g: GeoBuilder, c: V3, r: number, stripe: number, seg = 12, rings = 8, shell = 0xffffff) {
+  const shellShade = new THREE.Color(shell).multiplyScalar(0.9).getHex();
   ellipsoid(g, c, [r * 0.92, r, r * 1.04], (nx, ny, nz) => {
     if (nz < -0.42 && ny > -0.3 && ny < 0.38) return ny > 0.2 ? 0x2a3e58 : 0x101a26; // visor with a sky glint on top
     if (nz < -0.5 && ny <= -0.3) return 0xd8d8d4; // chin bar
     if (Math.abs(nx) < 0.2 && ny > -0.1) return stripe; // centre stripe over the crown
     if (ny < -0.55) return 0x1a1a1c; // neck roll
-    return ny > 0.3 ? 0xffffff : 0xe6e6e2;
+    return ny > 0.3 ? shell : shellShade;
   }, seg, rings);
 }
 

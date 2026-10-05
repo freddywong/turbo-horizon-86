@@ -234,7 +234,7 @@ overtaking, and the time bonus at the goal.
 * **Catch-up:** more than 150 m behind the leading car, your top speed and acceleration go up,
   rising to +6% at 400 m behind. A CATCH-UP badge under your position shows how much.
 * **Checkpoint bonus:** cross a checkpoint in the back half of the field and you get a free turbo
-  (and a rocket when weapons are on).
+  (and a rocket when weapons are on, up to the maximum of 5).
 
 Turning scrubs off speed, as in other racers: the harder you steer and the faster you go, the more you lose
 (cars with more GRIP lose less). Take bends with a light touch, or drift through them.

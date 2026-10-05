@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GeoBuilder, V3 } from '../geom';
 import { CARTEX, RIM_TILE, RimStyle } from '../textures';
 import { CarSpec, Light, Seg, Station } from './spec';
-import { ellipsoid, helmet, torso } from './figure';
+import { driverColours, ellipsoid, helmet, torso } from './figure';
 
 /**
  * '92 car builder: the spec's few cross-sections are resampled along smooth
@@ -16,7 +16,6 @@ const GLASS = 0x34506c, GLASS_SIDE = 0x3c5874, DARK = 0x161618, BLACK = 0x0a0a0c
 const MESH_COL = 0x5a5a60;
 
 const scale = (c: number, k: number) => new THREE.Color(c).multiplyScalar(k).getHex();
-const mix = (a: number, b: number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
 
 type Key = 'w' | 'yb' | 'belt' | 'top' | 'wt';
 type P2 = [number, number];
@@ -703,7 +702,8 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
     const seats: { x: number; z: number; driver: boolean }[] = drive === 'C'
       ? [{ x: 0, z: zh - 0.12, driver: true }, { x: -0.44, z: zh + 0.12, driver: false }, { x: 0.44, z: zh + 0.12, driver: false }]
       : [{ x: dx, z: zh, driver: true }, { x: -dx, z: zh, driver: false }];
-    const suit = traffic ? 0x4a4a52 : mix(paint, 0x202030, 0.55);
+    const dc = driverColours(paint);
+    const suit = traffic ? 0x4a4a52 : dc.suit;
     const wheelZ = zh - (traffic ? 0.5 : 0.48), wheelY = headY - 0.24;
     // dashboard
     const dashZ = Math.max(wsSt.z + 0.3, wheelZ - 0.22);
@@ -727,9 +727,9 @@ export function buildBodyHD(spec: CarSpec, paint: number, traffic = false): CarG
       });
       if (seat.driver) {
         // driver: helmet with a paint-colour stripe, shoulders, arms to the wheel
-        helmet(cabin, [sx, headY, sz], 0.125, paint);
+        helmet(cabin, [sx, headY, sz], 0.125, dc.band, 12, 8, dc.shell);
         ellipsoid(cabin, [sx, headY - 0.16, sz + 0.02], [0.05, 0.06, 0.05], 0x1a1a1c, 6, 4);
-        torso(cabin, [sx, headY - 0.33, sz + 0.04], [0.21, 0.17, 0.12], suit, paint);
+        torso(cabin, [sx, headY - 0.33, sz + 0.04], [0.21, 0.17, 0.12], suit, dc.band);
         for (const s of [-1, 1]) {
           limb(cabin, [sx + s * 0.18, headY - 0.26, sz + 0.02], [sx + s * 0.16, wheelY - 0.02, wheelZ + 0.05], 0.075, suit);
           ball(cabin, [sx + s * 0.16, wheelY - 0.02, wheelZ + 0.04], 0.04, 0x1a1a1a, 5, 3);

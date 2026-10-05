@@ -546,11 +546,12 @@ export class Game {
           if (this.mode !== 'arcade' && field > 1 && place > Math.ceil(field / 2)) {
             // back half of the field: a free turbo (and a rocket when weapons are on)
             this.turbos++;
-            if (this.weapons) {
+            const gotRocket = this.weapons && this.rockets < ROCKETS_MAX; // never more than 5 rockets
+            if (gotRocket) {
               this.rockets++;
               this.raceRockets = Math.max(this.raceRockets, this.rockets);
             }
-            this.flash('CHECKPOINT!', this.weapons ? 'BONUS TURBO + ROCKET' : 'BONUS TURBO', 2.5);
+            this.flash('CHECKPOINT!', gotRocket ? 'BONUS TURBO + ROCKET' : 'BONUS TURBO', 2.5);
           } else this.flash('CHECKPOINT!', 'EXTENDED PLAY', 2.5);
           this.audio.jingle();
         }
