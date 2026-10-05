@@ -34,8 +34,13 @@ export const ROCKET_WIDTH = 1.5; // half-width of its path: no auto-aim, it only
 export const ROCKET_DAMAGE = 40;
 
 // ---- player vs player (online, and the ?test=pvp mode) --------------------------
-/** Damage per round between players. No per-shooter cap: one player can wreck another. */
+/** Damage per round between players (no per-shooter cap: one player can wreck another)... */
 export const PVP_PER_HIT = 1;
+/** ...and in bigger races, from PVP_CROWD players up, so a crowd can't shred someone in seconds. */
+export const PVP_PER_HIT_CROWD = 0.5;
+export const PVP_CROWD = 4;
+/** Damage per round a computer driver's gun does to you in VS RIVALS. */
+export const AI_PER_HIT = 0.5;
 /** Damage per rocket between players. */
 export const PVP_ROCKET_DAMAGE = 10;
 

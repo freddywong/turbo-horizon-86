@@ -64,7 +64,8 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
-* **Online, between players:** each round that hits takes **1%** of the damage bar and each rocket
+* **Online, between players:** each round that hits takes **1%** of the damage bar (**0.5%** in races with 4 or
+  more players) and each rocket
   **10%**. There's no limit on how much one player can do, so someone who keeps you in their sights
   can wreck you.
 * **VS RIVALS, against the computer cars:** your rounds take **7.5%** of their bar (3 times a base
@@ -72,7 +73,7 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   you're hitting shows how it's holding up. Shot-up cars smoke, lose a tail lamp and limp. At zero
   they're **wrecked**: they roll to a stop in black smoke and drop out of the race (DNF), and you get
   50,000 points. The computer drivers shoot back in short bursts when you're in front of them
-  (2.5% a round), but **all of them together can take at most 20% of your bar**. They don't have
+  (0.5% a round), but **all of them together can take at most 20% of your bar**. They don't have
   bazookas.
 * Online, the shooter's game decides what hits and tells the victim's game, which applies the damage
   (and the cap). Everyone sees everyone's gunfire and rockets.
@@ -81,6 +82,8 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
 
 Race real people from the link **https://freddywong.github.io/turbo-horizon-86/#join**. It works on
 phones and computers, with no account and no sign-in.
+
+Up to **8 players** race at once (the lobby can hold more; they wait for the next race).
 
 1. Open the link and type your name. You go straight into the **online lobby**.
 2. While you wait, pick your car and colour (← → / ↑ ↓, or tap the ◀ ▶ arrows and the colour swatches).
