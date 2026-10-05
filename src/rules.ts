@@ -27,7 +27,7 @@ export const VS_AI_DAMAGE = 3;
 /** All the computer drivers' gunfire together can take at most this much of your bar. */
 export const AI_GUN_CAP = 40;
 // ---- bazooka ----------------------------------------------------------------
-export const ROCKETS_DEFAULT = 5; // rockets per race unless changed in the menu
+export const ROCKETS_DEFAULT = 3; // rockets per race unless changed in the menu
 export const ROCKETS_MAX = 5;
 export const ROCKET_SPEED = 70; // m/s on top of the shooter's own speed
 export const ROCKET_RANGE = 900; // metres before it burns out

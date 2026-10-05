@@ -61,7 +61,7 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   get out of someone's sights.
 * **Ammo: 30 to 500 rounds per race**, set with B (or tap AMMO). The default is 200 in VS RIVALS
   and 100 online (online has its own setting; the host's applies).
-* **Bazooka: 5 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
+* **Bazooka: 3 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
