@@ -2210,9 +2210,6 @@ export class Game {
     const tl = Math.ceil(this.timeLeft);
     const low = this.timeLeft < 10 && this.state === 'race';
     if (!low || blink) h.text(String(tl).padStart(2, '0'), HUD_W / 2, 34, 48, low ? RED : ORANGE, 'center');
-    h.text(`STAGE ${Math.min(this.stage + 1, route.stageNames.length)}`, HUD_W - 20, 16, 16, YELLOW, 'right');
-    const km = Math.max(0, (this.pos - 3 * SEG) / 1000);
-    h.text(`${km.toFixed(1)}KM`, HUD_W - 20, 38, 16, WHITE, 'right');
     if (this.mode !== 'arcade' && this.world.rivals.length && this.state === 'race') {
       // live race position, in the gap under the timer
       // on phones the course bar sits under the timer, so the position goes under the speed gauge
@@ -2314,7 +2311,7 @@ export class Game {
     }
 
     // course progress bar
-    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 20, y = t ? 118 : 90;
+    const x0 = t ? HUD_W / 2 - 120 : HUD_W - 250, x1 = t ? HUD_W / 2 + 120 : HUD_W - 20, y = t ? 118 : 44;
     h.text('COURSE', x0, y - 26, 16, YELLOW);
     h.rect(x0, y, x1 - x0, 8, 0x202040);
     const goal = this.world.track.goalDist;
@@ -2323,6 +2320,7 @@ export class Game {
     const p = Math.min(1, this.pos / goal);
     h.rect(x0, y, p * (x1 - x0), 8, PINK);
     h.rect(x0 + p * (x1 - x0) - 4, y - 6, 8, 20, YELLOW);
-    h.text(route.stageNames[Math.min(this.stage, route.stageNames.length - 1)], x1, y + 14, 8, WHITE, 'right');
+    const si = Math.min(this.stage, route.stageNames.length - 1);
+    h.text(`STAGE ${si + 1}  ${route.stageNames[si]}`, x1, y + 14, 8, WHITE, 'right');
   }
 }
