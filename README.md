@@ -59,14 +59,13 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   in it, a racer or traffic, up to 90 m ahead. While you fire, a crosshair shows where the rounds
   go: white down an empty lane, red on the car in your line. Line up behind someone to hit them; change lanes to
   get out of someone's sights.
-* **Ammo: 100 to 500 rounds per race**, set with B (or tap AMMO). The default is 200 in VS RIVALS
-  and 100 online (online has its own setting; the host's applies).
+* **Ammo: 30 to 500 rounds per race**, set with B (or tap AMMO). The default is 200 in VS RIVALS
+  and 30 online (online has its own setting; the host's applies).
 * **Bazooka: 3 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
-* **Online, between players:** each round that hits takes **2%** of the damage bar with 2-3 players, **1%** with
-  4-5 and **0.5%** with 6-8 and each rocket
+* **Online, between players:** each round that hits takes **2%** of the damage bar and each rocket
   **10%**. There's no limit on how much one player can do, so someone who keeps you in their sights
   can wreck you.
 * **VS RIVALS, against the computer cars:** your rounds take **7.5%** of their bar (3 times a base

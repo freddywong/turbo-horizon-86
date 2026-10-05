@@ -15,10 +15,10 @@ export const SLIP_TIME = 2.5;
 export const SLIP_SPEED = 0.08;
 
 // ---- weapons ----------------------------------------------------------------
-export const AMMO_STEPS = [100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
+export const AMMO_STEPS = [30, 50, 100, 150, 200, 300, 400, 500]; // menu choices, rounds per race
 export const AMMO_DEFAULT = 200;
 /** Online races have their own ammo setting, with a smaller default. */
-export const AMMO_DEFAULT_ONLINE = 100;
+export const AMMO_DEFAULT_ONLINE = 30;
 export const FIRE_RATE = 5; // rounds per second while FIRE is held
 /** Most one shooter's gunfire can take off a car: three quarters of the damage bar. */
 export const GUN_CAP = 75;
@@ -36,13 +36,8 @@ export const ROCKET_WIDTH = 1.5; // half-width of its path: no auto-aim, it only
 export const ROCKET_DAMAGE = 40;
 
 // ---- player vs player (online, and the ?test=pvp mode) --------------------------
-/**
- * Damage per round between players, by how many cars are in the race: more shooters, less each,
- * so a crowd can't shred someone in seconds. No per-shooter cap: one player can wreck another.
- */
-export function pvpPerHit(players: number): number {
-  return players <= 3 ? 2 : players <= 5 ? 1 : 0.5;
-}
+/** Damage per round between players, whatever the size of the race. No per-shooter cap. */
+export const PVP_PER_HIT = 2;
 /** Damage per round a computer driver's gun does to you in VS RIVALS. */
 export const AI_PER_HIT = 0.5;
 /** Damage per rocket between players. */
