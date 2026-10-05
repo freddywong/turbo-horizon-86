@@ -65,7 +65,7 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
 * **Online, between players:** each round that hits takes **0.5%** of the damage bar and each rocket
-  **20%**. There's no limit on how much one player can do, so someone who keeps you in their sights
+  **10%**. There's no limit on how much one player can do, so someone who keeps you in their sights
   can wreck you.
 * **VS RIVALS, against the computer cars:** your rounds take **7.5%** of their bar (3 times a base
   2.5%, about 3 seconds of fire to wreck one) and a rocket wrecks them outright. A bar over the car

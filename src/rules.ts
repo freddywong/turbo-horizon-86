@@ -27,7 +27,7 @@ export const ROCKET_DAMAGE = 40;
 /** Damage per round between players. No per-shooter cap: one player can wreck another. */
 export const PVP_PER_HIT = 0.5;
 /** Damage per rocket between players. */
-export const PVP_ROCKET_DAMAGE = 20;
+export const PVP_ROCKET_DAMAGE = 10;
 
 /** Damage per round that hits (30 hits reach the cap; more ammo doesn't make a shooter stronger, it just lasts longer). */
 export const PER_HIT = 2.5;
