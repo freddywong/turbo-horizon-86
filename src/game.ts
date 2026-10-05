@@ -2242,19 +2242,21 @@ export class Game {
 
     // speed + tach
     const kmh = Math.round(this.speed * KMH);
-    // on phones the thumbs cover the bottom corners, so the gauges move up
+    // on phones the thumbs cover the bottom corners, so the gauges move up; on a computer they sit
+    // together in the bottom-left corner (turbo, speed, revs), leaving the middle clear for the car
     const t = this.touch;
-    const sy = t ? 70 : HUD_H - 92;
+    const sy = t ? 70 : HUD_H - 100;
     h.text('SPEED', 20, sy, 16, YELLOW);
-    h.text(String(kmh).padStart(3, ' '), 20, sy + 26, 32, WHITE);
-    h.text('KM/H', 130, sy + 42, 16, CYAN);
+    h.text(String(kmh).padStart(3, ' '), 20, sy + 22, 32, WHITE);
+    h.text('KM/H', 130, sy + 38, 16, CYAN);
     if (t) h.tach(20, sy + 100, this.speed / this.vmax);
-    else h.tach(220, HUD_H - 24, this.speed / this.vmax);
+    else h.tach(20, HUD_H - 10, this.speed / this.vmax, 9);
     // turbo stock: one lamp per boost left, and a draining bar while one is firing
-    const tx = t ? 20 : 220, ty = t ? sy + 112 : HUD_H - 80;
+    const tx = 20, ty = t ? sy + 112 : sy - 40;
     h.text('TURBO', tx, ty, 16, this.turboT > 0 && blink ? WHITE : ORANGE);
-    if (this.turboLayers.length > 1) h.text(`x${this.turboLayers.length}`, tx + 88, ty - 18, 16, blink ? YELLOW : RED, 'right');
     const tn = this.raceTurbos, ts = tn > 5 ? 13 : 20, tstep = ts + (tn > 5 ? 4 : 6);
+    // stacked turbos: x2, x3... after the lamps
+    if (this.turboLayers.length > 1) h.text(`x${this.turboLayers.length}`, tx + 96 + tn * tstep, ty, 16, blink ? YELLOW : RED);
     for (let i = 0; i < tn; i++) h.box(tx + 92 + i * tstep, ty - 2 + (20 - ts) / 2, ts, ts, i < this.turbos ? ORANGE : 0x202030, i < this.turbos ? YELLOW : 0x404058, tn > 5 ? 2 : 3);
     if (this.turboT > 0) h.rect(tx + 92, ty + 22, (this.turboT / TURBO_TIME) * (tn * tstep - 6), 5, YELLOW);
     if (this.weapons) {

@@ -398,13 +398,14 @@ export class Hud {
     g.restore();
   }
 
-  tach(x: number, y: number, frac: number) {
+  /** Rev bars rising left to right; `step` is the width of each bar plus its gap. */
+  tach(x: number, y: number, frac: number, step = 12) {
     const n = 24;
     const lit = Math.round(frac * n);
     for (let i = 0; i < n; i++) {
       const c = i < 13 ? GREEN : i < 20 ? YELLOW : RED;
       const h = 8 + Math.floor(i * 0.9);
-      this.rect(x + i * 12, y - h, 10, h, i < lit ? c : 0x203020);
+      this.rect(x + i * step, y - h, step - 2, h, i < lit ? c : 0x203020);
     }
   }
 }
