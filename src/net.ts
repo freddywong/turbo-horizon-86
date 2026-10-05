@@ -100,8 +100,8 @@ const TURN_SECRET = 'openrelayprojectsecret';
  * Our own TURN relay account (metered.ca free plan): fresh credentials are fetched from it each time
  * someone goes online. The key is meant to sit in client code; leave either value empty to skip it.
  */
-const METERED_APP = '';
-const METERED_KEY = '';
+const METERED_APP = 'turbo-horizon';
+const METERED_KEY = 'f5f40d32a05e4a316475df2cc0979d044f8b';
 /** true once our own relay account handed out credentials */
 let relayReady = false;
 async function meteredServers(): Promise<RTCIceServer[]> {
