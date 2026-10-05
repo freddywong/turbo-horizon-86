@@ -14,7 +14,7 @@ const spec = (id: string, name: string, stations: Station[], lights: Light[], pl
   return {
     id, name, make: '', year: 0, group: 'TRAFFIC', paints: [0xffffff], stations, lights,
     wheels: { r, fz: stations[0].z + L * 0.2, rz: stations[0].z + L * 0.8, fx: w - 0.06, rx: w - 0.06, rim: 0x9a9a9a, spokes: 4 },
-    exhaust: [], plateY, stats: { vmax: 0, accel: 0, grip: 0 },
+    exhaust: [], plateY, stats: { vmax: 0, accel: 0, grip: 0, hp: 100 },
   };
 };
 

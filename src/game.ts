@@ -22,7 +22,7 @@ const CARD_X = 39, CARD_Y = 52, CARD_STEP_X = 262, CARD_STEP_Y = 106;
 /** Route select: mode tabs and the GO button under the course map. */
 const MODE_X = 39, MODE_STEP = 262, MODE_W = 250, MODE_Y = 330, MODE_H = 46, GO_Y = 396;
 /** Online lobby left panel: positions shared by the drawing and the tap zones. */
-const LOBBY = { x0: 16, x1: 330, mid: 173, carY: 64, carH: 44, paintY: 112, turbY: 132, weapY: 154, ammoY: 176, rockY: 198, chipH: 20, minusX: 170, plusX: 262, ctrlY: 278 }; // ctrlY: the controls guide under the host's panel
+const LOBBY = { x0: 16, x1: 330, mid: 173, carY: 64, carH: 44, paintY: 112, turbY: 132, weapY: 154, ammoY: 176, rockY: 198, chipH: 20, minusX: 170, plusX: 262, ctrlY: 289 }; // ctrlY: the controls guide under the host's panel
 const GREY = 0x8a8aa8;
 /** Car select: side arrows, the two bottom panels and the RACE button. */
 const CSEL = { arrowX: 14, arrowY: 170, arrowW: 46, arrowH: 84, lx: 20, py: 274, ph: 124, paintY: 284, swX: 106, turbY: 308, weapY: 330, ammoY: 352, rockY: 374, minusX: 146, plusX: 234, goY: 410 };
@@ -245,6 +245,11 @@ export class Game {
   get vmax(): number {
     return this.spec.stats.vmax / KMH;
   }
+  /** How much of each hit the player's car feels: tough cars (high HP) take less. */
+  private get frail() {
+    return 100 / this.spec.stats.hp;
+  }
+
   private applyCar(spec = this.spec, paint = spec.paints[this.paintIdx % spec.paints.length]) {
     this.audio.setEngine(spec.engine);
     this.world.setPlayerCar(spec, paint);
@@ -1035,7 +1040,7 @@ export class Game {
   private takeRocketHit(from: string) {
     if (this.state !== 'race' || this.wrecked) return;
     const taken = this.gunFrom.get(from) ?? 0;
-    const dmg = PVP_ROCKET_DAMAGE;
+    const dmg = PVP_ROCKET_DAMAGE * this.frail;
     this.speed *= 0.55;
     this.shakeKick = Math.max(this.shakeKick, 0.7);
     this.hitFlash = 0.5;
@@ -1048,7 +1053,7 @@ export class Game {
       this.testNote(`${who} > YOU ROCKET ${Math.max(0, dmg).toFixed(1)}${dmg <= 0 ? ' (CAPPED)' : ''}`, ORANGE);
     }
     if (dmg <= 0) return;
-    this.gunFrom.set(from, taken + dmg);
+    this.gunFrom.set(from, taken + PVP_ROCKET_DAMAGE);
     this.hp = Math.max(0, this.hp - dmg);
     this.afterDamage(dmg);
   }
@@ -1188,8 +1193,8 @@ export class Game {
           this.shakeKick = 0.25;
           if (Math.random() < dt * 12) this.audio.scrape();
           if (!demo && this.state === 'race') {
-            this.hp -= 3 * dt;
-            if (this.testPvp) this.testScrape += 3 * dt;
+            this.hp -= 3 * dt * this.frail;
+            if (this.testPvp) this.testScrape += 3 * dt * this.frail;
             this.scrapeDmg += dt;
             if (this.scrapeDmg > 0.6) {
               this.scrapeDmg = 0;
@@ -1320,6 +1325,7 @@ export class Game {
   /** Takes condition off the car and dents the model where it was hit. */
   private damage(amount: number, severity: number, where: 'front' | 'rear' | 'left' | 'right') {
     if (this.state !== 'race' || this.wrecked) return;
+    amount *= this.frail;
     if (this.testPvp) this.testNote(`CRASH ${where.toUpperCase()} ${amount.toFixed(1)}`, CYAN);
     this.hp = Math.max(0, this.hp - amount);
     this.dmgCool = 0.5;
@@ -1346,13 +1352,14 @@ export class Game {
       for (const [k, v] of this.gunFrom) if (k.startsWith('ai:')) ai += v;
       dmg = Math.min(dmg, AI_GUN_CAP - ai);
     }
+    dmg *= this.frail; // tough cars feel less of it (the caps above scale with it)
     if (this.testPvp && from.startsWith('p:')) {
       const who = from.slice(2);
       this.testTaken.set(who, (this.testTaken.get(who) ?? 0) + Math.max(0, dmg));
       this.testNote(`${who} > YOU GUN ${Math.max(0, dmg).toFixed(1)}${dmg <= 0 ? ' (CAPPED)' : ''}`, dmg <= 0 ? GREY : RED);
     }
     if (dmg <= 0) return;
-    this.gunFrom.set(from, taken + dmg);
+    this.gunFrom.set(from, taken + dmg / this.frail);
     this.hp = Math.max(0, this.hp - dmg);
     const wh = ['left', 'right', 'rear'] as const;
     this.world.car.hit(0.1, wh[Math.floor(Math.random() * 3)]);
@@ -1380,6 +1387,8 @@ export class Game {
       this.testNote(`YOU > ${r.name} ${rocket ? 'ROCKET' : 'GUN'} ${dmg.toFixed(1)}${dmg === 0 ? ' (CAPPED)' : ''}`, dmg === 0 ? GREY : YELLOW);
       if (dmg <= 0) return;
     }
+    // tough cars take less (but a rocket still finishes a computer car)
+    if (!(rocket && !this.testPvp)) dmg *= 100 / r.spec.stats.hp;
     const before = r.hp;
     r.hp = Math.max(0, r.hp - dmg);
     r.gunTaken += dmg;
@@ -1765,6 +1774,7 @@ export class Game {
           ['SPEED', (s.stats.vmax - 230) / 120, RED, `${s.stats.vmax}KM/H`],
           ['ACCEL', (s.stats.accel - 0.85) / 0.35, ORANGE, ''],
           ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN, ''],
+          ['HP', (s.stats.hp - 70) / 60, CYAN, String(s.stats.hp)],
         ];
         bars.forEach(([label, v, c, note], i) => {
           const y = C.py + 26 + i * 22;
@@ -1895,8 +1905,8 @@ export class Game {
     // your car and stats on a compact panel (plus the race settings for the host), the driving controls under it
     const L = LOBBY, kb = !this.touch;
     const host = net?.status === 'online' ? net.host() : null, amHost = !host || host.id === net?.selfId;
-    const statsY = amHost ? 237 : 140, ctrlY = amHost ? L.ctrlY : 186;
-    h.shade(L.x0, 60, L.x1 - L.x0, statsY + 35 - 60);
+    const statsY = amHost ? 237 : 140, ctrlY = amHost ? L.ctrlY : 197;
+    h.shade(L.x0, 60, L.x1 - L.x0, statsY + 46 - 60);
     // car: arrows either side of the name, paint swatches under it
     h.chip(L.x0 + 6, L.carY + 4, 30, L.carH - 8, '←', YELLOW);
     h.chip(L.x1 - 36, L.carY + 4, 30, L.carH - 8, '→', YELLOW);
@@ -1930,7 +1940,7 @@ export class Game {
     }
     // the car's stats, as on the car-select screen
     const bars: [string, number, number][] = [
-      ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.35, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN],
+      ['SPEED', (s.stats.vmax - 230) / 120, RED], ['ACCEL', (s.stats.accel - 0.85) / 0.35, ORANGE], ['GRIP', (s.stats.grip - 0.82) / 0.38, GREEN], ['HP', (s.stats.hp - 70) / 60, CYAN],
     ];
     bars.forEach(([label, v, c], i) => {
       const y = statsY + i * 11;
@@ -1939,6 +1949,7 @@ export class Game {
       for (let k = 0; k < 12; k++) h.rect(L.x0 + 66 + k * 11, y, 9, 8, k < lit ? c : 0x202040);
     });
     h.text(`${s.stats.vmax} KM/H`, L.x1 - 10, statsY + 1, 8, WHITE, 'right');
+    h.text(`${s.stats.hp} HP`, L.x1 - 10, statsY + 34, 8, WHITE, 'right');
     // the driving controls (hidden under the countdown)
     if (!this.pending) {
       h.shade(L.x0, ctrlY, kb ? L.x1 - L.x0 : 346, 98, 0.8);

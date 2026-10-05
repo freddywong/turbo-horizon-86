@@ -201,7 +201,26 @@ acceleration and grip, plus three paint colours.
 
 The speeds follow the real cars' order (the McLaren F1 is fastest, the Ferrari exotics next, the
 Japanese cars after them and the muscle cars slowest), with the gaps squeezed so every car can win.
-The muscle cars have big torque: they launch hard but top out lowest. Real vs. game top speeds:
+The muscle cars have big torque: they launch hard but top out lowest.
+
+**HP** is how much punishment a car takes. Damage from bullets, rockets, crashes and wall scrapes is
+scaled by 100 / HP, so the Charger (130 HP) takes about 77% of normal damage and the McLaren F1 (80 HP)
+125%. It follows what the real cars were built from: the heavy steel muscle cars are toughest, the
+carbon and kevlar F1 and F40 the most fragile. The same applies to the computer cars you shoot (a
+rocket still wrecks one outright).
+
+| HP | Cars |
+|---|---|
+| 130 | Charger R/T |
+| 125 | Boss 429, 'Cuda 440, Trans Am |
+| 115 | Camaro Z/28, Supra RZ |
+| 110 | Skyline R32, Diablo |
+| 105 | Corvette (fibreglass body), Testarossa, 959 |
+| 100 | Countach QV |
+| 95 | NSX, F355 |
+| 90 | RX-7 |
+| 85 | F40 |
+| 80 | McLaren F1 | Real vs. game top speeds:
 
 | Car | Real (approx.) | Game |
 |---|---|---|

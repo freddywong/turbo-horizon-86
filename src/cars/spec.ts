@@ -75,7 +75,8 @@ export interface CarSpec {
   arch?: number;
   drive?: 'L' | 'R' | 'C';
   trim?: number;
-  stats: { vmax: number; accel: number; grip: number }; // vmax km/h; others ~1.0
+  /** vmax km/h; accel, grip ~1.0; hp = toughness, 100 = normal (damage taken is scaled by 100 / hp) */
+  stats: { vmax: number; accel: number; grip: number; hp: number };
   /** the engine, for its sound (see ENGINES in audio.ts) */
   engine?: EngineType;
 }
