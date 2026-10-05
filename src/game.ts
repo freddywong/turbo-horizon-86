@@ -236,6 +236,8 @@ export class Game {
   private table: ResultRow[] = [];
   private musicToast = 0;
   private msgPrio = 0;
+  /** pause menu: RESTART was pressed once; a second press before this time restarts */
+  private restartArm = 0;
   private msgQueue: { a: string; b: string; dur: number; prio: number; at: number }[] = [];
   carIdx = loadCar()[0];
   paintIdx = loadCar()[1];
@@ -287,6 +289,8 @@ export class Game {
     this.steer = 0;
     this.driftYaw = 0;
     this.crashT = 0;
+    this.crashYaw = 0; // restarting mid-spin used to leave the car facing sideways
+    this.bounce = 0;
     this.stage = 0;
     this.wrecked = false;
     this.world.resetTraffic(this.pos);
@@ -342,6 +346,7 @@ export class Game {
 
   startRace() {
     this.paused = false;
+    this.restartArm = 0;
     this.resetPlayer(false);
     this.hp = 100;
     this.wrecked = false;
@@ -386,7 +391,8 @@ export class Game {
     this.timeLeft = this.world.route.startTime;
     this.score = 0;
     this.lastBeep = -1;
-    this.msg = '';
+    this.msg = this.msg2 = '';
+    this.msgUntil = this.msgPrio = 0;
     this.msgQueue = [];
     this.go('countdown');
     this.audio.music(this.trackId());
@@ -403,14 +409,21 @@ export class Game {
     if (!this.paused && inp.hit('KeyN') && ['carselect', 'countdown', 'race'].includes(this.state)) this.nextTrack();
 
     if (this.paused) {
-      let act = inp.hit('Escape') ? 'resume' : inp.hit('KeyR') ? 'restart' : inp.hit('KeyQ') ? 'quit' : '';
+      let act = inp.hit('Escape') ? 'resume' : inp.hit('Backspace') ? 'restart' : inp.hit('KeyQ') ? 'quit' : '';
       for (const tp of inp.taps) {
         if (tp.y > 222 && tp.y < 254) act = 'resume';
         else if (tp.y >= 254 && tp.y < 280) act = 'restart';
         else if (tp.y >= 280 && tp.y < 310) act = 'quit';
       }
       if (act === 'resume') this.paused = false;
-      else if (act === 'restart' && this.mode !== 'online') this.startRace();
+      else if (act === 'restart' && this.mode !== 'online') {
+        // restarting throws the race away, so it takes a second press to confirm
+        if (this.clock < this.restartArm) this.startRace();
+        else {
+          this.restartArm = this.clock + 2;
+          this.audio.blip();
+        }
+      }
       else if (act === 'quit') { this.paused = false; if (this.mode === 'online') this.toLobby(); else this.toSelect(); }
       this.audio.engine(false, 0, 0);
       this.audio.skid(0);
@@ -562,7 +575,6 @@ export class Game {
           this.flash('GO!', '', 1.0, 3);
         }
         if (inp.hit('Escape')) this.paused = true;
-        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
       case 'race': {
@@ -618,7 +630,6 @@ export class Game {
           this.saveScore();
         }
         if (inp.hit('Escape')) this.paused = true;
-        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
       case 'goal': {
@@ -633,13 +644,11 @@ export class Game {
           if (this.bonusLeft <= 0) this.saveScore();
         }
         if (this.t > 3 && this.bonusLeft <= 0 && (inp.confirm || inp.taps.length || this.t > 14)) this.afterRace();
-        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
       case 'over': {
         this.drive(dt, { accel: false, brake: this.t > 1, steer: 0, drift: false }, false);
         if (this.t > 2.5 && (inp.confirm || inp.taps.length || this.t > 12)) this.afterRace();
-        if (inp.hit('KeyR') && this.mode !== 'online') this.startRace();
         break;
       }
     }
@@ -1570,7 +1579,7 @@ export class Game {
   private rocketsTick(dt: number) {
     const w = this.world, inp = this.input;
     this.rocketMsgT = Math.max(0, this.rocketMsgT - dt);
-    if (this.weapons && this.state === 'race' && !this.wrecked && this.crashT <= 0 && inp.hit('KeyE')) {
+    if (this.weapons && this.state === 'race' && !this.wrecked && this.crashT <= 0 && inp.hit('KeyR', 'KeyE')) {
       if (this.rockets > 0) {
         this.rockets--;
         const v = Math.max(this.speed, 15) + ROCKET_SPEED;
@@ -1901,7 +1910,9 @@ export class Game {
           h.box(HUD_W / 2 - 220, 150, 440, 170, 0x101030, WHITE);
           h.text('PAUSE', HUD_W / 2, 180, 32, YELLOW, 'center');
           h.text(this.touch ? 'RESUME' : 'ESC  RESUME', HUD_W / 2, 230, 16, WHITE, 'center');
-          h.text(this.touch ? 'RESTART' : 'R  RESTART', HUD_W / 2, 260, 16, WHITE, 'center');
+          if (this.mode === 'online') h.text('RESTART (NOT ONLINE)', HUD_W / 2, 260, 16, GREY, 'center');
+          else if (this.clock < this.restartArm) h.text(this.touch ? 'TAP AGAIN TO RESTART' : 'BACKSPACE AGAIN TO RESTART', HUD_W / 2, 260, 16, blink ? RED : WHITE, 'center');
+          else h.text(this.touch ? 'RESTART' : 'BACKSPACE  RESTART', HUD_W / 2, 260, 16, WHITE, 'center');
           h.text(this.touch ? 'QUIT' : 'Q  QUIT', HUD_W / 2, 290, 16, WHITE, 'center');
         }
       }
@@ -2078,7 +2089,7 @@ export class Game {
       [[['↑'], 'GAS', GREEN], [['SPACE'], 'DRIFT', CYAN]],
       [[['↓'], 'BRAKE', RED], [['SHIFT'], 'TURBO', ORANGE]],
       [[['←', '→'], 'STEER', WHITE], [['F'], fire ? 'GUN' : 'GUN (OFF)', fire ? RED : GREY]],
-      [[['ESC'], 'PAUSE', GREY], [['E'], fire ? 'ROCKET' : 'ROCKET (OFF)', fire ? ORANGE : GREY]],
+      [[['ESC'], 'PAUSE', GREY], [['R'], fire ? 'ROCKET' : 'ROCKET (OFF)', fire ? ORANGE : GREY]],
       [[['M'], 'MUTE', GREY], [['N'], 'MUSIC', PINK]],
     ];
     rows.forEach((r, i) => r.forEach(([keys, act, c], j) => {
@@ -2179,7 +2190,7 @@ export class Game {
       return;
     }
     const items: [string[], string, number][] = [[['↑'], 'GAS', GREEN], [['↓'], 'BRAKE', RED], [['←', '→'], 'STEER', WHITE], [['SPACE'], 'DRIFT', CYAN], [['SHIFT'], 'TURBO', ORANGE]];
-    if (fire) items.push([['F'], 'GUN', RED], [['E'], 'ROCKET', ORANGE]);
+    if (fire) items.push([['F'], 'GUN', RED], [['R'], 'ROCKET', ORANGE]);
     const width = (it: [string[], string, number]) => it[0].reduce((a, k) => a + h.keyW(k, 18) + 3, 0) + 5 + it[1].length * 8;
     const tot = items.reduce((a, it) => a + width(it), 0) + (items.length - 1) * 18;
     let x = HUD_W / 2 - tot / 2;
@@ -2260,6 +2271,8 @@ export class Game {
       h.text('POS', px - 12, py + 8, 16, YELLOW, 'right');
       h.text(p, px, py, 32, this.place === 1 ? YELLOW : WHITE);
       h.text(`/${this.world.rivals.length + 1}`, px + p.length * 32 + 4, py + 16, 16, WHITE);
+      // the gaps that matter: the car just ahead, the car just behind, and the leader
+      this.gaps(t ? 20 : HUD_W / 2 + 96, t ? 260 : 92);
     }
     if (this.state === 'race') this.statusLine();
 
@@ -2303,7 +2316,7 @@ export class Game {
       for (let i = 0; i < 30; i++) h.rect(colX + i * 5.7, ammoY + 22, 3, 10, i < lit ? YELLOW : 0x303040);
       // rockets: the key, then a rocket per shot left
       h.text('ROCKETS', colX, rockY, 16, this.rockets ? ORANGE : 0x6a6a7a);
-      if (!t) h.keycap(colX + 170 - 18, rockY - 1, 'E');
+      if (!t) h.keycap(colX + 170 - 18, rockY - 1, 'R');
       for (let i = 0; i < this.raceRockets; i++) this.rocketIcon(colX + 4 + i * 30, rockY + 22, i < this.rockets);
       if (this.lastHitT > 0 && this.lastGunTarget !== null && this.state === 'race') {
         // the computer car you're hitting: its condition over its roof
@@ -2333,9 +2346,41 @@ export class Game {
     for (const s of starts) h.rect(x0 + ((s * SEG) / goal) * (x1 - x0) - 1, cy - 4, 4, 16, WHITE);
     const p = Math.min(1, this.pos / goal);
     h.rect(x0, cy, p * (x1 - x0), 8, PINK);
+    // everyone else: a dot in their car's paint (grey once wrecked), under your marker
+    if (this.mode !== 'arcade' && this.state !== 'attract') {
+      for (const r of this.world.rivals) {
+        const rx = x0 + Math.max(0, Math.min(1, r.d / goal)) * (x1 - x0);
+        h.rect(rx - 4, cy - 3, 8, 14, r.wrecked ? 0x404040 : 0xd0d0d0);
+        h.rect(rx - 3, cy - 2, 6, 12, r.wrecked ? 0x707070 : r.paint);
+      }
+    }
     h.rect(x0 + p * (x1 - x0) - 4, cy - 6, 8, 20, YELLOW);
     const si = Math.min(this.stage, route.stageNames.length - 1);
     h.text(`STAGE ${si + 1}  ${route.stageNames[si]}`, x1, cy + 14, 8, WHITE, 'right');
+  }
+
+  /** Who's just ahead and just behind (and the leader, if that's someone else), with the gap in metres. */
+  private gaps(x: number, y: number) {
+    const h = this.hud, me = this.pos;
+    const live = this.world.rivals.filter((r) => !r.wrecked);
+    let ahead: (typeof live)[number] | null = null, behind: (typeof live)[number] | null = null, lead: (typeof live)[number] | null = null;
+    for (const r of live) {
+      if (r.d > me && (!ahead || r.d < ahead.d)) ahead = r;
+      if (r.d <= me && (!behind || r.d > behind.d)) behind = r;
+      if (r.d > me && (!lead || r.d > lead.d)) lead = r;
+    }
+    const nm = (r: { name: string }) => r.name.slice(0, 7);
+    const m = (d: number) => `${Math.round(Math.abs(d))}M`;
+    const rows: [string, string, number, 'up' | 'down' | null][] = [];
+    if (lead && lead !== ahead) rows.push([`LEADER ${nm(lead)}`, `+${m(lead.d - me)}`, ORANGE, null]);
+    if (ahead) rows.push([nm(ahead), `+${m(ahead.d - me)}`, WHITE, 'up']);
+    if (behind) rows.push([nm(behind), `-${m(me - behind.d)}`, GREY, 'down']);
+    rows.forEach(([name, gap, c, dir], i) => {
+      const ry = y + i * 18;
+      if (dir) h.arrow(x + 5, ry + 4, dir, 8, dir === 'up' ? GREEN : RED);
+      h.text(name, x + (dir ? 16 : 0), ry, 8, c);
+      h.text(gap, x + 196, ry, 8, c, 'right');
+    });
   }
 
   /** Under the timer: catch-up on its own line, then ONE status line (most urgent first). */

@@ -23,12 +23,11 @@ npm run build    # type-check + production build into dist/
 | A / ← , D / → | Steer |
 | Space | Drift / handbrake (also confirms in menus) |
 | Enter | Insert coin / confirm |
-| R | Restart the current route |
-| Esc | Pause (Q in the pause menu quits to route select) |
+| Esc | Pause. In the pause menu, Backspace twice restarts the route (tap RESTART twice on phones) and Q quits to route select |
 | N | Next music track (car select and while racing) |
 | Shift | Turbo boost (5 per race by default) |
 | F | Fire the gun (weapons on) |
-| E | Fire a bazooka rocket (weapons on) |
+| R (or E) | Fire a bazooka rocket (weapons on) |
 | M | Mute / unmute on any screen (remembered next time) |
 
 ### Phones and tablets
@@ -62,7 +61,7 @@ screen or in the online lobby. It's on by default. Online, the host sets it for 
   get out of someone's sights.
 * **Ammo: 30 to 500 rounds per race**, set with B (or tap AMMO). The default is 200 in VS RIVALS
   and 100 online (online has its own setting; the host's applies).
-* **Bazooka: 3 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **E** (or
+* **Bazooka: 3 rockets per race** by default (ROCKETS 1 to 5, set with K or tap). Press **R** (or
   the orange **ROCKET** button on phones): your driver shoulders the bazooka and fires. The rocket
   flies straight down your line, with no auto-aim, and explodes on the first car in its path, up to
   900 m away.
@@ -143,6 +142,9 @@ the engine blows: the car rolls to a stop under black smoke and flames, and it's
 * **Top left:** score. **Top centre:** time and your position. **Top right:** the course bar and the stage you're on.
 * **Bottom left:** speed and revs. **Bottom centre:** the HP meter.
 * **Bottom right:** what you use up: turbo lamps, then (with weapons on) ammo and rockets.
+* **Next to your position:** the car just ahead and just behind you with the gap in metres (green ▲ /
+  red ▼), plus the leader if that's someone else. Every other car is a dot in its paint colour on the
+  course bar (grey once wrecked), so you can see how spread out the field is.
 * **Middle:** one status line under the timer (SLIPSTREAM, OUT OF AMMO, NO ROCKETS LEFT, with
   CATCH-UP above it) and one big message at a time under that. Urgent ones (GO!, ROCKET HIT,
   WARNING) take over; the rest wait their turn.
