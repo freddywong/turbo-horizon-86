@@ -25,7 +25,7 @@ export const ROCKET_DAMAGE = 40;
 
 // ---- player vs player (online, and the ?test=pvp mode) --------------------------
 /** Damage per round between players. No per-shooter cap: one player can wreck another. */
-export const PVP_PER_HIT = 1;
+export const PVP_PER_HIT = 0.5;
 /** Damage per rocket between players. */
 export const PVP_ROCKET_DAMAGE = 20;
 
