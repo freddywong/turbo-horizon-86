@@ -275,9 +275,9 @@ V12 at 7,000 rpm sits well above a big-block V8 at 5,000. The engine type also s
 | Flat-12 | Testarossa | smooth, silky wail |
 | V12 | Countach, Diablo, McLaren F1 | dense, rising scream |
 | Flat-plane V8 | F355 | shriek to 8,500 rpm |
-| Twin-turbo V8 | F40 | raw rasp, turbo whistle, blow-off *pssh* |
+| Twin-turbo V8 | F40 | raw rasp, turbo whoosh, blow-off *pssh* |
 | Twin-turbo flat-6 | 959 | gruff growl, turbos |
-| Turbo straight-6 | Skyline R32, Supra | smooth, whistle and blow-off |
+| Turbo straight-6 | Skyline R32, Supra | smooth, turbo whoosh and blow-off |
 | Twin-rotor rotary | RX-7 | high, buzzy brap to 9,000 rpm |
 | VTEC V6 | NSX | turns harder and louder past 5,800 rpm |
 | Big-block V8 | Boss 429, Charger, 'Cuda, Trans Am | deep, lumpy cross-plane rumble |

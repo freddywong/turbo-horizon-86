@@ -306,12 +306,13 @@ export class Audio {
   private engLfo!: OscillatorNode;
   private engLfoG!: GainNode;
   private engG!: GainNode;
-  private turboO!: OscillatorNode;
+  private turboF!: BiquadFilterNode;
   private turboG!: GainNode;
   private engVoice: EngineVoice = ENGINES.flat12;
   private lastLoad = 0;
   private lastRpm = 0;
   private spool = 0;
+  private spoolSlow = 0;
   private skidG!: GainNode;
   private delay!: DelayNode;
   muted = (() => {
@@ -366,7 +367,7 @@ export class Audio {
     this.engShape.oversample = '2x';
     this.engF = ctx.createBiquadFilter();
     this.engF.type = 'lowpass';
-    this.engF.Q.value = 4;
+    this.engF.Q.value = 1.6; // a gentle filter: a sharp resonance whined on one note at full revs
     this.engAM = ctx.createGain();
     this.engLfo = ctx.createOscillator();
     this.engLfoG = ctx.createGain();
@@ -380,12 +381,18 @@ export class Audio {
     this.engC.connect(this.engCG).connect(mix);
     mix.connect(this.engShape).connect(this.engF).connect(this.engAM).connect(this.engG).connect(this.sfx);
     // turbo whistle
-    this.turboO = ctx.createOscillator();
-    this.turboO.type = 'sine';
+    // turbo: a rush of air (band-passed noise), not a pure whistle tone, which whined at top speed
+    const air = ctx.createBufferSource();
+    air.buffer = this.noise;
+    air.loop = true;
+    this.turboF = ctx.createBiquadFilter();
+    this.turboF.type = 'bandpass';
+    this.turboF.Q.value = 2.5;
     this.turboG = ctx.createGain();
     this.turboG.gain.value = 0;
-    this.turboO.connect(this.turboG).connect(this.sfx);
-    for (const o of [this.engA, this.engB, this.engC, this.engLfo, this.turboO]) o.start();
+    air.connect(this.turboF).connect(this.turboG).connect(this.sfx);
+    air.start();
+    for (const o of [this.engA, this.engB, this.engC, this.engLfo]) o.start();
     this.applyVoice();
 
     // tyre squeal: looping band-passed noise
@@ -453,11 +460,14 @@ export class Audio {
     this.engLfoG.gain.setTargetAtTime(lope * 0.5, t, 0.05);
     this.engLfo.frequency.setTargetAtTime(Math.max(4, f * 0.11), t, 0.05);
     this.engG.gain.setTargetAtTime(on ? (0.1 + load * 0.08 + vtec * 0.03) * v.vol : 0, t, 0.08);
-    // turbos: spool up under load, whistle, and blow off when you lift at high boost
+    // turbos: spool up under load with a whoosh, and blow off when you lift at high boost. The whoosh
+    // is loudest while the boost is building and settles to a faint hiss once you're holding speed.
     if (v.turbo) {
       this.spool += ((on ? load * rpm : 0) - this.spool) * (load ? 0.04 : 0.25);
-      this.turboO.frequency.setTargetAtTime(1800 + this.spool * 3200, t, 0.05);
-      this.turboG.gain.setTargetAtTime(on ? this.spool * 0.018 * v.turbo : 0, t, 0.05);
+      this.spoolSlow += (this.spool - this.spoolSlow) * 0.02;
+      const building = Math.max(0, this.spool - this.spoolSlow);
+      this.turboF.frequency.setTargetAtTime(700 + this.spool * 1300, t, 0.08);
+      this.turboG.gain.setTargetAtTime(on ? (this.spool * 0.006 + Math.min(1, building * 4) * 0.05) * v.turbo : 0, t, 0.08);
       if (on && this.lastLoad > 0.5 && load < 0.5 && this.lastRpm > 0.55 && this.spool > 0.3) this.blowOff(v.turbo);
     } else this.turboG.gain.setTargetAtTime(0, t, 0.05);
     this.lastLoad = load;
